@@ -21,6 +21,7 @@ import { AddStudentModal } from '../modals/AddStudentModal';
 import { EditStudentModal } from '../modals/EditStudentModal';
 import { ViewStudentModal } from '../modals/ViewStudentModal';
 import { AdminHeader } from '../layout/AdminHeader';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Student {
   id: string;
@@ -44,6 +45,7 @@ interface Student {
     lastMoodCheckin?: string;
     averageMood?: number;
     riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+    profileImage?: string;
   };
   _count?: {
     chatSessions: number;
@@ -374,9 +376,15 @@ export function StudentsManagementSection() {
                     <tr key={student.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full">
-                            {getInitials(student.firstName, student.lastName)}
-                          </div>
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage 
+                              src={student.studentProfile?.profileImage || ''} 
+                              alt={`${student.firstName} ${student.lastName}`}
+                            />
+                            <AvatarFallback className="bg-blue-100 text-blue-600">
+                              {getInitials(student.firstName, student.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
                               {student.firstName} {student.lastName}

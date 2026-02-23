@@ -82,6 +82,8 @@ export class MeditationStudentRepository {
           instructor: true,
           type: true,
           status: true,
+          audioUrl: true,
+          videoUrl: true,
           createdAt: true,
           updatedAt: true,
           // Include minimal relation data for list view

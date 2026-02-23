@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { ChevronLeft, Heart, Play, Clock, User } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from "@/src/hooks/use-toast";
+import { getStudentId } from "@/src/utils/auth";
 
 interface MusicResource {
   id: string;
@@ -146,40 +148,22 @@ function SavedMusicCard({
 }
 
 export default function SavedMusicPage() {
-  const [savedMusic, setSavedMusic] = useState<MusicResource[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<CardProps | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
+  const { toast } = useToast();
 
-  // Fetch saved music on component mount
-  useEffect(() => {
-    fetchSavedMusic();
-  }, []);
-
-  const fetchSavedMusic = async () => {
-    try {
-      setLoading(true);
-      const studentId = 'student-123'; // Replace with actual student ID from auth
-      const response = await fetch(`/api/student/saved-music?studentId=${studentId}`);
-      const result = await response.json();
-      
-      if (result.success) {
-        setSavedMusic(result.data);
-        console.log('📚 Loaded saved music:', result.data.length);
-      } else {
-        toast.error(result.message || 'Failed to fetch saved music');
-      }
-    } catch (error) {
-      console.error('Error fetching saved music:', error);
-      toast.error('Failed to fetch saved music');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use SWR for data fetching
+  const fetcher = (url: string) => fetch(url).then((res) => res.json());
+  const { data: savedRes, error, isLoading } = useSWR(
+    `/api/student/saved-music?studentId=${getStudentId()}`,
+    fetcher
+  );
+  
+  const savedMusic = savedRes?.data || [];
 
   const toggleSave = async (musicId: string) => {
     try {
-      const studentId = 'student-123'; // Replace with actual student ID from auth
+      const studentId = getStudentId();
       
       const response = await fetch('/api/student/saved-music', {
         method: 'POST',
@@ -197,17 +181,26 @@ export default function SavedMusicPage() {
       if (result.success) {
         // Update local state
         if (result.isSaved) {
-          toast.success('Added to saved items');
+          toast({
+            title: 'Added to saved items'
+          });
         } else {
-          setSavedMusic(prev => prev.filter(m => m.id !== musicId));
-          toast.success('Removed from saved items');
+          toast({
+            title: 'Removed from saved items'
+          });
         }
       } else {
-        toast.error(result.message || 'Failed to save music');
+        toast({
+          title: result.message || 'Failed to save music',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       console.error('Error toggling save:', error);
-      toast.error('Failed to save music');
+      toast({
+        title: 'Failed to save music',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -239,7 +232,7 @@ export default function SavedMusicPage() {
     window.history.back();
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
@@ -274,7 +267,7 @@ export default function SavedMusicPage() {
         {/* Saved Music Grid */}
         {savedMusic.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {savedMusic.map((music) => (
+            {savedMusic.map((music: MusicResource) => (
               <SavedMusicCard
                 key={music.id}
                 id={music.id}

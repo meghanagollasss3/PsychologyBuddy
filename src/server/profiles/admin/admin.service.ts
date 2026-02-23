@@ -160,6 +160,29 @@ export class AdminService {
     }
   }
 
+  // Update admin permissions (SuperAdmin only)
+  static async updateAdminPermissions(id: string, permissions: string[]) {
+    try {
+      // Check if admin exists
+      const existingAdmin = await AdminRepository.getAdminById(id);
+      if (!existingAdmin) {
+        throw AuthError.notFound('Admin not found');
+      }
+
+      // Don't allow updating permissions for SuperAdmin
+      if (existingAdmin.role.name === 'SUPERADMIN') {
+        throw new Error('Cannot modify SuperAdmin permissions');
+      }
+
+      // Update admin permissions
+      const updatedAdmin = await AdminRepository.updateAdminPermissions(id, permissions);
+
+      return ApiResponse.success(updatedAdmin, 'Admin permissions updated successfully');
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Delete admin (SuperAdmin only)
   static async deleteAdmin(id: string) {
     try {

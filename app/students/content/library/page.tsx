@@ -13,20 +13,20 @@ export default function LibraryPage() {
   const handleShowSaves = () => {
     setShowSaves(!showSaves);
   };
-  
+   
   return (
     <div className="min-h-screen bg-[#F3F4F8]">
       <StudentLayout>
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-3 sm:px-2 md:px-6 lg:px-8 py-4 sm:py-5 lg:py-3 max-w-7xl">
         {/* Header */}
         <LibraryHeader 
-          onShowSaves={handleShowSaves}
+          onShowSaves={handleShowSaves} 
           isShowingSaves={showSaves}
         />
         
         {/* Category Tabs - Only show when not viewing saves */}
         {!showSaves && (
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <CategoryTabs 
               selectedCategory={selectedCategory}
               onCategoryChange={setSelectedCategory}

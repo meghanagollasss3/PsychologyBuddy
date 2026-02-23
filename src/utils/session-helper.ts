@@ -98,6 +98,11 @@ export async function requirePermission(req: Request, permission: string): Promi
     throw new AuthError('No session found', 401);
   }
 
+  // Super admins have all permissions
+  if (session.role === 'SUPERADMIN') {
+    return session;
+  }
+  
   // Check if user has the required permission
   const hasPermission = await AuthRepository.userHasPermission(session.userId, permission);
   

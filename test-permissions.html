@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Permissions</title>
+</head>
+<body>
+    <h1>Test Admin Permissions</h1>
+    <button onclick="setPermissions()">Set Test Permissions</button>
+    <div id="result"></div>
+    
+    <script>
+        async function setPermissions() {
+            try {
+                const response = await fetch('/api/test-permissions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        adminId: 'cmlrunsbr000jhof0vyq3c5ww'
+                    })
+                });
+                
+                const result = await response.json();
+                document.getElementById('result').innerHTML = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

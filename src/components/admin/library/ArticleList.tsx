@@ -49,6 +49,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { AdminHeader } from '../../admin/layout/AdminHeader';
 import { getAuthHeaders } from '@/src/utils/session.util';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Article {
   id: string;
@@ -58,6 +59,7 @@ interface Article {
   status: 'DRAFT' | 'PUBLISHED';
   createdAt: string;
   updatedAt: string;
+  views?: number;
   categories?: {
     id: string;
     categoryId: string;
@@ -122,6 +124,7 @@ interface Category {
 export function ArticleList() {
   const router = useRouter();
   const mountedRef = useRef(false);
+  const { toast } = useToast();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   // const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -413,9 +416,21 @@ export function ArticleList() {
 
   const handleAddCategory = async () => {
     if (!categoryForm.name.trim()) {
-      setCategoryError('Category name is required');
+      toast({
+        title: "Error",
+        description: "Please enter a category name.",
+        variant: "destructive",
+      });
       return;
     }
+    toast({
+      title: "Category Added",
+      description: `"${categoryForm.name}" has been added to categories.`,
+    });
+    // if (!categoryForm.name.trim()) {
+    //   setCategoryError('Category name is required');
+    //   return;
+    // }
     
     setCategoryError(''); // Clear error if validation passes
     
@@ -581,7 +596,7 @@ export function ArticleList() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right text-[#65758b]">
-                      {article._count?.categories || 0}
+                      {article.views || 0}
                     </TableCell>
                     <TableCell className="text-[#65758b]">
                       {new Date(article.updatedAt).toLocaleDateString('en-CA', {

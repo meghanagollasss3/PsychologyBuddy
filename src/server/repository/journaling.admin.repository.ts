@@ -28,12 +28,33 @@ export class JournalingAdminRepository {
     });
   }
 
+  static async updateJournalingConfigWithTransaction(schoolId: string, config: any, tx: any) {
+    return await tx.journalingToolConfig.upsert({
+      where: { schoolId },
+      update: config,
+      create: {
+        schoolId,
+        ...config,
+      },
+    });
+  }
+
   // Journaling Prompts Management
   static async createPrompt(text: string, moodIds: string[]) {
     return await prisma.journalingPrompt.create({
       data: {
         text,
         moodIds,
+      },
+    });
+  }
+
+  static async createGlobalPrompt(text: string, moodIds: string[]) {
+    return await prisma.journalingPrompt.create({
+      data: {
+        text,
+        moodIds,
+        // No schoolId for global prompts
       },
     });
   }
@@ -50,10 +71,21 @@ export class JournalingAdminRepository {
     });
   }
 
-  static async updatePrompt(id: string, data: { text?: string; moodIds?: string[] }) {
+  static async updatePrompt(id: string, data: { text?: string; moodIds?: string[]; isEnabled?: boolean }) {
     return await prisma.journalingPrompt.update({
       where: { id },
-      data,
+      data: {
+        ...(data.text !== undefined && { text: data.text }),
+        ...(data.moodIds !== undefined && { moodIds: data.moodIds }),
+        ...(data.isEnabled !== undefined && { isEnabled: data.isEnabled })
+      },
+    });
+  }
+
+  static async updatePromptStatus(id: string, isEnabled: boolean) {
+    return await prisma.journalingPrompt.update({
+      where: { id },
+      data: { isEnabled },
     });
   }
 
@@ -74,5 +106,15 @@ export class JournalingAdminRepository {
     });
 
     return user;
+  }
+
+  // Get all schools for global operations
+  static async getAllSchools() {
+    return await prisma.school.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+    });
   }
 }

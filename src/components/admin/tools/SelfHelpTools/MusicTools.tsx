@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Plus, Search, MoreVertical, Eye, Edit, Trash2, Upload, Play, Music, X, Check, ChevronDown, Loader2, Headphones, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +90,8 @@ export default function MusicTools({
     status: "DRAFT" as "DRAFT" | "PUBLISHED",
     category: "",
     supportedMoods: [] as string[],
-    goal: ""
+    goal: "",
+    format: "AUDIO"
   });
 
   const [categoryForm, setCategoryForm] = useState({
@@ -129,6 +130,8 @@ export default function MusicTools({
   // Dialog states
   const [isAddMusicModalOpen, setIsAddMusicModalOpen] = useState(false);
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+  const [isAddMusicTrackModalOpen, setIsAddMusicTrackModalOpen] = useState(false);
+  const [isAddMusicCategoryModalOpen, setIsAddMusicCategoryModalOpen] = useState(false);
 
   // API Functions
   const fetchMoods = async () => {
@@ -140,14 +143,13 @@ export default function MusicTools({
         setMusicMoods(moodNames);
       }
     } catch (error) {
-      console.error('Failed to fetch music moods:', error);
       toast({ title: "Error", description: "Failed to fetch music moods", variant: "destructive" });
     }
   };
 
   const fetchGoals = async () => {
     try {
-      const response = await fetch('/api/labels/goals');
+      const response = await fetch('/api/admin/music/goals');
       const data: ApiResponse<any[]> = await response.json();
       if (data.success && data.data) {
         const goalNames = data.data.map((goal: any) => goal.name);
@@ -159,7 +161,6 @@ export default function MusicTools({
         setMusicGoalsMap(goalMap);
       }
     } catch (error) {
-      console.error('Failed to fetch goals:', error);
       toast({ title: "Error", description: "Failed to fetch goals", variant: "destructive" });
     }
   };
@@ -178,7 +179,6 @@ export default function MusicTools({
         setMusicCategoriesMap(categoryMap);
       }
     } catch (error) {
-      console.error('Failed to fetch music categories:', error);
       toast({ title: "Error", description: "Failed to fetch music categories", variant: "destructive" });
     }
   };
@@ -189,7 +189,6 @@ export default function MusicTools({
       const data: ApiResponse<any> = await response.json();
       
       if (data.success && data.data) {
-        // Handle both single instruction and array of instructions
         const instruction = Array.isArray(data.data) ? data.data[0] : data.data;
         if (instruction) {
           setMusicInstructions({
@@ -198,11 +197,8 @@ export default function MusicTools({
             proTip: instruction.proTip
           });
         }
-      } else {
-        console.log('No music instruction data found');
       }
     } catch (error) {
-      console.error('Failed to fetch music instructions:', error);
       toast({ 
         title: "Error", 
         description: "Failed to fetch music instructions",
@@ -219,7 +215,6 @@ export default function MusicTools({
         setMusicResources(data.data.resources);
       }
     } catch (error) {
-      console.error('Failed to fetch music resources:', error);
       toast({ title: "Error", description: "Failed to fetch music resources", variant: "destructive" });
     }
   };
@@ -231,29 +226,27 @@ export default function MusicTools({
         status
       };
       
-      console.log('Updating music status:', { id, status, cleanPayload });
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
       
       const response = await fetch(`/api/admin/music/resources/${id}?id=${id}`, {
-        method: 'PATCH', // Music API uses PATCH, not PUT
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || 'admin@calmpath.ai', // Dynamic user ID from auth context
-          ...(user?.school?.id && { 'x-school-id': user.school.id }) // Dynamic school ID from auth context
-        },
-        body: JSON.stringify({ status }) // Only send status in body, not id
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status })
       });
       
-      console.log('Response status:', response.status);
-      
-      // Check if response is ok before parsing JSON
       if (!response.ok) {
-        console.error('Response not ok:', response.statusText);
         toast({ title: "Error", description: "Failed to update resource: " + response.statusText, variant: "destructive" });
         return;
       }
       
       const data: ApiResponse<MusicResource> = await response.json();
-      console.log('Response data:', data);
       
       if (data.success) {
         toast({ title: "Success", description: `Music resource ${status.toLowerCase()} successfully` });
@@ -262,19 +255,23 @@ export default function MusicTools({
         toast({ title: "Error", description: data.error || "Failed to update resource", variant: "destructive" });
       }
     } catch (error) {
-      console.error('Failed to update music resource:', error);
       toast({ title: "Error", description: "Failed to update music resource", variant: "destructive" });
     }
   };
 
   const deleteMusicResource = async (id: string) => {
     try {
+      const headers: Record<string, string> = {
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
+      
       const response = await fetch(`/api/admin/music/resources/${id}?id=${id}`, {
         method: 'DELETE',
-        headers: {
-          'x-user-id': user?.id || 'admin@calmpath.ai', // Dynamic user ID from auth context
-          ...(user?.school?.id && { 'x-school-id': user.school.id }) // Dynamic school ID from auth context
-        }
+        headers
       });
       const data: ApiResponse<null> = await response.json();
       if (data.success) {
@@ -284,7 +281,6 @@ export default function MusicTools({
         toast({ title: "Error", description: data.error || "Failed to delete resource", variant: "destructive" });
       }
     } catch (error) {
-      console.error('Failed to delete music resource:', error);
       toast({ title: "Error", description: "Failed to delete music resource", variant: "destructive" });
     }
   };
@@ -292,7 +288,14 @@ export default function MusicTools({
   const createMusicResource = async () => {
     setIsSubmitting(true);
     try {
-      const durationInSeconds = musicForm.duration ? parseDurationToSeconds(musicForm.duration) : undefined;
+      const durationInSeconds = musicForm.duration ? parseInt(Math.round(parseDurationToMinutes(musicForm.duration) * 60).toString()) : undefined;
+      
+      // Debug logging for duration
+      console.log('Original duration from form:', musicForm.duration);
+      console.log('Parsed duration in minutes:', parseDurationToMinutes(musicForm.duration));
+      console.log('Final duration in seconds:', durationInSeconds);
+      console.log('Duration type:', typeof durationInSeconds);
+      console.log('Is integer?:', Number.isInteger(durationInSeconds));
       
       const audioUrl = musicForm.audioUrl || musicForm.url;
       if (!audioUrl) {
@@ -307,7 +310,12 @@ export default function MusicTools({
         return;
       }
       
-      const finalUrl = audioUrl.startsWith('blob:') ? 'https://placeholder.audio/file.mp3' : audioUrl;
+      const finalUrl = audioUrl;
+      
+      // Debug logging to check URL format
+      console.log('Audio URL being sent:', finalUrl);
+      console.log('URL type:', typeof finalUrl);
+      console.log('URL starts with data:', finalUrl?.startsWith('data:'));
       
       const payload: any = {
         title: musicForm.title,
@@ -321,6 +329,7 @@ export default function MusicTools({
       if (musicForm.artist?.trim()) payload.artist = musicForm.artist;
       if (musicForm.album?.trim()) payload.album = musicForm.album;
       if (musicForm.coverImage?.trim()) payload.coverImage = musicForm.coverImage;
+      if (musicForm.thumbnail?.trim()) payload.thumbnailUrl = musicForm.thumbnail;
       if (musicForm.category && musicCategoriesMap[musicForm.category]) {
         payload.categoryIds = [musicCategoriesMap[musicForm.category]];
       }
@@ -333,13 +342,18 @@ export default function MusicTools({
         payload.schoolId = user.school.id;
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
+
       const response = await fetch('/api/admin/music/resources', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || 'admin@calmpath.ai', // Dynamic user ID from auth context
-          ...(user?.school?.id && { 'x-school-id': user.school.id }) // Dynamic school ID from auth context
-        },
+        headers,
         body: JSON.stringify(payload)
       });
       const data: ApiResponse<MusicResource> = await response.json();
@@ -361,7 +375,8 @@ export default function MusicTools({
           status: "DRAFT",
           category: "",
           supportedMoods: [],
-          goal: ""
+          goal: "",
+          format: "AUDIO"
         });
         setIsAddMusicTrackOpen?.(false);
         await fetchMusicResources();
@@ -369,7 +384,6 @@ export default function MusicTools({
         toast({ title: "Error", description: data.error || "Failed to create music resource", variant: "destructive" });
       }
     } catch (error) {
-      console.error('Failed to create music resource:', error);
       toast({ title: "Error", description: "Failed to create music resource", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -379,13 +393,18 @@ export default function MusicTools({
   const createMusicCategory = async () => {
     setIsSubmitting(true);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
+
       const response = await fetch('/api/admin/music/categories', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || 'admin@calmpath.ai', // Dynamic user ID from auth context
-          ...(user?.school?.id && { 'x-school-id': user.school.id }) // Dynamic school ID from auth context
-        },
+        headers,
         body: JSON.stringify(categoryForm)
       });
       const data: ApiResponse<any> = await response.json();
@@ -404,7 +423,6 @@ export default function MusicTools({
         toast({ title: "Error", description: data.error || "Failed to create category", variant: "destructive" });
       }
     } catch (error) {
-      console.error('Failed to create music category:', error);
       toast({ title: "Error", description: "Failed to create music category", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -419,16 +437,17 @@ export default function MusicTools({
       description: "", // MusicResource doesn't have description
       url: "", // MusicResource doesn't have url
       audioUrl: "", // MusicResource doesn't have audioUrl
-      duration: resource.duration || "",
+      duration: resource.duration?.toString() || "",
       artist: "", // MusicResource doesn't have artist
       album: "", // MusicResource doesn't have album
-      coverImage: resource.thumbnail || "",
-      thumbnail: resource.thumbnail || "",
+      coverImage: resource.coverImage || "",
+      thumbnail: resource.thumbnailUrl || "",
       isPublic: resource.isPublic || true,
       status: resource.status || "DRAFT",
       category: "",
       supportedMoods: [],
-      goal: ""
+      goal: "",
+      format: "AUDIO"
     });
     setIsEditMusicTrackOpen(true);
   };
@@ -438,7 +457,7 @@ export default function MusicTools({
     
     setIsSubmitting(true);
     try {
-      const durationInSeconds = musicForm.duration ? parseDurationToSeconds(musicForm.duration) : undefined;
+      const durationInSeconds = musicForm.duration ? Math.round(parseDurationToMinutes(musicForm.duration) * 60) : undefined;
       
       const audioUrl = musicForm.audioUrl || musicForm.url;
       if (!audioUrl) {
@@ -453,7 +472,12 @@ export default function MusicTools({
         return;
       }
       
-      const finalUrl = audioUrl.startsWith('blob:') ? 'https://placeholder.audio/file.mp3' : audioUrl;
+      const finalUrl = audioUrl;
+      
+      // Debug logging to check URL format
+      console.log('Update Audio URL being sent:', finalUrl);
+      console.log('URL type:', typeof finalUrl);
+      console.log('URL starts with data:', finalUrl?.startsWith('data:'));
       
       const payload: any = {
         id: selectedMusicResource.id,
@@ -468,6 +492,7 @@ export default function MusicTools({
       if (musicForm.artist?.trim()) payload.artist = musicForm.artist;
       if (musicForm.album?.trim()) payload.album = musicForm.album;
       if (musicForm.coverImage?.trim()) payload.coverImage = musicForm.coverImage;
+      if (musicForm.thumbnail?.trim()) payload.thumbnailUrl = musicForm.thumbnail;
       if (musicForm.category && musicCategoriesMap[musicForm.category]) {
         payload.categoryIds = [musicCategoriesMap[musicForm.category]];
       }
@@ -480,13 +505,18 @@ export default function MusicTools({
         payload.schoolId = user.school.id;
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
+
       const response = await fetch(`/api/admin/music/resources/${selectedMusicResource.id}?id=${selectedMusicResource.id}`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || 'admin@calmpath.ai', // Dynamic user ID from auth context
-          ...(user?.school?.id && { 'x-school-id': user.school.id }) // Dynamic school ID from auth context
-        },
+        headers,
         body: JSON.stringify(payload)
       });
       const data: ApiResponse<MusicResource> = await response.json();
@@ -510,14 +540,14 @@ export default function MusicTools({
           status: "DRAFT",
           category: "",
           supportedMoods: [],
-          goal: ""
+          goal: "",
+          format: "AUDIO"
         });
         await fetchMusicResources();
       } else {
         toast({ title: "Error", description: data.error || "Failed to update music resource", variant: "destructive" });
       }
     } catch (error) {
-      console.error('Failed to update music resource:', error);
       toast({ title: "Error", description: "Failed to update music resource", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -548,12 +578,18 @@ export default function MusicTools({
   }, []);
 
   // Utility functions
-  const parseDurationToSeconds = (duration: string): number => {
-    const parts = duration.split(':');
-    if (parts.length === 2) {
-      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  const parseDurationToMinutes = (duration: string): number => {
+    // Handle different input formats
+    if (duration.includes(':')) {
+      // Convert MM:SS to minutes (decimal)
+      const parts = duration.split(':');
+      const minutes = parseInt(parts[0]) || 0;
+      const seconds = parseInt(parts[1]) || 0;
+      return minutes + (seconds / 60);
     }
-    return parseInt(duration) || 0;
+    // Handle plain number input (already in minutes)
+    const parsed = parseFloat(duration);
+    return isNaN(parsed) ? 0 : parsed;
   };
 
   const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -571,38 +607,69 @@ export default function MusicTools({
     }
   };
 
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAudioUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: string,
+  ) => {
     const file = e.target.files?.[0];
     if (file) {
-      const audioUrl = URL.createObjectURL(file);
-      
-      const audio = new Audio();
-      audio.src = audioUrl;
-      
-      audio.addEventListener('loadedmetadata', () => {
-        const duration = Math.floor(audio.duration);
-        const minutes = Math.floor(duration / 60);
-        const seconds = duration % 60;
-        const durationString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        
-        setMusicForm(prev => ({ 
-          ...prev, 
-          audioUrl: audioUrl,
-          duration: durationString
-        }));
-      });
-      
-      audio.addEventListener('error', () => {
-        // Fallback duration estimate
-        const durationString = `${Math.floor(file.size / 100000)}s`;
-        setMusicForm(prev => ({ 
-          ...prev, 
-          audioUrl: audioUrl,
-          duration: durationString
-        }));
-      });
-      
-      toast({ title: "Audio Uploaded", description: `Audio file "${file.name}" uploaded successfully` });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (type === "meditation" || type === "edit") {
+          const url = reader.result as string;
+
+          // Get actual duration for audio files
+          if (file.type.startsWith("audio/")) {
+            const audio = new Audio(url);
+            audio.addEventListener("loadedmetadata", () => {
+              const durationInSeconds = Math.floor(audio.duration);
+              const durationInMinutes = Math.round((durationInSeconds / 60) * 100) / 100;
+
+              setMusicForm((prev) => ({
+                ...prev,
+                audioUrl: url,
+                videoUrl: url,
+                duration: durationInMinutes.toString(),
+              }));
+              toast({
+                title: "File Uploaded",
+                description: `${musicForm.format.toLowerCase()} file "${file.name}" uploaded successfully`,
+              });
+            });
+
+            audio.addEventListener("error", () => {
+              // Fallback to file size estimate if audio metadata fails
+              const durationInMinutes = Math.round((file.size / 6000000) * 100) / 100; // Rough estimate: 1MB ≈ 1 minute
+              setMusicForm((prev) => ({
+                ...prev,
+                audioUrl: url,
+                videoUrl: url,
+                duration: durationInMinutes.toString(),
+              }));
+              toast({
+                title: "File Uploaded",
+                description: `${musicForm.format.toLowerCase()} file "${file.name}" uploaded successfully`,
+              });
+            });
+          } else {
+            // For non-audio files, use file size estimate
+            const durationInMinutes = (file.size / 6000000).toFixed(2); // Rough estimate: 1MB ≈ 1 minute
+            setMusicForm((prev) => ({
+              ...prev,
+              audioUrl: url,
+              videoUrl: url,
+              duration: durationInMinutes.toString(),
+            }));
+            toast({
+              title: "File Uploaded",
+              description: `${musicForm.format.toLowerCase()} file "${file.name}" uploaded successfully`,
+            });
+          }
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -635,7 +702,7 @@ export default function MusicTools({
       // Update the form and save to database
       setInstructionsForm((prev) => ({
         ...prev,
-        points: updatedPoints,
+        points: updatedPoints
       }));
 
       // Save the updated instruction
@@ -647,13 +714,28 @@ export default function MusicTools({
           description: point
         }));
 
+      // Validate that at least one step exists
+      if (steps.length === 0) {
+        toast({
+          title: "Error",
+          description: "At least one instruction step is required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
+
       const response = await fetch('/api/admin/music/instructions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || 'admin@calmpath.ai',
-          ...(user?.school?.id && { 'x-school-id': user.school.id })
-        },
+        headers,
         body: JSON.stringify({
           title: musicInstructions.title,
           description: musicInstructions.title,
@@ -683,7 +765,6 @@ export default function MusicTools({
         });
       }
     } catch (error) {
-      console.error("Failed to delete music step:", error);
       toast({
         title: "Error",
         description: "Failed to delete step",
@@ -695,13 +776,18 @@ export default function MusicTools({
   const handleDeleteInstructions = async () => {
     try {
       // Delete ALL music instructions from database
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
+
       const response = await fetch('/api/admin/music/instructions', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || 'admin@calmpath.ai',
-          ...(user?.school?.id && { 'x-school-id': user.school.id })
-        }
+        headers
       });
       
       if (response.ok) {
@@ -718,7 +804,6 @@ export default function MusicTools({
         });
       }
     } catch (error) {
-      console.error('Failed to delete music instructions:', error);
       toast({ 
         title: "Error", 
         description: "Failed to delete instructions",
@@ -762,13 +847,28 @@ export default function MusicTools({
           description: point
         }));
 
+      // Validate that at least one step exists
+      if (steps.length === 0) {
+        toast({
+          title: "Error",
+          description: "At least one instruction step is required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-user-id': user?.id || 'admin@calmpath.ai'
+      };
+      
+      if (user?.school?.id) {
+        headers['x-school-id'] = user.school.id;
+      }
+
       const response = await fetch('/api/admin/music/instructions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || 'admin@calmpath.ai',
-          ...(user?.school?.id && { 'x-school-id': user.school.id })
-        },
+        headers,
         body: JSON.stringify({
           title: instructionsForm.title || "Listening Instructions",
           description: instructionsForm.title || "Music listening instructions for therapy sessions",
@@ -866,22 +966,39 @@ export default function MusicTools({
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 mb-3">
-                {resource.categories?.map((cat) => (
-                  <Badge key={cat.category.name} variant="outline" className="text-xs">{cat.category.name}</Badge>
-                ))}
-                {resource.duration && <span className="text-xs text-[#64748B]">{resource.duration}</span>}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#64748B]">{resource.learnerCount || 0} learners</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant={resource.status === "PUBLISHED" ? "default" : "secondary"} className="text-xs">
-                    {resource.status.toLowerCase()}
-                  </Badge>
-                  <Switch 
-                    checked={resource.status === "PUBLISHED"} 
-                    onCheckedChange={() => updateMusicResourceStatus(resource.id, resource.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED")}
-                  />
+              <div className="flex items-start gap-3">
+                <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                  {resource.thumbnailUrl ? (
+                    <img src={resource.thumbnailUrl} alt={resource.title} className="w-full h-full object-cover" />
+                  ) : resource.coverImage ? (
+                    <img src={resource.coverImage} alt={resource.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Music className="h-6 w-6 text-[#3B82F6]" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-foreground mb-1 truncate">{resource.title}</h4>
+                  <p className="text-sm text-muted-foreground mb-2 truncate">{resource.subtitle || "Music resource"}</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    {resource.categories?.map((cat) => (
+                      <Badge key={cat.category.name} variant="outline" className="text-xs">{cat.category.name}</Badge>
+                    ))}
+                    {resource.duration && <span className="text-xs text-[#64748B]">{resource.duration}</span>}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-[#64748B]">{resource.learnerCount || 0} learners</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={resource.status === "PUBLISHED" ? "default" : "secondary"} className="text-xs">
+                        {resource.status.toLowerCase()}
+                      </Badge>
+                      <Switch 
+                        checked={resource.status === "PUBLISHED"} 
+                        onCheckedChange={() => updateMusicResourceStatus(resource.id, resource.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED")}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -996,39 +1113,79 @@ export default function MusicTools({
                 <Input value={musicForm.subtitle} onChange={(e) => setMusicForm(prev => ({ ...prev, subtitle: e.target.value }))} placeholder="Short subtitle" />
               </div>
               <div className="grid gap-2">
-                <Label>Upload Audio</Label>
-                <div 
-                  className={`relative border-2 border-dashed ${musicForm.audioUrl ? 'border-[#3B82F6]/20 bg-[#3B82F6]/5' : 'border-[#E2E8F0] rounded-lg'} p-6 text-center cursor-pointer transition-all duration-200 hover:border-[#3B82F6]/50`}
-                  onClick={() => document.getElementById('music-audio')?.click()}
+                <Label>Format</Label>
+                <Select
+                  value={musicForm.format}
+                  onValueChange={(v: "AUDIO" | "VIDEO" | "TEXT") =>
+                    setMusicForm((prev) => ({ ...prev, format: v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUDIO">Audio</SelectItem>
+                    <SelectItem value="VIDEO">Video</SelectItem>
+                    <SelectItem value="TEXT">Text</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>
+                  Upload{" "}
+                  {musicForm.format === "VIDEO"
+                    ? "Video"
+                    : musicForm.format === "AUDIO"
+                      ? "Audio"
+                      : "Text"}
+                </Label>
+                <div
+                  className="border-2 border-dashed border-[#E2E8F0] rounded-lg p-4 text-center cursor-pointer hover:border-[#3B82F6]/50"
+                  onClick={() => fileInputRef.current?.click()}
                 >
                   {musicForm.audioUrl ? (
                     <div className="space-y-2">
-                      <audio 
-                        src={musicForm.audioUrl} 
-                        className="w-full h-16 rounded-md"
-                        controls
-                      />
-                      <div className="flex items-center justify-center text-xs text-[#65758b]">
-                        <Music className="h-4 w-4 mr-1" />
-                        <span>Audio uploaded successfully</span>
+                      <div className="h-6 w-6 mx-auto text-green-600">
+                        <svg
+                          className="w-full h-full"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8.586 9H15a1 1 0 110 2H8.586l4.707 4.707a1 1 0 001.414-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
                       </div>
+                      <p className="text-xs text-green-600 font-medium">
+                        File uploaded successfully
+                      </p>
+                      <p className="text-xs text-[#64748B]">
+                        {musicForm.duration}
+                      </p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <Music className="h-8 w-8 mx-auto text-[#65758b]" />
-                      <p className="text-xs text-[#65758b] mt-1">Click to upload audio file</p>
+                    <div className="space-y-1">
+                      <Upload className="h-6 w-6 mx-auto text-[#64748B]" />
+                      <p className="text-xs text-[#64748B]">
+                        Click to upload {musicForm.format.toLowerCase()}{" "}
+                        file
+                      </p>
                     </div>
                   )}
-                  <input 
-                    id="music-audio" 
-                    type="file" 
-                    accept="audio/*" 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                    onChange={handleAudioUpload} 
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleAudioUpload(e, "meditation");
+                    }}
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Duration: {musicForm.duration}</p>
+              <p className="text-xs text-muted-foreground">Duration: {musicForm.duration} minutes</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Category</Label>
@@ -1112,7 +1269,6 @@ export default function MusicTools({
                                     toast({ title: "Error", description: result.error || "Failed to create music mood", variant: "destructive" });
                                   }
                                 } catch (error) {
-                                  console.error('Error creating music mood:', error);
                                   toast({ title: "Error", description: "Failed to create music mood", variant: "destructive" });
                                 }
                               } 
@@ -1149,10 +1305,13 @@ export default function MusicTools({
                               e.stopPropagation(); 
                               if (newGoal.trim() && !musicGoals.includes(newGoal.trim())) { 
                                 try {
-                                  const response = await fetch('/api/labels/goals', {
+                                  const response = await fetch('/api/admin/music/goals', {
                                     method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ name: newGoal.trim(), status: 'active' })
+                                    headers: { 
+                                      'Content-Type': 'application/json',
+                                      'x-user-id': user?.id || 'admin@calmpath.ai'
+                                    },
+                                    body: JSON.stringify({ name: newGoal.trim(), status: 'ACTIVE' })
                                   });
                                   const result = await response.json();
                                   if (result.success) {
@@ -1163,7 +1322,6 @@ export default function MusicTools({
                                     toast({ title: "Error", description: result.error || "Failed to create goal", variant: "destructive" });
                                   }
                                 } catch (error) {
-                                  console.error('Error creating goal:', error);
                                   toast({ title: "Error", description: "Failed to create goal", variant: "destructive" });
                                 }
                               } 
@@ -1196,8 +1354,9 @@ export default function MusicTools({
                         className="hidden" 
                         onLoadedMetadata={(e) => {
                           const audio = e.target as HTMLAudioElement;
-                          const duration = Math.floor(audio.duration);
-                          setMusicForm(prev => ({ ...prev, duration: `${duration}s` }));
+                          const durationInSeconds = Math.floor(audio.duration);
+                          const durationInMinutes = Math.round((durationInSeconds / 60) * 100) / 100;
+                          setMusicForm(prev => ({ ...prev, duration: durationInMinutes.toString() }));
                         }}
                       />
                     )}
@@ -1279,39 +1438,79 @@ export default function MusicTools({
                 <Input value={musicForm.subtitle} onChange={(e) => setMusicForm(prev => ({ ...prev, subtitle: e.target.value }))} placeholder="Short subtitle" />
               </div>
               <div className="grid gap-2">
-                <Label>Upload Audio</Label>
-                <div 
-                  className={`relative border-2 border-dashed ${musicForm.audioUrl ? 'border-primary/20 bg-primary/5' : 'border-border rounded-lg'} p-6 text-center cursor-pointer transition-all duration-200 hover:border-primary/50`}
-                  onClick={() => document.getElementById('edit-music-audio')?.click()}
+                <Label>Format</Label>
+                <Select
+                  value={musicForm.format}
+                  onValueChange={(v: "AUDIO" | "VIDEO" | "TEXT") =>
+                    setMusicForm((prev) => ({ ...prev, format: v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUDIO">Audio</SelectItem>
+                    <SelectItem value="VIDEO">Video</SelectItem>
+                    <SelectItem value="TEXT">Text</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>
+                  Upload{" "}
+                  {musicForm.format === "VIDEO"
+                    ? "Video"
+                    : musicForm.format === "AUDIO"
+                      ? "Audio"
+                      : "Text"}
+                </Label>
+                <div
+                  className="border-2 border-dashed border-[#E2E8F0] rounded-lg p-4 text-center cursor-pointer hover:border-[#3B82F6]/50"
+                  onClick={() => fileInputRef.current?.click()}
                 >
                   {musicForm.audioUrl ? (
                     <div className="space-y-2">
-                      <audio 
-                        src={musicForm.audioUrl} 
-                        className="w-full h-16 rounded-md"
-                        controls
-                      />
-                      <div className="flex items-center justify-center text-xs text-[#65758b]">
-                        <Music className="h-4 w-4 mr-1" />
-                        <span>Audio uploaded successfully</span>
+                      <div className="h-6 w-6 mx-auto text-green-600">
+                        <svg
+                          className="w-full h-full"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8.586 9H15a1 1 0 110 2H8.586l4.707 4.707a1 1 0 001.414-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
                       </div>
+                      <p className="text-xs text-green-600 font-medium">
+                        File uploaded successfully
+                      </p>
+                      <p className="text-xs text-[#64748B]">
+                        {musicForm.duration}
+                      </p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <Music className="h-8 w-8 mx-auto text-[#65758b]" />
-                      <p className="text-xs text-[#65758b] mt-1">Click to upload audio file</p>
+                    <div className="space-y-1">
+                      <Upload className="h-6 w-6 mx-auto text-[#64748B]" />
+                      <p className="text-xs text-[#64748B]">
+                        Click to upload {musicForm.format.toLowerCase()}{" "}
+                        file
+                      </p>
                     </div>
                   )}
-                  <input 
-                    id="edit-music-audio" 
-                    type="file" 
-                    accept="audio/*" 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                    onChange={handleAudioUpload} 
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleAudioUpload(e, "edit");
+                    }}
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Duration: {musicForm.duration}</p>
+              <p className="text-xs text-muted-foreground">Duration: {musicForm.duration} minutes</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Category</Label>
@@ -1381,13 +1580,18 @@ export default function MusicTools({
                               e.stopPropagation(); 
                               if (newMood.trim() && !musicMoods.includes(newMood.trim())) { 
                                 try {
+                                  const headers: Record<string, string> = {
+                                    'Content-Type': 'application/json',
+                                    'x-user-id': user?.id || 'admin@calmpath.ai'
+                                  };
+                                  
+                                  if (user?.school?.id) {
+                                    headers['x-school-id'] = user.school.id;
+                                  }
+
                                   const response = await fetch('/api/admin/music/moods', {
                                     method: 'POST',
-                                    headers: { 
-                                      'Content-Type': 'application/json',
-                                      'x-user-id': user?.id || 'admin@calmpath.ai',
-                                      ...(user?.school?.id && { 'x-school-id': user.school.id })
-                                    },
+                                    headers,
                                     body: JSON.stringify({ name: newMood.trim(), status: 'ACTIVE' })
                                   });
                                   const result = await response.json();
@@ -1399,7 +1603,6 @@ export default function MusicTools({
                                     toast({ title: "Error", description: result.error || "Failed to create music mood", variant: "destructive" });
                                   }
                                 } catch (error) {
-                                  console.error('Error creating music mood:', error);
                                   toast({ title: "Error", description: "Failed to create music mood", variant: "destructive" });
                                 }
                               } 
@@ -1436,14 +1639,13 @@ export default function MusicTools({
                               e.stopPropagation(); 
                               if (newGoal.trim() && !musicGoals.includes(newGoal.trim())) { 
                                 try {
-                                  const response = await fetch('/api/labels/goals', {
+                                  const response = await fetch('/api/admin/music/goals', {
                                     method: 'POST',
                                     headers: { 
                                       'Content-Type': 'application/json',
-                                      'x-user-id': user?.id || 'admin@calmpath.ai',
-                                      ...(user?.school?.id && { 'x-school-id': user.school.id })
+                                      'x-user-id': user?.id || 'admin@calmpath.ai'
                                     },
-                                    body: JSON.stringify({ name: newGoal.trim(), status: 'active' })
+                                    body: JSON.stringify({ name: newGoal.trim(), status: 'ACTIVE' })
                                   });
                                   const result = await response.json();
                                   if (result.success) {
@@ -1454,7 +1656,6 @@ export default function MusicTools({
                                     toast({ title: "Error", description: result.error || "Failed to create goal", variant: "destructive" });
                                   }
                                 } catch (error) {
-                                  console.error('Error creating goal:', error);
                                   toast({ title: "Error", description: "Failed to create goal", variant: "destructive" });
                                 }
                               } 
@@ -1487,8 +1688,9 @@ export default function MusicTools({
                         className="hidden" 
                         onLoadedMetadata={(e) => {
                           const audio = e.target as HTMLAudioElement;
-                          const duration = Math.floor(audio.duration);
-                          setMusicForm(prev => ({ ...prev, duration: `${duration}s` }));
+                          const durationInSeconds = Math.floor(audio.duration);
+                          const durationInMinutes = Math.round((durationInSeconds / 60) * 100) / 100;
+                          setMusicForm(prev => ({ ...prev, duration: durationInMinutes.toString() }));
                         }}
                       />
                     )}

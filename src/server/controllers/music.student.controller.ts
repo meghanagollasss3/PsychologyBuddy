@@ -19,33 +19,14 @@ export async function getMusicResources(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const queryData = Object.fromEntries(searchParams.entries());
     const validatedData = StudentGetMusicResourcesSchema.parse(queryData);
-    
-    console.log('Student getMusicResources - queryData:', queryData);
-    console.log('Student getMusicResources - validatedData:', validatedData);
 
     // Add user context
     const contextData = {
       ...validatedData,
       // Don't pass schoolId placeholder - let repository handle null schoolId
     };
-    
-    console.log('Student getMusicResources - contextData:', contextData);
 
     const result = await musicStudentService.getMusicResources(contextData);
-    console.log('Student getMusicResources - result:', result);
-    
-    // Log the actual resources data to check coverImage field
-    if (result.success && result.data?.resources) {
-      console.log('Resources with coverImage data:');
-      result.data.resources.forEach((resource: any, index: number) => {
-        console.log(`Resource ${index + 1}:`, {
-          id: resource.id,
-          title: resource.title,
-          coverImage: resource.coverImage,
-          hasCoverImage: !!resource.coverImage
-        });
-      });
-    }
 
     if (result.success) {
       return NextResponse.json(result);

@@ -18,7 +18,7 @@ interface CategoryTabsProps {
 const defaultIconMap: Record<string, any> = {
   'Emotional Intelligence': Smile,
   'Stress Management': Frown,
-  'Growth': TrendingUp,
+  'Growth': TrendingUp, 
   'Wellness': Coffee,
   'Social Skill': Users,
 };
@@ -68,10 +68,10 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange }: Cat
 
   if (loading) {
     return (
-      <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-        <div className="flex items-center gap-3 min-w-max">
+      <div className="w-full overflow-x-auto pb-2 sm:pb-4 scrollbar-hide">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-max">
           {[...Array(6)].map((_, index) => (
-            <div key={index} className="h-14 px-6 rounded-2xl bg-gray-200 animate-pulse w-24"></div>
+            <div key={index} className="h-10 sm:h-12 lg:h-14 px-3 sm:px-4 lg:px-6 rounded-xl sm:rounded-2xl bg-gray-200 animate-pulse w-20 sm:w-24"></div>
           ))}
         </div>
       </div>
@@ -79,8 +79,8 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange }: Cat
   }
 
   return (
-    <div className="w-full ml-[2px] overflow-x-auto pb-4 scrollbar-hide">
-      <div className="flex items-center gap-3 min-w-max h-[66px]">
+    <div className="w-full ml-[2px] overflow-x-auto pb-2 sm:pb-4 scrollbar-hide">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-max h-10 sm:h-12 lg:h-[66px]">
         {allCategories.map((cat) => {
           const Icon = defaultIconMap[cat.name];
           const isActive = selectedCategory === cat.id;
@@ -91,15 +91,16 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange }: Cat
               
               onClick={() => onCategoryChange(cat.id)}
               className={`
-                h-14 px-6 rounded-[16px] flex items-center gap-3 font-base transition-all shadow-sm border
+                h-10 sm:h-12 lg:h-14 px-3 sm:px-4 lg:px-6 rounded-xl sm:rounded-[16px] flex items-center gap-2 sm:gap-3 font-base transition-all shadow-sm border text-xs sm:text-sm lg:text-base
                 ${isActive 
                   ? 'bg-[#1C76DC] text-white' 
                   : 'bg-white text-slate-600 border-slate-200 hover:shadow-md'
                 }
               `}
             >
-              {Icon && <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />}
-              <span>{cat.name}</span>
+              {Icon && <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />}
+              <span className="hidden xs:block sm:block">{cat.name}</span>
+              <span className="block xs:hidden sm:hidden text-xs">{cat.name.length > 10 ? cat.name.substring(0, 8) + '...' : cat.name}</span>
             </button>
           );
         })}

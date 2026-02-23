@@ -1,181 +1,315 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Filter, 
-  Eye, 
-  Edit, 
-  Trash2,
-  UserPlus,
-  Calendar,
-  Shield,
-  Building2,
-  Settings,
-  Key
+
+import {
+  Plus, Search, MoreVertical, Edit, Trash2, Shield, Eye, Users
 } from 'lucide-react';
+
 import { AddAdminModal } from '../modals/AddAdminModal';
 import { EditAdminModal } from '../modals/EditAdminModal';
 import { ViewAdminModal } from '../modals/ViewAdminModal';
-import { ManagePermissionsModal } from '../modals/ManagePermissionsModal';
-import { Admin, Role } from '@/src/types/admin.types';
+
+import { Admin } from '@/src/types/admin.types';
 import { AdminHeader } from '../layout/AdminHeader';
 
+import {
+  Avatar, AvatarFallback, AvatarImage
+} from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from '@/components/ui/table';
+
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle
+} from '@/components/ui/dialog';
+
+import { cn } from '@/lib/utils';
+import { useToast } from '@/src/hooks/use-toast';
+
+///////////////////////////////////////////////////////////////////////////
+// CONSTANTS
+///////////////////////////////////////////////////////////////////////////
+
+const DEV_LOG = false; // Set true if you want logs
+
+const PERMISSION_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  activity: "Activity",
+  contentManagement: "Psycho-Education Library",
+  selfHelp: "Self-help Tools",
+  analytics: "Analytics & Reports",
+  userManagement: "User Management",
+  alerts: "Escalation & Alerts",
+  gamification: "Badges & Streaks",
+  settings: "Settings",
+};
+
+const PERMISSION_MAP: Record<string, string> = {
+  dashboard: 'dashboard.view',
+  activity: 'activity.view',
+  contentManagement: 'psycho.education.view',
+  selfHelp: 'selfhelp.view',
+  analytics: 'analytics.view',
+  userManagement: 'users.view',
+  alerts: 'escalations.view',
+  gamification: 'badges.view',
+  settings: 'settings.view',
+};
+
+const REVERSE_PERMISSION_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(PERMISSION_MAP).map(([ui, perm]) => [perm, ui])
+);
+
+const ROLE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  "SUPERADMIN": { bg: "bg-[#3B82F6]/10", text: "text-[#3B82F6]", label: "Super Admin" },
+  "ADMIN": { bg: "bg-[#3B82F6]/10", text: "text-[#3B82F6]", label: "Admin" },
+  // Default fallback for unknown roles
+  "DEFAULT": { bg: "bg-gray-100", text: "text-gray-600", label: "Unknown Role" },
+};
+
+///////////////////////////////////////////////////////////////////////////
+// UTILITY HELPERS
+///////////////////////////////////////////////////////////////////////////
+
+const extractAdminPermissionKeys = (admin: Admin): Record<string, boolean> => {
+  const adminPerms = admin.adminProfile?.adminPermissions || [];
+
+  const permNames = adminPerms.map((ap: any) => {
+    if (typeof ap === 'string') return ap;
+    return ap.permission?.name || ap.name || '';
+  });
+
+  const result: Record<string, boolean> = {};
+
+  Object.keys(PERMISSION_MAP).forEach((key) => {
+    const permString = PERMISSION_MAP[key];
+    result[key] = permNames.includes(permString);
+  });
+
+  return result;
+};
+
+///////////////////////////////////////////////////////////////////////////
+// MAIN COMPONENT
+///////////////////////////////////////////////////////////////////////////
+
 export function AdminManagementSection() {
+  const { toast } = useToast();
+  const { user, refreshUser } = useAuth();
+
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [schoolFilter, setSchoolFilter] = useState<string>('all');
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  const [editedPermissions, setEditedPermissions] = useState<Record<string, boolean>>({});
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
+
   const [schools, setSchools] = useState<any[]>([]);
-  
-  const { user } = useAuth();
+
   const { hasPermission } = usePermissions();
 
-  // Permission checks
   const canCreateAdmins = hasPermission('users.create');
   const canViewAdmins = hasPermission('users.view');
   const canUpdateAdmins = hasPermission('users.update');
-  const canDeleteAdmins = hasPermission('users.delete');
   const canManagePermissions = hasPermission('permissions.manage');
+
+  ///////////////////////////////////////////////////////////////////////////
+  // FETCH ADMINS
+  ///////////////////////////////////////////////////////////////////////////
+
+  const fetchAdmins = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(`/api/admins`, { credentials: 'include' });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data.success) setAdmins(data.data || []);
+
+    } catch (err) {
+      console.error("Error fetching admins:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // FETCH SCHOOLS
+  ///////////////////////////////////////////////////////////////////////////
+
+  const fetchSchools = useCallback(async () => {
+    try {
+      const response = await fetch('/api/schools', { credentials: 'include' });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data.success) setSchools(data.data);
+
+    } catch (err) {
+      console.error("Error fetching schools:", err);
+    }
+  }, []);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // INITIAL LOAD
+  ///////////////////////////////////////////////////////////////////////////
 
   useEffect(() => {
     if (canViewAdmins) {
       fetchAdmins();
-      if (user?.role?.name === 'SUPERADMIN') {
-        fetchSchools();
-      }
+      if (user?.role?.name === 'SUPERADMIN') fetchSchools();
     }
-  }, [canViewAdmins]);
+  }, [canViewAdmins, fetchAdmins, fetchSchools]);
 
-  const fetchAdmins = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (schoolFilter !== 'all') params.append('schoolId', schoolFilter);
+  ///////////////////////////////////////////////////////////////////////////
+  // FILTER ADMINS (MEMOIZED)
+  ///////////////////////////////////////////////////////////////////////////
 
-      const response = await fetch(`/api/admins?${params.toString()}`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to fetch admins:', response.status);
-        return;
-      }
-      
-      const data = await response.json();
-      console.log('Admins API response:', data);
-      
-      if (data.success) {
-        setAdmins(data.data || []);
-        console.log('Admins loaded:', data.data?.length || 0);
-      } else {
-        console.error('API returned error:', data);
-      }
-    } catch (error) {
-      console.error('Error fetching admins:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filteredAdmins = useMemo(() => {
+    return admins.filter((admin) => {
+      const term = searchTerm.toLowerCase();
+      return (
+        admin.firstName.toLowerCase().includes(term) ||
+        admin.lastName.toLowerCase().includes(term) ||
+        admin.email.toLowerCase().includes(term)
+      );
+    });
+  }, [admins, searchTerm]);
 
-  const fetchSchools = async () => {
-    try {
-      const response = await fetch('/api/schools', {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to fetch schools:', response.status);
-        return;
-      }
-      
-      const data = await response.json();
-      if (data.success) {
-        setSchools(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching schools:', error);
-    }
-  };
+  ///////////////////////////////////////////////////////////////////////////
+  // DELETE ADMIN
+  ///////////////////////////////////////////////////////////////////////////
 
-  const handleAddAdmin = () => {
-    setSelectedAdmin(null);
-    setShowAddModal(true);
-  };
-
-  const handleEditAdmin = (admin: Admin) => {
-    setSelectedAdmin(admin);
-    setShowEditModal(true);
-  };
-
-  const handleViewAdmin = (admin: Admin) => {
-    setSelectedAdmin(admin);
-    setShowViewModal(true);
-  };
-
-  const handleManagePermissions = (admin: Admin) => {
-    setSelectedAdmin(admin);
-    setShowPermissionsModal(true);
-  };
-
-  const handleDeleteAdmin = async (adminId: string) => {
-    if (!confirm('Are you sure you want to deactivate this admin?')) return;
+  const deleteAdmin = useCallback(async () => {
+    if (!selectedAdmin) return;
 
     try {
-      const response = await fetch(`/api/admins/${adminId}`, {
+      const response = await fetch(`/api/admins/${selectedAdmin.id}`, {
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
       });
-      
-      if (!response.ok) {
-        console.error('Failed to delete admin:', response.status);
-        alert('Failed to delete admin');
-        return;
-      }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
+        toast({ title: "Admin Removed", description: "Admin removed successfully." });
         fetchAdmins();
-        alert('Admin deleted successfully!');
       } else {
-        alert(data.error?.message || 'Failed to delete admin');
+        toast({ title: "Error", description: data.error?.message, variant: "destructive" });
       }
-    } catch (error) {
-      console.error('Error deleting admin:', error);
-      alert('Failed to delete admin');
+
+    } catch (err) {
+      console.error("Delete error:", err);
     }
-  };
+  }, [selectedAdmin, fetchAdmins, toast]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'text-green-600 bg-green-50';
-      case 'INACTIVE': return 'text-gray-600 bg-gray-50';
-      case 'SUSPENDED': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
+  ///////////////////////////////////////////////////////////////////////////
+  // MANAGE PERMISSIONS
+  ///////////////////////////////////////////////////////////////////////////
+
+  const openPermissions = useCallback(async (admin: Admin) => {
+    try {
+      const res = await fetch(`/api/admins/${admin.id}`, { credentials: 'include' });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+
+          const updatedAdmin = data.data;
+          setSelectedAdmin(updatedAdmin);
+
+          const keys = extractAdminPermissionKeys(updatedAdmin);
+          setEditedPermissions(keys);
+
+          setShowPermissionsModal(true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Fetch admin error:", e);
     }
-  };
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  };
+    // fallback
+    setSelectedAdmin(admin);
+    setEditedPermissions(extractAdminPermissionKeys(admin));
+    setShowPermissionsModal(true);
+  }, []);
 
-  const getPermissionCount = (permissions: string[] | undefined) => {
-    if (!permissions) return '0/7 features';
-    return `${permissions.length}/7 features`;
-  };
+  ///////////////////////////////////////////////////////////////////////////
+  // SAVE PERMISSIONS (OPTIMIZED)
+  ///////////////////////////////////////////////////////////////////////////
+
+  const savePermissions = useCallback(async () => {
+    if (!selectedAdmin) return;
+
+    try {
+      const enabledPermissions = Object.entries(editedPermissions)
+        .filter(([_, enabled]) => enabled)
+        .map(([key]) => PERMISSION_MAP[key]);
+
+      const response = await fetch(`/api/admins/${selectedAdmin.id}/permissions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ permissions: enabledPermissions }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update permissions");
+
+      toast({
+        title: "Permissions Updated",
+        description: `Updated permissions for ${selectedAdmin.firstName}`,
+      });
+
+      setShowPermissionsModal(false);
+      fetchAdmins();
+      refreshUser();
+
+      if (user?.id === selectedAdmin.id) {
+        window.location.reload();
+      }
+
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Could not update permissions",
+        variant: "destructive",
+      });
+    }
+
+  }, [
+    editedPermissions,
+    selectedAdmin,
+    toast,
+    fetchAdmins,
+    refreshUser,
+    user,
+  ]);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // UI BLOCKED WITHOUT PERMISSION
+  ///////////////////////////////////////////////////////////////////////////
 
   if (!canViewAdmins) {
     return (
@@ -183,212 +317,183 @@ export function AdminManagementSection() {
         <div className="text-center">
           <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
-          <p className="text-gray-600">You don't have permission to view admins.</p>
+          <p className="text-gray-500">You don't have permission to view admins.</p>
         </div>
       </div>
     );
   }
 
+  ///////////////////////////////////////////////////////////////////////////
+  // JSX RENDER (UI UNCHANGED)
+  ///////////////////////////////////////////////////////////////////////////
+
   return (
-    <div>
-      <AdminHeader 
-        title="Admin Management" 
+    <div className="flex flex-col min-h-screen">
+
+      <AdminHeader
+        title="Admin Management"
         subtitle="Manage administrators and their permissions"
         showTimeFilter={false}
         actions={
           canCreateAdmins && (
-          <button
-            onClick={handleAddAdmin}
-            className="flex items-center space-x-2 px-4 py-2 bg-[#3c83f6] text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Admin</span>
-          </button>
-        )
-          
+            <Button onClick={() => setShowAddModal(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Add Admin
+            </Button>
+          )
         }
       />
-      {/* Header */}
-      {/* <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
-          <p className="text-gray-600">Manage administrators and their permissions</p>
+
+      <div className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">
+
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          <Input
+            placeholder="Search admins..."
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        {canCreateAdmins && (
-          <button
-            onClick={handleAddAdmin}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Add Admin</span>
-          </button>
-        )}
-      </div> */}
 
-      {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6 p-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name, email, or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-        
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
-          <option value="SUSPENDED">Suspended</option>
-        </select>
+        {/* Table */}
+        <div className="rounded-xl border border-gray-300 bg-white overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-200/50">
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Permissions</TableHead>
+                <TableHead>Last Active</TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
 
-        {user?.role?.name === 'SUPERADMIN' && (
-          <select
-            value={schoolFilter}
-            onChange={(e) => setSchoolFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">All Schools</option>
-            {schools.map((school) => (
-              <option key={school.id} value={school.id}>
-                {school.name}
-              </option>
-            ))}
-          </select>
-        )}
+            <TableBody>
+              {filteredAdmins.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-12 text-gray-500">
+                    No admins found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredAdmins.map((admin) => (
+                  <TableRow key={admin.id} className="hover:bg-gray-200/30">
 
-        <button
-          onClick={fetchAdmins}
-          className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <Filter className="w-4 h-4" />
-          <span>Apply</span>
-        </button>
-      </div>
-
-      {/* Admins Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Users
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Active
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {admins.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      No admins found
-                    </td>
-                  </tr>
-                ) : (
-                  admins.map((admin) => (
-                    <tr key={admin.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full">
-                            {getInitials(admin.firstName, admin.lastName)}
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {admin.firstName} {admin.lastName}
-                            </div>
-                            <div className="text-sm text-gray-500">{admin.email}</div>
-                          </div>
+                    {/* USER */}
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage
+                            src={admin.adminProfile?.profileImageUrl || ''}
+                            alt={`${admin.firstName} ${admin.lastName}`}
+                          />
+                          <AvatarFallback className="bg-blue-500/10 text-blue-500 text-sm">
+                            {admin.firstName[0]}{admin.lastName[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {admin.firstName} {admin.lastName}
+                          </p>
+                          <p className="text-xs text-gray-500">{admin.email}</p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          admin.role.name === 'SUPERADMIN' 
-                            ? 'text-purple-600 bg-purple-50' 
-                            : 'text-blue-600 bg-blue-50'
-                        }`}>
-                          {admin.role.name}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(admin.status)}`}>
-                          {admin.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {admin.adminProfile?.lastActive ? (
-                          <div className="flex items-center text-gray-600">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            {new Date(admin.adminProfile.lastActive).toLocaleDateString()}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">Never</span>
+                      </div>
+                    </TableCell>
+
+                    {/* ROLE */}
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "text-xs",
+                          ROLE_STYLES[admin.role.name]?.bg || ROLE_STYLES.DEFAULT.bg,
+                          ROLE_STYLES[admin.role.name]?.text || ROLE_STYLES.DEFAULT.text
                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => handleViewAdmin(admin)}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                            title="View Details"
+                      >
+                        {ROLE_STYLES[admin.role.name]?.label || ROLE_STYLES.DEFAULT.label}
+                      </Badge>
+                    </TableCell>
+
+                    {/* STATUS */}
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={cn(
+                            "h-2 w-2 rounded-full",
+                            admin.status === "ACTIVE" ? "bg-green-500" : "bg-gray-400"
+                          )}
+                        />
+                        <span className="text-sm capitalize">{admin.status.toLowerCase()}</span>
+                      </div>
+                    </TableCell>
+
+                    {/* PERMISSIONS */}
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {admin.role.name === "SUPERADMIN" ? "All features" : `${admin.adminProfile?.adminPermissions?.length || 0}/9 features`}
+                      </Badge>
+                    </TableCell>
+
+                    {/* LAST ACTIVE */}
+                    <TableCell className="text-gray-500">
+                      {admin.adminProfile?.lastActive
+                        ? new Date(admin.adminProfile.lastActive).toLocaleDateString()
+                        : "Never"}
+                    </TableCell>
+
+                    {/* ACTION MENU */}
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-white">
+
+                          {/* <DropdownMenuItem className="gap-2" onClick={() => {
+                            setSelectedAdmin(admin);
+                            setShowViewModal(true);
+                          }}>
+                            <Eye className="h-4 w-4" /> View
+                          </DropdownMenuItem> */}
+
+                          <DropdownMenuItem className="gap-2" onClick={() => {
+                            setSelectedAdmin(admin);
+                            setShowEditModal(true);
+                          }}>
+                            <Edit className="h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem className="gap-2" onClick={() => openPermissions(admin)}>
+                            <Shield className="h-4 w-4" /> Manage Permissions
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            className="gap-2 text-red-500"
+                            onClick={() => {
+                              setSelectedAdmin(admin);
+                              setIsDeleteOpen(true);
+                            }}
                           >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {canUpdateAdmins && (
-                            <button
-                              onClick={() => handleEditAdmin(admin)}
-                              className="text-green-600 hover:text-green-900 p-1 rounded"
-                              title="Edit Admin"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                          )}
-                          {canDeleteAdmins && (
-                            <button
-                              onClick={() => handleDeleteAdmin(admin.id)}
-                              className="text-red-600 hover:text-red-900 p-1 rounded"
-                              title="Deactivate Admin"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                            <Trash2 className="h-4 w-4" /> Remove
+                          </DropdownMenuItem>
+
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
-      {/* Add Admin Modal */}
+      {/* ADD ADMIN */}
       {showAddModal && (
         <AddAdminModal
           onClose={() => setShowAddModal(false)}
@@ -400,7 +505,7 @@ export function AdminManagementSection() {
         />
       )}
 
-      {/* Edit Admin Modal */}
+      {/* EDIT ADMIN */}
       {showEditModal && selectedAdmin && (
         <EditAdminModal
           admin={selectedAdmin}
@@ -413,7 +518,7 @@ export function AdminManagementSection() {
         />
       )}
 
-      {/* View Admin Modal */}
+      {/* VIEW ADMIN */}
       {showViewModal && selectedAdmin && (
         <ViewAdminModal
           admin={selectedAdmin}
@@ -421,17 +526,118 @@ export function AdminManagementSection() {
         />
       )}
 
-      {/* Manage Permissions Modal */}
-      {showPermissionsModal && selectedAdmin && (
-        <ManagePermissionsModal
-          admin={selectedAdmin}
-          onClose={() => setShowPermissionsModal(false)}
-          onSuccess={() => {
-            setShowPermissionsModal(false);
-            fetchAdmins();
-          }}
-        />
-      )}
+      {/* DELETE CONFIRMATION */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Admin</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove "{selectedAdmin?.firstName} {selectedAdmin?.lastName}"?
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                deleteAdmin();
+                setIsDeleteOpen(false);
+              }}
+            >
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* PERMISSIONS MODAL */}
+      <Dialog open={showPermissionsModal} onOpenChange={setShowPermissionsModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manage Permissions</DialogTitle>
+
+            <DialogDescription>
+              {selectedAdmin && (
+                <span className="flex items-center gap-2 mt-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage
+                      src={selectedAdmin.adminProfile?.profileImageUrl || ''}
+                      alt={`${selectedAdmin.firstName} ${selectedAdmin.lastName}`}
+                    />
+                    <AvatarFallback className="bg-blue-500/10 text-blue-500 text-xs">
+                      {selectedAdmin.firstName[0]}{selectedAdmin.lastName[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium text-gray-900">
+                    {selectedAdmin.firstName} {selectedAdmin.lastName}
+                  </span>
+                </span>
+              )}
+            </DialogDescription>
+
+            {selectedAdmin && (
+              <div className="flex items-center gap-2 mt-2">
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "text-xs",
+                    ROLE_STYLES[selectedAdmin.role.name]?.bg || ROLE_STYLES.DEFAULT.bg,
+                    ROLE_STYLES[selectedAdmin.role.name]?.text || ROLE_STYLES.DEFAULT.text
+                  )}
+                >
+                  {ROLE_STYLES[selectedAdmin.role.name]?.label || ROLE_STYLES.DEFAULT.label}
+                </Badge>
+              </div>
+            )}
+          </DialogHeader>
+
+          {/* PERMISSION TOGGLES */}
+          <div className="py-4 space-y-4">
+            {selectedAdmin?.role.name === 'SUPERADMIN' ? (
+              <div className="rounded-lg bg-gray-200 p-3 text-sm text-gray-700">
+                Super Admin permissions cannot be modified. They have full access.
+              </div>
+            ) : (
+              <div className="rounded-lg bg-blue-100 p-3 text-sm text-blue-900">
+                As a Super Admin, you can manage this admin's access.
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                  <span className="text-sm font-medium">{label}</span>
+
+                  <Switch
+                    checked={editedPermissions[key] || false}
+                    onCheckedChange={(checked) => {
+                      if (selectedAdmin?.role.name !== 'SUPERADMIN') {
+                        setEditedPermissions((prev) => ({ ...prev, [key]: checked }));
+                      }
+                    }}
+                    disabled={selectedAdmin?.role.name === 'SUPERADMIN'}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPermissionsModal(false)}>
+              Cancel
+            </Button>
+
+            <Button
+              onClick={savePermissions}
+              disabled={selectedAdmin?.role.name === 'SUPERADMIN'}
+            >
+              Save Permissions
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

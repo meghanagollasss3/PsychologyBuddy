@@ -1,436 +1,389 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { ChevronLeft, Heart, Play } from 'lucide-react';
-import { toast } from 'sonner';
-import SearchHeader from '@/src/components/StudentDashboard/SelfHelpTools/Meditation/SearchHeader';
-import FilterTabs from '@/src/components/StudentDashboard/SelfHelpTools/Meditation/FilterTabs';
-import { PlayerModal } from '@/src/components/StudentDashboard/SelfHelpTools/Meditation/PlayerModal';
-import { MeditationCardProps, CardProps } from '@/src/components/StudentDashboard/SelfHelpTools/Meditation/MeditationCard';
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import useSWR from "swr";
+import { ChevronLeft, Heart, Play, Search, Loader2, Music, Clock } from "lucide-react";
+import { useToast } from "@/src/hooks/use-toast";
+import Image from "next/image";
 
-interface MeditationResource {
-  id: string;
-  title: string;
-  description: string;
-  audioUrl?: string;
-  videoUrl?: string;
-  thumbnailUrl?: string;
-  durationSec?: number;
-  instructor?: string;
-  type?: string;
-  format?: string;
-  status?: string;
-  categories?: {
-    category: {
-      id: string;
-      name: string;
-      description?: string;
-    };
-  }[];
-  goals?: {
-    goal: {
-      id: string;
-      name: string;
-      description?: string;
-    };
-  }[];
-  school?: {
-    id: string;
-    name: string;
-  };
-}
+// Components
+import { PlayerModal } from "@/src/components/StudentDashboard/SelfHelpTools/Meditation/PlayerModal";
+import InstructionsDisplay from "@/src/components/StudentDashboard/SelfHelpTools/Meditation/InstructionsDisplay";
+import { useDebounce } from "@/src/hooks/useDebounce";
+import { getStudentId } from "@/src/utils/auth";
+import BackToDashboard from "@/src/components/StudentDashboard/Layout/BackToDashboard";
+import SearchHeader from "@/src/components/StudentDashboard/SelfHelpTools/MusicTherapy/SearchHeader";
+import FilterTabs from "@/src/components/StudentDashboard/SelfHelpTools/MusicTherapy/FilterTabs";
 
-export default function Page() {
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+export default function MeditationPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('Recommended');
-  const [meditationResources, setMeditationResources] = useState<MeditationResource[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCard, setSelectedCard] = useState<CardProps | null>(null);
-  const [showPlayer, setShowPlayer] = useState(false);
+  const { toast } = useToast();
+
+  // --- UI & Player State ---
+  const [activeTab, setActiveTab] = useState("Recommended");
+  const [searchTerm, setSearchTerm] = useState("");
   const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
 
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    (query: string) => {
-      const timer = setTimeout(() => {
-        setSearchQuery(query);
-      }, 300); // 300ms delay
+  // Instructions state
+  const [meditationInstructions, setMeditationInstructions] =
+    useState<any>(null);
 
-      return () => clearTimeout(timer);
-    },
-    []
+  // Modal State
+  const [selectedCard, setSelectedCard] = useState<any | null>(null);
+  const [showPlayer, setShowPlayer] = useState(false);
+
+  // --- Search Optimization ---
+  const debouncedSearch = useDebounce(searchTerm, 400);
+
+  // --- Data Fetching: Saved Items (load on mount) ---
+  const { data: savedRes, mutate: mutateSavedItems } = useSWR(
+    "/api/student/saved-meditations?studentId=" + getStudentId(),
+    fetcher,
   );
+  const initialSavedItems: Set<string> = useMemo(() => {
+    const ids = (savedRes?.data || []).map((item: any) => item.id as string);
+    return new Set(ids);
+  }, [savedRes]);
 
-  // Handle search with debounce
-  const handleSearchChange = (query: string) => {
-    debouncedSearch(query);
-  };
-
-  // Fetch categories on component mount and when page gets focus
+  // Sync saved items state with API response
   useEffect(() => {
-    fetchCategories();
-    fetchSavedItems();
-  }, []);
+    if (initialSavedItems.size > 0) {
+      setSavedItems(initialSavedItems);
+    }
+  }, [initialSavedItems]);
 
-  // Also fetch categories when window gets focus (in case admin added new categories)
-  useEffect(() => {
-    const handleFocus = () => {
-      fetchCategories();
+  // --- Data Fetching: Categories ---
+  const { data: catRes } = useSWR(
+    "/api/student/meditation/categories",
+    fetcher,
+  );
+  const categories = useMemo(() => catRes?.data || [], [catRes]);
+
+  // --- Data Fetching: Instructions ---
+  const { data: instructionsRes, error: instructionsError } = useSWR(
+    "/api/admin/meditation/instructions",
+    fetcher,
+  );
+  const instructions = useMemo(() => {
+    console.log("Instructions API response:", instructionsRes);
+    console.log("Instructions API error:", instructionsError);
+
+    if (instructionsRes?.success && instructionsRes?.data) {
+      const instruction = Array.isArray(instructionsRes.data)
+        ? instructionsRes.data[0]
+        : instructionsRes.data;
+      if (instruction) {
+        const processedData = {
+          title: instruction.title,
+          points: instruction.steps?.map((step: any) => step.description) || [],
+          proTip: instruction.proTip || undefined,
+          difficulty: instruction.difficulty || undefined,
+        };
+        console.log("Processed instructions data:", processedData);
+        return processedData;
+      }
+    }
+    console.log("No instructions data found");
+    return {
+      title: undefined,
+      points: [],
+      proTip: undefined,
+      difficulty: undefined,
     };
-    
-    window.addEventListener('focus', handleFocus);
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
+  }, [instructionsRes, instructionsError]);
 
-  // Fetch meditation resources on component mount
-  useEffect(() => {
-    fetchMeditationResources();
-  }, []);
+  console.log("Final meditationInstructions state:", instructions);
 
-  // Fetch when tab changes
-  useEffect(() => {
-    fetchMeditationResources(activeTab);
-  }, [activeTab, searchQuery]);
+  // FIX: deduplicate tabs
+  const tabList = useMemo(() => {
+    const names = categories.map((cat: any) => cat.name);
+    return Array.from(new Set(["Recommended", ...names]));
+  }, [categories]);
 
-  const fetchCategories = async () => {
-    try {
-      console.log('🔄 Fetching categories...');
-      const response = await fetch('/api/students/meditation/categories');
-      const result = await response.json();
-      
-      console.log('📊 Categories response:', result);
-      
-      if (result.success) {
-        console.log('✅ Categories fetched:', result.data?.length || 0);
-        setCategories(result.data || []);
-      } else {
-        console.error('❌ Failed to fetch categories:', result.message);
-      }
-    } catch (error) {
-      console.error('💥 Error fetching categories:', error);
+  const activeCategoryId = useMemo(() => {
+    if (activeTab === "Recommended") return null;
+    return categories.find((c: any) => c.name === activeTab)?.id;
+  }, [activeTab, categories]);
+
+  // --- Data Fetching: Resources ---
+  const queryParams = new URLSearchParams({
+    limit: "20",
+    ...(debouncedSearch && { search: debouncedSearch }),
+    ...(activeCategoryId && { categoryId: activeCategoryId }),
+  }).toString();
+
+  const endpoint = debouncedSearch
+    ? `/api/student/meditation/search?${queryParams}`
+    : `/api/student/meditation?${queryParams}`;
+
+  const { data: resData, isLoading } = useSWR(endpoint, fetcher, {
+    keepPreviousData: true,
+  });
+
+  const meditationResources = resData?.data || [];
+
+  // --- Player Initialization ---
+  const handleCardClick = (meditation: any) => {
+    const mediaUrl = meditation.audioUrl || meditation.videoUrl || null;
+
+    if (!mediaUrl) {
+      toast({
+        title: "No media file available for this session.",
+        variant: "destructive",
+      });
+      return;
     }
-  };
 
-  // Fetch saved meditations
-  const fetchSavedItems = async () => {
-    try {
-      // For now, use a hardcoded student ID. In a real app, this would come from auth context
-      const studentId = 'student-123'; // Replace with actual student ID from auth
-      const response = await fetch(`/api/student/saved-meditations?studentId=${studentId}`);
-      const result = await response.json();
-      
-      if (result.success) {
-        const savedIds: Set<string> = new Set(result.data.map((item: { id: string }) => item.id));
-        setSavedItems(savedIds);
-        console.log('📚 Loaded saved items:', savedIds.size);
-      }
-    } catch (error) {
-      console.error('Error fetching saved items:', error);
-    }
-  };
-
-  // Fetch meditation resources
-  const fetchMeditationResources = async (category?: string) => {
-    try {
-      console.log('🔄 Fetching meditation resources...', { category, searchQuery });
-      setLoading(true);
-      const params = new URLSearchParams();
-      
-      // Handle search
-      if (searchQuery) {
-        console.log('🔍 Searching for:', searchQuery);
-        params.append('search', searchQuery);
-        const response = await fetch(`/api/students/meditation/search?${params.toString()}`);
-        const result = await response.json();
-        
-        console.log('📊 Search results:', result);
-        
-        if (result.success) {
-          console.log('✅ Search successful, meditations found:', result.data?.length || 0);
-          setMeditationResources(result.data || []);
-          
-          // Refresh categories to get updated counts (in case new meditations were added)
-          fetchCategories();
-        } else {
-          console.error('❌ Search failed:', result.message);
-          toast.error(result.message || 'Failed to search meditation');
-        }
-      } else {
-        // Handle category filtering
-        if (category && category !== 'Recommended') {
-          console.log('🏷️ Filtering by category:', category);
-          
-          // Find category ID by name
-          const categoryObj = categories?.find(cat => cat.name === category);
-          if (categoryObj) {
-            params.append('categoryId', categoryObj.id);
-            const response = await fetch(`/api/students/meditation?${params.toString()}`);
-            const result = await response.json();
-            
-            console.log('📊 Category filter results:', result);
-            
-            if (result.success) {
-              console.log('✅ Category filter successful, meditations found:', result.data?.length || 0);
-              setMeditationResources(result.data || []);
-              
-              // Refresh categories to get updated counts (in case new meditations were added)
-              fetchCategories();
-            } else {
-              console.error('❌ Category filter failed:', result.message);
-              toast.error(result.message || 'Failed to filter by category');
-            }
-          } else {
-            console.error('❌ Category not found:', category);
-            toast.error('Category not found');
-            setMeditationResources([]);
-          }
-        } else {
-          console.log('📋 Loading all meditations (Recommended tab)');
-          // Get all meditation for "Recommended" tab
-          const response = await fetch(`/api/students/meditation?limit=20`);
-          const result = await response.json();
-          
-          console.log('📊 All meditations results:', result);
-          
-          if (result.success) {
-            console.log('✅ All meditations loaded:', result.data?.length || 0);
-            setMeditationResources(result.data || []);
-            
-            // Refresh categories to get updated counts (in case new meditations were added)
-            fetchCategories();
-          } else {
-            console.error('❌ Failed to load all meditations:', result.message);
-            toast.error(result.message || 'Failed to fetch meditation resources');
-          }
-        }
-      }
-    } catch (error) {
-      console.error('💥 Error fetching meditation resources:', error);
-      toast.error('Failed to fetch meditation resources');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCardClick = (meditation: MeditationResource & { categories?: any[] }) => {
-    const mediaUrl = meditation.audioUrl || meditation.videoUrl || '';
-    const mediaType = meditation.videoUrl ? 'video' : 'audio';
-    
     setSelectedCard({
-      categories: meditation.categories || [],
       id: meditation.id,
       title: meditation.title,
       description: meditation.description,
       url: mediaUrl,
-      duration: formatDuration(meditation.durationSec || 0),
-      type: mediaType,
-      image: meditation.thumbnailUrl || "https://picsum.photos/seed/meditation/400/400",
-      instructor: meditation.instructor
+      duration: `${Math.floor((meditation.durationSec || 0) / 60)} mins`,
+      type: meditation.videoUrl ? "video" : "audio",
+      image:
+        meditation.thumbnailUrl ||
+        "https://picsum.photos/seed/meditation/400/400",
+      instructor: meditation.instructor,
+      categories: meditation.categories || [],
     });
     setShowPlayer(true);
   };
 
-  const toggleSave = async (meditationId: string) => {
+  // --- Save Logic (Optimistic UI) ---
+  const toggleSave = async (id: string) => {
+    const wasSaved = savedItems.has(id);
+    setSavedItems((prev) => {
+      const next = new Set(prev);
+      wasSaved ? next.delete(id) : next.add(id);
+      return next;
+    });
+
     try {
-      const studentId = 'student-123'; // Replace with actual student ID from auth
-      
-      const response = await fetch('/api/student/saved-meditations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          meditationId,
-          studentId,
-        }),
+      const res = await fetch("/api/student/saved-meditations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meditationId: id, studentId: getStudentId() }),
       });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setSavedItems(prev => {
-          const newSet = new Set(prev);
-          if (result.isSaved) {
-            newSet.add(meditationId);
-            toast.success('Added to saved items');
-          } else {
-            newSet.delete(meditationId);
-            toast.success('Removed from saved items');
-          }
-          return newSet;
-        });
-      } else {
-        toast.error(result.message || 'Failed to save meditation');
-      }
+      if (!res.ok) throw new Error();
+      toast({
+        title: wasSaved ? "Removed from favorites" : "Saved to favorites",
+      });
+      // Revalidate cache to update other components
+      mutateSavedItems();
     } catch (error) {
-      console.error('Error toggling save:', error);
-      toast.error('Failed to save meditation');
+      // Revert if failed
+      setSavedItems((prev) => {
+        const next = new Set(prev);
+        wasSaved ? next.add(id) : next.delete(id);
+        return next;
+      });
+      toast({
+        title: "Failed to sync favorites",
+        variant: "destructive",
+      });
     }
-  };
-
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return '0 mins';
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes} mins`;
-  };
-
-  const getTrackCount = (meditation: MeditationResource) => {
-    // This would come from API, for now using a random number
-    return Math.floor(Math.random() * 20) + 8;
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <ChevronLeft className="w-6 h-6 text-gray-600 cursor-pointer hover:text-gray-900" />
-              <h1 className="ml-4 text-xl font-semibold text-gray-900">Back to Self-Help Tools</h1>
+      {/* Sticky Header */}
+      <div className="bg-white border-b sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center text-gray-600 hover:text-black"
+          >
+            <ChevronLeft className="w-6 h-6" />
+            <span className="ml-2 font-medium">Back to Tools</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-3 sm:px-2 md:px-6 lg:px-8 py-4 sm:py-5 lg:py-3 max-w-7xl">
+        <div className="max-w-7xl my-[2px] sm:my-[10px] mx-[-10px] pt-2 sm:pt-3 lg:pt-5 sm:px-3 lg:px-4">
+          <BackToDashboard />
+        </div>
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 lg:gap-6">
+          <div className="flex mb-[15px] sm:mb-[20px] items-start gap-3 sm:gap-4 w-full sm:w-[510px]">
+            <Image
+              src="/selfhelptools/music/Music.svg"
+              alt="Music Logo"
+              width={63}
+              height={63}
+              className="w-[25px] h-[25px] sm:w-[40px] sm:h-[40px] md:w-[50px] md:h-[50px] lg:w-[63px] lg:h-[63px]"
+            />
+            <div className="ml-[3px] sm:ml-[5px] flex-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-[32px] font-bold text-slate-900 mb-1 sm:mb-2">
+                Music Therapy
+              </h1>
+              <p className="text-[#686D70] text-sm sm:text-base md:text-[16px] font-light hidden xs:block sm:block">
+                Curated playlists designed to support your emotional wellbeing.
+              </p>
+              <p className="text-[#686D70] text-xs sm:text-sm font-light block xs:hidden sm:hidden">
+                Explore More Music for emotional wellbeing
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 w-full lg:w-auto mb-[30px] sm:mb-[55px]">
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
+              <SearchHeader
+                searchQuery={searchTerm}
+                onSearchChange={setSearchTerm}
+              />
+              <button
+                onClick={() =>
+                  router.push("/students/selfhelptools/meditation/saved")
+                }
+                className="h-10 sm:h-[47px] px-4 sm:px-6 rounded-full border font-base transition-colors flex items-center gap-2 whitespace-nowrap text-sm sm:text-base border-[#A5C3FF] bg-[#A5C3FF]/10 text-[#5982D4] hover:bg-blue-100"
+              >
+                <Heart className="w-3 h-3 sm:w-4 sm:h-4" />
+                Saved Items ({savedItems.size})
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Hero Section */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Find your inner peace with guided meditation
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Choose from our curated collection of mindfulness practices
-          </p>
-          
-          {/* Search and Show Saves */}
-          <div className="flex flex-col sm:flex-row gap-4 max-w-2xl mx-auto">
-            <SearchHeader 
-              searchQuery={searchQuery}
-              onSearchChange={handleSearchChange}
-            />
-            <button
-              onClick={() => router.push('/students/selfhelptools/meditation/saved')}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
-            >
-              Show Saves
-              {savedItems.size > 0 && (
-                <span className="bg-white text-blue-500 text-xs font-bold px-2 py-1 rounded-full">
-                  {savedItems.size}
-                </span>
-              )}
-            </button>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Categories Tabs */}
+        <div className="mb-6 sm:mb-8 sm:-mt-6">
+          <FilterTabs
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            categories={categories.map((c: any) => c.name)}
+          />
         </div>
 
-        {/* Filter Tabs */}
-        <FilterTabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          categories={categories?.map(cat => cat.name) || []}
-        />
-
-        {/* Loading State */}
-        {loading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        {/* Results Grid */}
+        {isLoading && !meditationResources.length ? (
+          <div className="flex flex-col items-center py-24">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
+            <p className="text-gray-500">Preparing your peace...</p>
           </div>
-        )}
-
-        {/* Meditation Grid */}
-        {!loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {meditationResources.map((meditation) => (
-              <div key={meditation.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                {/* Cover Image */}
-                <div className="aspect-square bg-gray-100 relative">
-                  {meditation.thumbnailUrl ? (
-                    <img
-                      src={meditation.thumbnailUrl}
-                      alt={meditation.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Play className="w-8 h-8 text-blue-500 ml-1" />
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Play Button Overlay */}
-                  <div 
-                    className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all flex items-center justify-center cursor-pointer"
-                    onClick={() => handleCardClick(meditation)}
-                  >
-                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                      <Play className="w-6 h-6 text-blue-500 ml-1" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1">{meditation.title}</h3>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{meditation.description}</p>
-                  
-                  {/* Metadata */}
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
-                    <span>{formatDuration(meditation.durationSec)}</span>
-                    <span>{getTrackCount(meditation)} Sessions</span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => handleCardClick(meditation)}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
-                    >
-                      Play
-                    </button>
-                    <button
-                      onClick={() => toggleSave(meditation.id)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        savedItems.has(meditation.id)
-                          ? 'bg-red-50 text-red-500 hover:bg-red-100'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Heart className={`w-5 h-5 ${savedItems.has(meditation.id) ? 'fill-current' : ''}`} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+        ) : meditationResources.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {meditationResources.map((med: any) => (
+              <MeditationCardItem
+                key={med.id}
+                meditation={med}
+                isSaved={savedItems.has(med.id)}
+                onSave={() => toggleSave(med.id)}
+                onClick={() => handleCardClick(med)}
+              />
             ))}
           </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && meditationResources.length === 0 && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Play className="w-8 h-8 text-gray-400 ml-1" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No meditation found</h3>
-            <p className="text-gray-600">Try adjusting your search or filters</p>
+        ) : (
+          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
+            <Music className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium">
+              No results found for your search.
+            </p>
           </div>
         )}
       </div>
 
-      {/* Player Modal */}
+      {/* Meditation Instructions Section */}
+      {(() => {
+        console.log("Checking instructions:", instructions);
+        if (instructions && instructions.title) {
+          return (
+            <div className="mb-6 mt-8">
+              <InstructionsDisplay
+                title={instructions.title}
+                points={instructions.points}
+                proTip={instructions.proTip}
+                // difficulty={instructions.difficulty}
+              />
+            </div>
+          );
+        }
+        return null;
+      })()}
+
+      {/* Modal - Passing allResources allows the modal to build the playlist */}
       {showPlayer && selectedCard && (
-        <PlayerModal
-          card={selectedCard}
-          onClose={() => setShowPlayer(false)}
-          categories={categories}
-        />
+        <PlayerModal card={selectedCard} onClose={() => setShowPlayer(false)} />
       )}
+    </div>
+  );
+}
+
+// Sub-component for individual card logic
+function MeditationCardItem({ meditation, isSaved, onSave, onClick }: any) {
+  const durationMin = Math.floor((meditation.durationSec || 0) / 60);
+
+  return (
+    <div
+      onClick={onClick}
+      className="group w-auto sm:w-[399px] bg-white rounded-[14px] hover:shadow-xl hover:shadow-[#15A0EA33]/20 transition-all duration-300 flex flex-col h-full cursor-pointer"
+    >
+      <div className="relative aspect-square h-[149px]">
+        <img
+          src={
+            meditation.thumbnailUrl || "https://picsum.photos/seed/med/400/300"
+          }
+          alt={meditation.title}
+          className="w-full h-full object-cover opacity-90 rounded-tl-[13px] rounded-tr-[14px]"
+        />
+        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+          <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center scale-90 group-hover:scale-100 transition-all shadow-lg">
+            <Play className="w-5 h-5 text-blue-600 fill-current ml-1" />
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-bold text-gray-900 text-[20px] truncate flex-1">
+            {meditation.title}
+          </h3>
+          <button
+            onClick={onSave}
+            className={`p-2 rounded-full w-[36px] h-[35px] border border-[#D4D4D4] ${isSaved ? "bg-red-50 text-red-500" : "bg-gray-50 text-[#666666]"}`}
+          >
+            <Heart
+              className={`w-[18px] h-[18px] ${isSaved ? "fill-current" : ""}`}
+            />
+          </button>
+        </div>
+        <p className="text-sm text-gray-600 mb-2">
+          {meditation.artist || "Therapeutic Artist"}
+        </p>
+        <div className="flex items-center gap-2 mb-2">
+          <Clock className="w-[14px] h-[14px] -mr-1 text-[#686D70]"></Clock>
+          <span className="text-[13px] text-[#686D70] -mb-0.5 -ml-0.5 rounded">
+            {Math.floor(meditation.duration / 60)} mins
+          </span>
+          {meditation.category && (
+            <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded">
+              {meditation.category}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
+          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded tracking-wider uppercase">
+            {durationMin} MINS
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Prevents opening the modal when clicking favorite
+              onSave();
+            }}
+            className={`p-2 rounded-full transition-colors ${
+              isSaved
+                ? "text-red-500 bg-red-50"
+                : "text-gray-400 hover:bg-gray-100 hover:text-red-400"
+            }`}
+          >
+            <Heart className={`w-5 h-5 ${isSaved ? "fill-current" : ""}`} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

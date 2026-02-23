@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Mic, Square, Play, Pause } from 'lucide-react';
+import { Mic, Square, Play, Pause, Lock, Trash, Trash2 } from 'lucide-react';
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number, title?: string) => void;
@@ -160,152 +160,146 @@ export default function AudioRecorder({ onRecordingComplete }: AudioRecorderProp
   };
 
   return (
-    <div className="space-y-6">
+    <>
+    <div className="space-y-4 sm:space-y-6">
       {/* Title Input */}
-      <div>
+      {/* <div className="mb-4 sm:mb-6">
+      <input
+        type="text"
+        placeholder="Give your entry a title (optional)"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm sm:text-base disabled:bg-gray-50"
+        disabled={isRecording}
+      />
+    </div> */}
+      <div className="bg-white p-2 sm:p-3 rounded-[32px] -mt-3 border border-slate-100 shadow-sm">
         <input
           type="text"
           placeholder="Give your entry a title (optional)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-          disabled={isRecording}
-        />
+          className="w-full h-10 sm:h-12 px-4 sm:px-6 rounded-[32px] bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-sm sm:text-base"
+          disabled={isRecording} />
       </div>
+    </div>
+    <div className="bg-white mt-2 rounded-[32px] p-4 sm:p-6 lg:p-8 border border-slate-100 shadow-sm">
 
-      {/* Today's Entry Section */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-8">
-        <div className="text-center space-y-6">
-          {/* Date */}
-          <div className="text-slate-600 font-medium">
-            {getCurrentDate()}
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center">
+              <img src="/journaling/Mic.svg" alt="Editor" className="w-[35px] h-[35px] sm:w-[63px] sm:h-[63px]" />
+            </div>
+            <div className='-ml-2 sm:ml-2'>
+              <h3 className="font-bold text-[#2F3D43] text-[14px] sm:text-[24px]">Today's Entry</h3>
+              <p className="text-[#686D70] text-[10px] sm:text-[14px] font-medium">{getCurrentDate()}</p>
+            </div>
           </div>
 
-          {/* Recording Animation and Timer */}
-          <div className="relative">
-            {/* Circular Animation */}
-            <div className="relative inline-flex items-center justify-center">
-              {isRecording && (
-                <div className="absolute inset-0 w-32 h-32 bg-cyan-100 rounded-full animate-ping opacity-20"></div>
-              )}
-              {isRecording && (
-                <div className="absolute inset-0 w-32 h-32 bg-cyan-200 rounded-full animate-pulse opacity-30"></div>
-              )}
-              <div className="relative w-32 h-32 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                <Mic className="w-12 h-12 text-white" />
-              </div>
+          {/* Privacy Indicator */}
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-[24px] text-slate-400 text-sm bg-[#F1FAFF]">
+            <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline ">This recording is private</span>
+            <span className="sm:hidden text-[10px] -ml-1">Private</span>
+          </div>
+        </div>
+
+        {/* Recording Interface */}
+        <div className="text-center space-y-8">
+          {/* Recording Indicator */}
+          <div className="relative inline-flex items-center sm:mt-6 justify-center">
+            {/* Concentric circles for recording state */}
+            <div className="absolute w-32 h-32 sm:w-[209px] sm:h-[209px] bg-blue-100 rounded-full opacity-30"></div>
+            {/* <div className="absolute w-28 h-28 sm:w-[259px] sm:h-[259px] bg-[#F1FAFF] rounded-full opacity-50"></div> */}
+            <div className="relative w-24 h-24 sm:w-[129px] sm:h-[129px] bg-[#D8F2FF] rounded-full flex items-center justify-center shadow-lg">
+              <Mic className="w-8 h-8 sm:w-10 sm:h-10 text-[#155A85]" />
             </div>
           </div>
 
           {/* Timer */}
-          <div className="text-4xl font-bold text-slate-900">
+          <div className="text-4xl sm:text-[36px] sm:mt-6 font-bold text-slate-900 ">
             {formatTime(duration)}
           </div>
 
-          {/* Recording Status */}
-          {isRecording && (
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-red-500 font-medium">
-                {isPaused ? 'Recording Paused' : 'Recording...'}
-              </span>
-            </div>
-          )}
+          {/* Start Recording Button */}
+          {!isRecording ? (
+            <button
+              onClick={startRecording}
+              className="w-full h-[47px] sm:h-[57px] max-w-xs mx-auto bg-gradient-to-l from-[#4FC1F9] to-[#1B9EE0] hover:from-[#4FC1F9] hover:to-[#1B9EE0] text-white rounded-[24px] font-medium text-base sm:text-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+            >
+              Start Recording
+            </button>
+          ) : (
+            <div className="space-y-4">
+              {/* Recording Status */}
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-red-500 font-medium text-sm sm:text-base">
+                  {isPaused ? 'Recording Paused' : 'Recording...'}
+                </span>
+              </div>
 
-          {/* Control Buttons */}
-          <div className="flex items-center justify-center gap-4">
-            {!isRecording ? (
-              <button
-                onClick={startRecording}
-                className="w-16 h-16 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-full flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 shadow-lg"
-              >
-                <Mic className="w-6 h-6" />
-              </button>
-            ) : (
-              <>
+              {/* Control Buttons */}
+              <div className="flex items-center justify-center gap-4">
                 <button
                   onClick={pauseRecording}
-                  className="px-8 py-3 border border-cyan-500 text-cyan-500 rounded-xl font-medium transition-colors hover:bg-cyan-50 flex items-center gap-2"
+                  className="px-6 py-3 sm:pl-15 border border-[#1B9EE0] text-[#1B9EE0] sm:w-[199px] sm:h-[57px] rounded-[24px] font-medium transition-colors hover:bg-blue-50 flex items-center gap-2 text-sm sm:text-base"
                 >
-                  {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                  {isPaused ? <Play className="w-4 h-4 items-center" /> : <Pause className="w-4 h-4" />}
                   {isPaused ? 'Resume' : 'Pause'}
                 </button>
                 <button
                   onClick={stopRecording}
-                  className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+                  className="px-6 sm:pl-15 sm:w-[199px] sm:h-[57px] py-3 bg-gradient-to-b from-[#4FC1F9] to-[#1B9EE0] hover:bg-blue-600 text-white rounded-[24px] font-medium transition-colors flex items-center gap-2 text-sm sm:text-base"
                 >
-                  <Square className="w-5 h-5" />
+                  <Square className="w-4 h-4" />
                   Stop
                 </button>
-              </>
-            )}
-          </div>
-
-          {/* Privacy Indicator */}
-          <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
-            <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
-            <span>This recording is private</span>
-            <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
-          </div>
+              </div>
+            </div>
+          )}
 
           {/* Warning Message */}
           {showWarning && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-yellow-800 text-sm">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800 text-sm">
               Recording is too short. Please record for at least 2 seconds.
             </div>
           )}
 
           {/* Audio Playback */}
           {audioURL && !isRecording && (
-            <div className="pt-4 border-t border-slate-100">
-              <div className="space-y-4">
-                {/* Playback Controls */}
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={playPauseAudio}
-                    className="w-12 h-12 bg-cyan-500 hover:bg-cyan-600 text-white rounded-full flex items-center justify-center transition-all"
-                  >
-                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  </button>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center justify-center gap-3">
-                  {duration >= 2 ? (
-                    <>
-                      <button
-                        onClick={saveRecording}
-                        className="px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-medium transition-colors"
-                      >
-                        Save Recording
-                      </button>
-                      <button
-                        onClick={discardRecording}
-                        className="px-6 py-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl font-medium transition-colors"
-                      >
-                        Discard
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={discardRecording}
-                      className="px-6 py-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl font-medium transition-colors"
-                    >
-                      Record New
-                    </button>
-                  )}
-                </div>
-              </div>
+            <div className="pt-6 border-t border-slate-100 space-y-4">
               <audio
                 ref={audioRef}
                 src={audioURL}
                 onEnded={() => setIsPlaying(false)}
-                className="hidden"
-              />
+                className="hidden" />
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={playPauseAudio}
+                  className="w-12 h-12 bg-gradient-to-b from-[#4FC1F9] to-[#1B9EE0] hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-all"
+                >
+                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                </button>
+                <button
+                  onClick={saveRecording}
+                  disabled={duration < 2}
+                  className="py-2 px-3  sm:px-6 sm:py-3 border border-[#1B9EE0] text-[#1B9EE0] sm:w-[199px] sm:h-[57px] rounded-[24px]  font-medium transition-colors text-sm sm:text-base"
+                >
+                  Save Recording
+                </button>
+                <button
+                  onClick={discardRecording}
+                  className="px-3 py-3 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl font-medium transition-colors text-sm sm:text-base"
+                >
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </button>
+              </div>
             </div>
           )}
         </div>
-      </div>
     </div>
+    </>
   );
 }

@@ -8,10 +8,11 @@ export interface ListeningInstructions {
 
 export interface JournalPrompt {
   id: string;
-  prompt: string;
-  moods: string[];
-  journalTypes: ("writing" | "art")[];
+  text: string;
+  moodIds: string[];
   isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MusicResource {
@@ -19,9 +20,11 @@ export interface MusicResource {
   title: string;
   subtitle?: string;
   thumbnail?: string | null;
+  thumbnailUrl?: string | null;
+  coverImage?: string | null;
   categories?: { category: { name: string } }[];
   goals?: { goal: { name: string } }[];
-  duration?: string;
+  duration?: number;
   status: "DRAFT" | "PUBLISHED";
   isPublic?: boolean;
   learnerCount?: number;
@@ -139,31 +142,16 @@ export const defaultMeditationInstructions: ListeningInstructions = {
 };
 
 export const journalPrompts: JournalPrompt[] = [
-  { id: "1", prompt: "What are you grateful for today?", moods: [], journalTypes: ["writing", "art"], isEnabled: true },
-  { id: "2", prompt: "Describe a challenge you overcame recently", moods: [], journalTypes: ["writing"], isEnabled: true },
-  { id: "3", prompt: "What made you smile today?", moods: [], journalTypes: ["writing", "art"], isEnabled: true },
-  { id: "4", prompt: "Write about something you're looking forward to", moods: [], journalTypes: ["writing"], isEnabled: false },
-  { id: "5", prompt: "Draw how you're feeling right now", moods: [], journalTypes: ["art"], isEnabled: true },
-  { id: "6", prompt: "Create an image of your happy place", moods: [], journalTypes: ["art"], isEnabled: true },
+  { id: "1", text: "What are you grateful for today?", moodIds: [], isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "2", text: "Describe a challenge you overcame recently", moodIds: [], isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "3", text: "What made you smile today?", moodIds: [], isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "4", text: "Write about something you're looking forward to", moodIds: [], isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "5", text: "Draw how you're feeling right now", moodIds: [], isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "6", text: "Create an image of your happy place", moodIds: [], isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export const defaultJournalMoods: string[] = [];
 export const defaultMusicMoods: string[] = [];
-export const defaultMeditationMoods: string[] = [
-  "Calm",
-  "Relaxed", 
-  "Peaceful",
-  "Focused",
-  "Sleepy",
-  "Energized",
-  "Balanced",
-  "Grounded",
-  "Mindful",
-  "Serene",
-  "Tranquil",
-  "Centered",
-  "Rejuvenated",
-  "Clear-headed"
-];
+export const defaultMeditationMoods: string[] = [];
 export const defaultMusicGoals: string[] = [];
 export const defaultMeditationGoals: string[] = [];

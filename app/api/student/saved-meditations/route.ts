@@ -14,11 +14,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Use raw SQL to get saved meditations since Prisma model is not generating properly
-    const savedMeditations = await prisma.$queryRaw`
+    const savedMeditations = await prisma.$queryRaw<Array<any>>`
       SELECT ms.*, m.* 
       FROM "MeditationSaves" ms
       JOIN "Meditation" m ON ms."meditationId" = m.id
-      WHERE ms."studentId" = ${studentId} OR ms."studentId" IS NULL
+      WHERE ms."studentId" = ${studentId}
       ORDER BY ms."createdAt" DESC
     `;
 
@@ -94,10 +94,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already saved using raw SQL
-    const existingSave = await prisma.$queryRaw`
+    const existingSave = await prisma.$queryRaw<Array<any>>`
       SELECT * FROM "MeditationSaves" 
       WHERE "meditationId" = ${meditationId} 
-      AND ("studentId" = ${studentId} OR "studentId" IS NULL)
+      AND "studentId" = ${studentId}
       LIMIT 1
     `;
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         DELETE FROM "MeditationSaves" 
         WHERE "meditationId" = ${meditationId} 
-        AND ("studentId" = ${studentId} OR "studentId" IS NULL)
+        AND "studentId" = ${studentId}
       `;
 
       return NextResponse.json({

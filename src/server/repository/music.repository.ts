@@ -22,7 +22,6 @@ export class MusicRepository {
 
     // Validate that categoryIds and goalIds exist before creating
     if (categoryIds && categoryIds.length > 0) {
-      console.log('Validating categoryIds:', categoryIds);
       const existingCategories = await this.prisma.musicCategory.findMany({
         where: {
           id: { in: categoryIds },
@@ -51,7 +50,6 @@ export class MusicRepository {
     }
 
     if (goalIds && goalIds.length > 0) {
-      console.log('Validating goalIds:', goalIds);
       const existingGoals = await this.prisma.musicGoal.findMany({
         where: {
           id: { in: goalIds },
@@ -99,8 +97,6 @@ export class MusicRepository {
       createData.schoolId = schoolId;
     }
 
-    console.log('Final createData for MusicResource:', JSON.stringify(createData, null, 2));
-
     const resource = await this.prisma.musicResource.create({
       data: createData,
       include: {
@@ -118,7 +114,6 @@ export class MusicRepository {
       },
     });
 
-    console.log('Created MusicResource:', JSON.stringify(resource, null, 2));
     return resource;
   }
 
@@ -202,7 +197,7 @@ export class MusicRepository {
   }
 
   async getMusicResourceById(id: string) {
-    return await this.prisma.musicResource.findUnique({
+    return await this.prisma.musicResource.findFirst({
       where: { id },
       include: {
         categories: {

@@ -80,7 +80,10 @@ export class JournalingAdminController {
     try {
       const session = await requirePermission(req, 'selfhelp.journaling.view');
 
-      const result = await JournalingAdminService.getAllPrompts(session.userId);
+      const { searchParams } = new URL(req.url);
+      const schoolId = searchParams.get('schoolId');
+
+      const result = await JournalingAdminService.getAllPrompts(session.userId, schoolId);
 
       return NextResponse.json(result);
     } catch (err) {
@@ -98,6 +101,23 @@ export class JournalingAdminController {
       const parsed = UpdateJournalingPromptSchema.parse(body);
 
       const result = await JournalingAdminService.updatePrompt(session.userId, params.id, parsed);
+
+      return NextResponse.json(result);
+    } catch (err) {
+      const errorResponse = handleError(err);
+      return NextResponse.json(errorResponse, { status: errorResponse.error?.code || 500 });
+    }
+  }
+
+  // PUT /api/admin/journaling/prompts/:id/status
+  async updatePromptStatus(req: NextRequest, id: string) {
+    try {
+      const session = await requirePermission(req, 'selfhelp.journaling.update');
+
+      const body = await req.json();
+      const { isEnabled } = body;
+
+      const result = await JournalingAdminService.updatePromptStatus(session.userId, id, isEnabled);
 
       return NextResponse.json(result);
     } catch (err) {

@@ -42,9 +42,10 @@ export class AdminController {
   static getAdminById = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'VIEW' 
-  })(async (req: NextRequest, { params }: any) => {
+  })(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
-      const result = await AdminService.getAdminById(params.id);
+      const { id } = await params;
+      const result = await AdminService.getAdminById(id);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Get admin error:', error);
@@ -57,12 +58,13 @@ export class AdminController {
   static updateAdmin = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'UPDATE' 
-  })(async (req: NextRequest, { params }: any) => {
+  })(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
+      const { id } = await params;
       const body = await req.json();
       const validatedData = UpdateAdminSchema.parse(body);
       
-      const result = await AdminService.updateAdmin(params.id, validatedData);
+      const result = await AdminService.updateAdmin(id, validatedData);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Update admin error:', error);
@@ -75,12 +77,13 @@ export class AdminController {
   static resetAdminPassword = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'UPDATE' 
-  })(async (req: NextRequest, { params }: any) => {
+  })(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
+      const { id } = await params;
       const body = await req.json();
       const validatedData = ResetAdminPasswordSchema.parse(body);
       
-      const result = await AdminService.resetAdminPassword(params.id, validatedData);
+      const result = await AdminService.resetAdminPassword(id, validatedData);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Reset admin password error:', error);
@@ -93,12 +96,13 @@ export class AdminController {
   static updateAdminStatus = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'UPDATE' 
-  })(async (req: NextRequest, { params }: any) => {
+  })(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
+      const { id } = await params;
       const body = await req.json();
       const validatedData = UpdateAdminStatusSchema.parse(body);
       
-      const result = await AdminService.updateAdminStatus(params.id, validatedData);
+      const result = await AdminService.updateAdminStatus(id, validatedData);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Update admin status error:', error);
@@ -111,9 +115,10 @@ export class AdminController {
   static deleteAdmin = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'DELETE' 
-  })(async (req: NextRequest, { params }: any) => {
+  })(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
-      const result = await AdminService.deleteAdmin(params.id);
+      const { id } = await params;
+      const result = await AdminService.deleteAdmin(id);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Delete admin error:', error);

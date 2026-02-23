@@ -138,15 +138,15 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
         {[...Array(6)].map((_, index) => (
           <div key={index} className="animate-pulse">
-            <div className="bg-gray-200 h-48 rounded-t-3xl"></div>
-            <div className="bg-white p-6 rounded-b-3xl border border-slate-100">
-              <div className="h-4 bg-gray-200 rounded mb-4 w-1/2"></div>
-              <div className="h-6 bg-gray-200 rounded mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded mb-4"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="bg-gray-200 h-32 sm:h-40 lg:h-48 rounded-t-2xl sm:rounded-t-3xl"></div>
+            <div className="bg-white p-4 sm:p-6 rounded-b-2xl sm:rounded-b-3xl border border-slate-100">
+              <div className="h-3 sm:h-4 bg-gray-200 rounded mb-3 sm:mb-4 w-1/2"></div>
+              <div className="h-5 sm:h-6 bg-gray-200 rounded mb-2"></div>
+              <div className="h-3 sm:h-4 bg-gray-200 rounded mb-3 sm:mb-4"></div>
+              <div className="h-3 sm:h-4 bg-gray-200 rounded w-3/4"></div>
             </div>
           </div>
         ))}
@@ -156,11 +156,11 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <div className="text-red-500 mb-4">{error}</div>
+      <div className="text-center py-8 sm:py-12">
+        <div className="text-red-500 mb-4 text-sm sm:text-base">{error}</div>
         <button 
           onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
         >
           Try Again
         </button>
@@ -170,14 +170,14 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
 
   if (articles.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-gray-500 mb-4">
+      <div className="text-center py-8 sm:py-12 px-4">
+        <div className="text-gray-500 mb-4 text-sm sm:text-base">
           {showSaves 
             ? 'No saved articles yet. Start exploring and save articles you like!' 
             : 'No articles available at the moment.'
           }
         </div>
-        <p className="text-gray-400">
+        <p className="text-gray-400 text-xs sm:text-sm">
           {showSaves 
             ? 'Articles you save will appear here for easy access.' 
             : 'Check back later for new content!'
@@ -188,7 +188,7 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
       {articles.map((article, index) => (
         <CourseCard 
           key={article.id} 

@@ -135,14 +135,23 @@ export async function updateMusicResource(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const queryData = Object.fromEntries(searchParams.entries());
-    const { id, ...updateData } = await request.json();
+    const updateData = await request.json();
     
-    const validatedQuery = GetSingleMusicResourceSchema.parse(queryData);
+    // Get id from URL params, not request body
+    const { id } = queryData;
+    
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "ID is required" },
+        { status: 400 }
+      );
+    }
+    
     const validatedData = UpdateMusicResourceSchema.parse(updateData);
 
-    // Add user context
+    // Add user context - use id from URL params
     const contextData = {
-      id: validatedQuery.id,
+      id,
       ...validatedData,
       schoolId: "school_id", // This should come from user context
     };

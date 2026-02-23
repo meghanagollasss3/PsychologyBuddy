@@ -90,52 +90,52 @@ export default function AudioJournalList({ journals, onDelete, loading }: AudioJ
 
   if (loading) {
     return (
-      <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mx-auto"></div>
-        <p className="text-slate-500 mt-2">Loading audio journals...</p>
+      <div className="text-center py-6 sm:py-8">
+        <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-cyan-500 mx-auto"></div>
+        <p className="text-slate-500 mt-2 text-sm sm:text-base">Loading audio journals...</p>
       </div>
     );
   }
 
   if (journals.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-slate-500">No audio journals yet</p>
-        <p className="text-slate-400 text-sm mt-1">Start recording to see your entries here</p>
+      <div className="text-center py-6 sm:py-8">
+        <p className="text-slate-500 text-sm sm:text-base mb-2">No audio journals yet</p>
+        <p className="text-slate-400 text-xs sm:text-sm mt-1">Start recording to see your entries here</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Your Journals</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Your Journals</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         {journals.map((journal) => (
           <div 
             key={journal.id} 
-            className="bg-white rounded-2xl border border-slate-100 p-6 hover:shadow-lg transition-all group relative overflow-hidden"
+            className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-6 hover:shadow-lg transition-all group relative overflow-hidden"
           >
             {/* Play Button Overlay */}
-            <div className="absolute top-4 right-4">
+            <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
               <button
                 onClick={() => togglePlayPause(journal.id)}
-                className="w-12 h-12 bg-cyan-500 hover:bg-cyan-600 text-white rounded-full flex items-center justify-center transition-all shadow-lg opacity-90 hover:opacity-100"
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-cyan-500 hover:bg-cyan-600 text-white rounded-full flex items-center justify-center transition-all shadow-lg opacity-90 hover:opacity-100"
               >
                 {playingId === journal.id ? (
-                  <Pause className="w-5 h-5" />
+                  <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
                 ) : (
-                  <Play className="w-5 h-5 ml-0.5" />
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />
                 )}
               </button>
             </div>
 
             {/* Journal Content */}
-            <div className="pr-16">
-              <h4 className="font-semibold text-slate-900 mb-2">
+            <div className="pr-12 sm:pr-16">
+              <h4 className="font-semibold text-slate-900 mb-2 text-sm sm:text-base">
                 {journal.title || 'Audio Entry'}
               </h4>
               
-              <div className="space-y-1 text-sm text-slate-500">
+              <div className="space-y-1 text-xs sm:text-sm text-slate-500">
                 <div>
                   {formatDate(journal.createdAt)}, {formatTime(journal.createdAt)}
                 </div>
@@ -156,9 +156,9 @@ export default function AudioJournalList({ journals, onDelete, loading }: AudioJ
             {/* Delete Button */}
             <button
               onClick={() => onDelete(journal.id)}
-              className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 transition-all p-2 hover:bg-red-50 rounded-xl"
+              className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 transition-all p-2 hover:bg-red-50 rounded-xl"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>

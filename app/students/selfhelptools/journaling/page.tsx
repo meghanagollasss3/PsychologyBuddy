@@ -76,8 +76,6 @@ export default function JournalingPage() {
 
   // Fetch journaling configuration for student's school
   const fetchJournalingConfig = async () => {
-    console.log('=== STUDENT CONFIG FETCH START ===');
-    
     try {
       const response = await fetch('/api/student/journaling/config', {
         headers: {
@@ -85,9 +83,7 @@ export default function JournalingPage() {
         },
       });
       
-      console.log('API Response status:', response.status);
       const data = await response.json();
-      console.log('API Response data:', data);
       
       if (data.success && data.data) {
         const config = {
@@ -101,7 +97,6 @@ export default function JournalingPage() {
           enableColorPalette: loadColorPaletteFromStorage(), // Load from localStorage
         };
         
-        console.log('Setting config to:', config);
         setJournalingConfig(config);
         
         // Set default tab to first enabled type
@@ -119,7 +114,6 @@ export default function JournalingPage() {
       console.error('Failed to fetch journaling config:', error);
     } finally {
       setConfigLoading(false);
-      console.log('=== STUDENT CONFIG FETCH END ===');
     }
   };
 
@@ -201,7 +195,11 @@ export default function JournalingPage() {
   };
 
   const viewAllJournals = () => {
-    router.push('/students/journaling/all');
+    router.push('/students/selfhelptools/journaling/all');
+  };
+
+  const viewAllArtJournals = () => {
+    router.push('/students/selfhelptools/journaling/art-gallery');
   };
 
   const saveJournal = async () => {
@@ -218,7 +216,7 @@ export default function JournalingPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: title.trim() || null,
+          title: title.trim() || 'Untitled Journal',
           content: content.trim(),
         }),
       });
@@ -410,7 +408,7 @@ export default function JournalingPage() {
           </div>
         ) : (
           <>
-            <JournalHeader activeTab={activeTab} onTabChange={setActiveTab} />
+            <JournalHeader activeTab={activeTab} onTabChange={setActiveTab} viewAllJournals={viewAllJournals} viewAllArtJournals={viewAllArtJournals} />
             <JournalTabs activeTab={activeTab} setActiveTab={setActiveTab} config={journalingConfig || undefined} />
             <div className="mt-8">
               {activeTab === 'writing' ? (
@@ -433,20 +431,15 @@ export default function JournalingPage() {
                       />
                     </div>
                     <div className="lg:col-span-1 space-y-6">
-                      <WritingPrompts onPromptSelect={handlePromptSelect} />
-                      <button 
-                        onClick={viewAllJournals}
-                        className="w-full px-4 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-                      >
-                        <BookOpen className="w-5 h-5" />
-                        <span>View All Journals</span>
-                      </button>
+                      <div id="writing-prompts">
+                        <WritingPrompts onPromptSelect={handlePromptSelect} />
+                      </div>
                     </div>
                   </div>
                 </div>
               ) : activeTab === 'audio' ? (
                 <div className="space-y-8">
-                  <div className="max-w-2xl mx-auto">
+                  <div className="max-w-4xl mx-auto">
                     <AudioRecorder onRecordingComplete={saveAudioJournal} />
                   </div>
                   <div className="max-w-4xl mx-auto">
@@ -459,17 +452,17 @@ export default function JournalingPage() {
                 </div>
               ) : (
                 <div className="min-h-screen bg-[#F3F6F8] font-sans selection:bg-cyan-200 selection:text-cyan-900 pb-20">
-                  <main className="max-w-6xl mx-auto px-6 pt-8">
+                  {/* <main className="max-w-6xl mx-auto px-6 pt-8"> */}
                     <MoodSelector selectedMood={artMood} onMoodSelect={setArtMood} />
-                    <div className="bg-[#FFF5EC] border border-[#FFE0B2] rounded-[1.5rem] p-6 mb-8 flex items-center justify-between shadow-sm relative overflow-hidden group">
+                    <div className="bg-[#FFF5EC] sm:h-[79px] border border-[#FF7A1E] rounded-[20px] sm:rounded-[32px] sm:p-6 p-3 -mt-3 mb-8 flex items-center justify-between shadow-sm relative overflow-hidden group">
                       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-orange-200/20 to-transparent rounded-full -mr-16 -mt-16 pointer-events-none"></div>
-                      <h3 className="text-[#E67E22] font-semibold text-lg z-10">Create Waves that Carry your feelings away ?</h3>
-                      <button className="bg-[#FFE0B2] hover:bg-[#FFCC80] text-[#E65100] px-6 py-2 rounded-full font-semibold text-sm flex items-center gap-2 transition-all shadow-sm z-10">
+                      <h3 className="text-[#BF570F] font-base sm:pl-5 text-[13px] sm:text-[20px] z-10">Create Waves that Carry your feelings away ?</h3>
+                      <button className="bg-[#FCEEDD] hover:bg-[#FFCC80] text-[#E65100] px-3 py-1 sm:px-6 sm:py-2 rounded-[12px] font-semibold text-sm flex items-center gap-2 transition-all shadow-sm z-10">
                         <Sparkles className="w-4 h-4" />
                         New
                       </button>
                     </div>
-                    {artJournals.length > 0 && (
+                    {/* {artJournals.length > 0 && (
                       <div className="flex justify-center mt-8 mb-8">
                         <Link 
                           href="/students/selfhelptools/journaling/art-gallery"
@@ -479,7 +472,7 @@ export default function JournalingPage() {
                           <span>View All Art Journals</span>
                         </Link>
                       </div>
-                    )}
+                    )} */}
                     <DrawingCanvas onSave={saveArtJournal} loading={loading} config={journalingConfig || undefined} />
                     <div className="flex justify-center mt-10">
                       <button 
@@ -491,12 +484,12 @@ export default function JournalingPage() {
                           }
                         }}
                         disabled={loading}
-                        className="bg-[#2D9CDB] hover:bg-[#2188C1] disabled:bg-gray-400 text-white px-16 py-4 rounded-2xl font-bold text-lg shadow-lg shadow-blue-400/30 hover:shadow-xl hover:shadow-blue-400/40 hover:-translate-y-1 transition-all duration-300 w-full md:w-auto disabled:cursor-not-allowed"
+                        className="bg-gradient-to-b from-[#67CCFF] to-[#1B9EE0]  disabled:bg-gray-400 text-white px-16 py-4 rounded-[24px] font-bold text-lg shadow-lg shadow-blue-400/30 hover:shadow-xl hover:shadow-blue-400/40 hover:-translate-y-1 transition-all duration-300 w-full md:w-auto "
                       >
                         {loading ? 'Saving...' : 'Save Journal'}
                       </button>
                     </div>
-                  </main>
+                  {/* </main> */}
                 </div>
               )}
             </div>

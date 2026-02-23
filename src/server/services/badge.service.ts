@@ -1,5 +1,5 @@
-import prisma from '@/src/prisma';
-import { BadgeType } from '@/src/generated/prisma';
+import prisma from '../../prisma';
+import { BadgeType } from '../../generated/prisma';
 
 export class BadgeService {
   /**
@@ -167,12 +167,11 @@ export class BadgeService {
       const progress = this.calculateProgress(badge, userStats);
       badgesWithProgress.push({
         id: badge.id,
-        name: badge.name,
-        icon: badge.icon,
-        description: badge.description,
-        requirement: badge.requirement,
+        badgeId: badge.id,
+        earnedAt: new Date(),
         progress,
         earned: false,
+        badge: badge,
       });
     }
 

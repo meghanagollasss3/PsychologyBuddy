@@ -11,9 +11,6 @@ interface PlayerModalProps {
 }
 
 export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => {
-  console.log('PlayerModal received card:', card);
-  console.log('PlayerModal coverImage:', card.coverImage);
-  
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [activeTrack, setActiveTrack] = useState(0);
@@ -25,7 +22,6 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
 
   // Get tracks from the same category
   const getTracksFromSameCategory = async () => {
-    console.log('🔍 getTracksFromSameCategory called');
     try {
       // Get current music resources to find other tracks in same category
       const response = await fetch('/api/student/music/resources?limit=50');
@@ -33,11 +29,9 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
       
       if (result.success) {
         const allMusic = result.data.resources || [];
-        console.log(`Found ${allMusic.length} total music resources`);
         
         // Get the category names from the current card
         const currentCategoryNames = card.categories?.map((cat: any) => cat.category?.name).filter(Boolean) || [];
-        console.log('Current category names:', currentCategoryNames);
         
         // Find tracks that share the same category as the current card
         const sameCategoryTracks = allMusic.filter((music: { categories: any[]; id: string; }) => {
@@ -49,8 +43,6 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
             currentCategoryNames.includes(musicCat.category?.name)
           );
         });
-
-        console.log(`Found ${sameCategoryTracks.length} tracks in same category`);
         
         // Transform the tracks to the expected format
         const transformedTracks = sameCategoryTracks.map((music: any) => ({
@@ -65,7 +57,6 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
           { title: card.title, artist: card.artist || 'Unknown Artist', duration: card.duration, url: card.url }, 
           ...transformedTracks
         ];
-        console.log(`Total tracks to display: ${tracks.length}`);
         return tracks;
       }
       
@@ -115,27 +106,15 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
 
     const handleError = (e: any) => {
       const audio = audioRef.current;
-      const errorDetails = {
-        error: e,
-        src: audio?.src,
-        networkState: audio?.networkState,
-        readyState: audio?.readyState,
-        errorCode: audio?.error?.code,
-        errorMessage: audio?.error?.message,
-        currentTrack: tracks[activeTrack],
-        trackIndex: activeTrack
-      };
-      console.error('Audio error details:', errorDetails);
       
       // Try to play next track if current track fails
       if (tracks.length > 1) {
-        console.log('Attempting to play next track due to error...');
         handleNextTrack();
       }
     };
 
     const handleCanPlay = () => {
-      console.log('Audio can play:', tracks[activeTrack].url);
+      // Audio can play
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
@@ -338,10 +317,10 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/20 pointer-events-none z-10" />
                
                {/* Dynamic Background Blur Image */}
-               {card.coverImage && (
+               {(card.coverImage || card.thumbnailUrl) && (
                   <div className="absolute inset-0 overflow-hidden rounded-[3rem]">
                      <img 
-                       src={card.coverImage} 
+                       src={card.coverImage || card.thumbnailUrl} 
                        className="w-full h-full object-cover blur-3xl opacity-30 scale-150 animate-pulse-slow" 
                        alt="bg"
                      />
@@ -352,6 +331,12 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
                   {card.coverImage ? (
                     <img 
                       src={card.coverImage} 
+                      alt="Now Playing" 
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[2s]"
+                    />
+                  ) : card.thumbnailUrl ? (
+                    <img 
+                      src={card.thumbnailUrl} 
                       alt="Now Playing" 
                       className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[2s]"
                     />

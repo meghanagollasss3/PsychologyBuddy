@@ -11,7 +11,7 @@ import MeditationTools from "./SelfHelpTools/MeditationTools";
 import { ApiResponse } from "./SelfHelpTools/types";
 
 export default function SelfHelpTools() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("journaling");
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,17 +28,6 @@ export default function SelfHelpTools() {
   });
   const [isLoadingSchools, setIsLoadingSchools] = useState(true);
   
-  // Check if user is super admin
-  const isSuperAdmin = user?.role?.name === 'SUPER_ADMIN' || user?.role?.name === 'SUPERADMIN';
-  const showSchoolFilter = isSuperAdmin;
-  
-  // Save selected school to localStorage when it changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('admin-selected-school', selectedSchool);
-    }
-  }, [selectedSchool]);
-  
   // Modal states for meditation
   const [isAddMeditationOpen, setIsAddMeditationOpen] = useState(false);
   const [isAddMeditationCategoryModalOpen, setIsAddMeditationCategoryModalOpen] = useState(false);
@@ -50,7 +39,55 @@ export default function SelfHelpTools() {
   // Modal states for music
   const [isAddMusicTrackOpen, setIsAddMusicTrackOpen] = useState(false);
   const [isAddMusicCategoryOpen, setIsAddMusicCategoryOpen] = useState(false);
-
+  
+  // Check if user is super admin - more robust detection with validation
+  console.log('User role:', user?.role, 'Role name:', user?.role?.name);
+  const isSuperAdmin = user?.role?.name === 'SUPER_ADMIN' || 
+                         user?.role?.name === 'SUPERADMIN' ||
+                         user?.role?.name?.toLowerCase() === 'super_admin' ||
+                         user?.role?.name?.toLowerCase() === 'superadmin';
+  console.log('Calculated isSuperAdmin:', isSuperAdmin);
+  const showSchoolFilter = isSuperAdmin;
+  
+  // Save selected school to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('admin-selected-school', selectedSchool);
+    }
+  }, [selectedSchool]);
+  
+  // Load schools on component mount and when authentication is complete
+  useEffect(() => {
+    if (!authLoading && user) {
+      fetchSchools();
+    }
+  }, [isSuperAdmin, authLoading, user]);
+  
+  // Show loading state while authentication is being determined
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center gap-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+  
+  // Validate user is properly authenticated
+  if (!user || !user.role) {
+    console.error('User authentication error: User or role is undefined');
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">Authentication Error</div>
+          <p className="text-gray-600">Unable to determine user role. Please refresh the page or contact support.</p>
+        </div>
+      </div>
+    );
+  }
+  
   // Fetch schools for super admin
   const fetchSchools = async () => {
     if (!isSuperAdmin) {
@@ -58,10 +95,17 @@ export default function SelfHelpTools() {
       return;
     }
 
+    // Validate user is available before making API calls
+    if (!user?.id) {
+      console.error('User ID not available for schools API call');
+      setIsLoadingSchools(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/schools', {
         headers: {
-          "x-user-id": user?.id || "admin@calmpath.ai",
+          "x-user-id": user.id,
         },
       });
       const data = await response.json();
@@ -69,6 +113,7 @@ export default function SelfHelpTools() {
       if (data.success && data.data) {
         setSchools(data.data);
       } else {
+        console.warn('Schools API returned non-success response:', data);
         // Fallback to mock data for testing
         setSchools([
           { id: 'school-1', name: 'Demo Elementary School' },
@@ -94,11 +139,6 @@ export default function SelfHelpTools() {
     }
   };
 
-  // Load schools on component mount
-  useEffect(() => {
-    fetchSchools();
-  }, [isSuperAdmin]);
-
   const renderActions = () => {
     // Show different Add buttons based on active tab
     if (activeTab === "meditation") {
@@ -117,10 +157,7 @@ export default function SelfHelpTools() {
     } else if (activeTab === "journaling") {
       return (
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsAddJournalingCategoryOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Category
-          </Button>
+          
           <Button onClick={() => setIsAddJournalingPromptOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             Add Prompt

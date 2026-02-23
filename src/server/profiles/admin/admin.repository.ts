@@ -44,8 +44,24 @@ export const AdminRepository = {
         },
       },
       include: {
-        role: true,
-        adminProfile: true,
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        adminProfile: {
+          include: {
+            adminPermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
         school: {
           select: {
             id: true,
@@ -65,8 +81,24 @@ export const AdminRepository = {
     return prisma.user.findUnique({
       where: { id },
       include: {
-        role: true,
-        adminProfile: true,
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        adminProfile: {
+          include: {
+            adminPermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
         school: {
           select: {
             id: true,
@@ -87,9 +119,15 @@ export const AdminRepository = {
         ...(data.phone && { phone: data.phone }),
         ...(data.schoolId && { schoolId: data.schoolId }),
         adminProfile: {
-          update: {
-            ...(data.department && { department: data.department }),
-            ...(data.profileImage && { profileImage: data.profileImage }),
+          upsert: {
+            create: {
+              ...(data.department && { department: data.department }),
+              ...(data.profileImage && { profileImage: data.profileImage }),
+            },
+            update: {
+              ...(data.department && { department: data.department }),
+              ...(data.profileImage && { profileImage: data.profileImage }),
+            },
           },
         },
       },
@@ -174,6 +212,80 @@ export const AdminRepository = {
       include: {
         role: true,
         adminProfile: true,
+      },
+    });
+  },
+
+  // Update admin permissions
+  updateAdminPermissions: async (id: string, permissions: string[]) => {
+    // First, get the admin with their profile to get the correct adminProfileId
+    const admin = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        adminProfile: true
+      }
+    });
+
+    if (!admin || !admin.adminProfile) {
+      throw new Error('Admin profile not found');
+    }
+
+    // Get permission IDs from permission names
+    const permissionRecords = await prisma.permission.findMany({
+      where: {
+        name: {
+          in: permissions
+        }
+      }
+    });
+
+    // Delete existing admin permissions
+    await prisma.adminPermission.deleteMany({
+      where: {
+        adminProfileId: admin.adminProfile.id
+      }
+    });
+
+    // Create new admin permissions
+    const newPermissions = permissionRecords.map(permission => ({
+      adminProfileId: admin.adminProfile!.id,
+      permissionId: permission.id
+    }));
+
+    if (newPermissions.length > 0) {
+      await prisma.adminPermission.createMany({
+        data: newPermissions
+      });
+    }
+
+    // Return updated admin with permissions
+    return prisma.user.findUnique({
+      where: { id },
+      include: {
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        adminProfile: {
+          include: {
+            adminPermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        school: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   },

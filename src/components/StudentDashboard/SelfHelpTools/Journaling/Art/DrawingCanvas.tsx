@@ -245,146 +245,143 @@ const fetchArtJournals = async () => {
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 relative">
+    <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] lg:rounded-[32px] p-4 sm:p-6 lg:p-8 shadow-sm border border-gray-100 relative -mt-4">
       {/* Header */}
       
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex gap-4">
-          <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl">
+      <div className="flex justify-between items-start mb-4 sm:mb-6">
+        <div className="flex gap-2 sm:gap-4">
+          <div className="w-10 h-10 sm:w-14 sm:h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-xl sm:text-2xl">
             🎨
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Today&apos;s Entry</h2>
-            <p className="text-gray-500 font-medium">Tuesday, December 23</p>
-          </div>
+              <h3 className="font-bold text-[#2F3D43] text-[18px] sm:text-[24px]">Today's Entry</h3>
+              <p className="text-[10px] sm:text-[16px] text-[#686D70] font-medium">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+            </div>
         </div>
-        <div className="bg-gray-50 px-4 py-2 rounded-full flex items-center gap-2 text-xs text-gray-500 font-medium border border-gray-100">
+        <div className="bg-gray-50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-full flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 font-medium border border-gray-100">
           
-          <Lock className="w-3 h-3" />
-          Your drawing is private
+          <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
+          <span className="hidden xs:block sm:block">Your drawing is private</span>
+          <span className="block xs:hidden sm:hidden">Private</span>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-8 mb-6 relative">
+      <div className="flex items-center gap-4 sm:gap-6 lg:gap-8 mb-4 sm:mb-6 relative">
         {/* Colors */}
-        <div className="flex items-center gap-2">
-          {colors.map((color, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentColor(color)}
-              className={`w-8 h-8 rounded-full border-2 ${currentColor === color ? 'border-gray-400' : 'border-white'} shadow-sm hover:scale-110 transition-transform`}
-              style={{ backgroundColor: color }}
-            />
-          ))}
+        <div className="flex items-center gap-1 sm:gap-2 ml-2">
+          <div className="hidden sm:flex gap-1 sm:gap-2">
+            {colors.map((color, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentColor(color)}
+                className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 ${currentColor === color ? 'border-gray-400' : 'border-white'} shadow-sm hover:scale-110 transition-transform`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
           {config?.enableColorPalette !== false && (
             <button 
               onClick={() => setShowColorPicker(!showColorPicker)}
-              className="w-8 h-8 rounded-full bg-[#1F4B43] flex items-center justify-center text-white hover:opacity-90 transition-opacity"
+              className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#1F4B43] flex items-center justify-center text-white hover:opacity-90 transition-opacity"
             >
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
             </button>
           )}
         </div>
 
-        <div className="h-8 w-px bg-gray-200"></div>
-
+        <div className="h-px -mr-2 sm:h-px w-px bg-gray-200"></div>
         {/* Brush Size */}
-        <div className="flex items-center gap-3">
-            {[4, 8, 12, 16, 20].map((size) => (
+        <div className="flex items-center gap-2 sm:gap-3">
+          {[4, 8, 12, 16, 20].map((size) => (
                 <button 
                   key={size}
                   onClick={() => setBrushSize(size)}
                   className={`rounded-full hover:bg-gray-700 transition-colors ${brushSize === size ? 'bg-black' : 'bg-gray-400'}`}
                   style={{ width: size, height: size }}
                 />
-            ))}
+          ))}
         </div>
 
-        <div className="h-8 w-px bg-gray-200"></div>
-
+      <div className="h-px sm:h-px w-px bg-gray-200"></div>
         {/* Opacity */}
-        <div className="flex items-center gap-3 flex-1">
-          <span className="text-sm text-gray-500">Opacity</span>
-          <div className="relative flex-1 h-2 bg-gray-100 rounded-full">
+        <div className="flex items-center gap-2 -ml-3 sm:gap-3 flex-1">
+          <span className="text-xs sm:text-sm text-gray-500">Opacity</span>
+          <div className="relative h-2 w-[50px] sm:w-[152px] sm:h-2 bg-gray-100 rounded-full">
             <input
               type="range"
               min="0"
               max="100"
               value={opacity}
               onChange={(e) => setOpacity(Number(e.target.value))}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              className="absolute inset-0 sm:w-[152px] h-full opacity-1 cursor-pointer"
             />
             <div 
-              className="absolute left-0 top-0 h-full bg-[#2D9CDB] rounded-full" 
-              style={{ width: `${opacity}%` }}
-            />
-            <div 
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-[#2D9CDB] rounded-full shadow-sm cursor-pointer"
-                style={{ left: `${opacity}%` }}
+              className="absolute top-1/2 -translate-y-1/2 w-4 h-4 sm:w-4 sm:h-4 bg-[#1B9EE0] rounded-full shadow-sm cursor-pointer"
+              style={{ left: `${opacity}%` }}
             />
           </div>
-          <span className="text-sm text-gray-500 w-8">{opacity}%</span>
+          <span className="text-xs sm:text-sm text-gray-500 sm:ml-2 w-6 sm:w-8">{opacity}%</span>
         </div>
       </div>
 
       {/* Tools & Canvas Container */}
       <div className="relative">
         {/* Floating Tools */}
-        <div className="absolute top-4 left-4 flex gap-2 z-10">
+        <div className="absolute top-3 sm:top-4 left-3 sm:left-4 flex gap-1 sm:gap-2 z-10">
           {config?.enableUndo !== false && (
             <button 
               onClick={undo}
               disabled={historyStep <= 0}
-              className={`w-10 h-10 ${historyStep <= 0 ? 'bg-gray-100 text-gray-300' : 'bg-white text-gray-600 border border-gray-100'} rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all disabled:cursor-not-allowed`}
+              className={`w-8 h-8 sm:w-10 sm:h-10 ${historyStep <= 0 ? 'bg-gray-100 text-gray-300' : 'bg-white text-gray-600 border border-gray-100'} rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all disabled:cursor-not-allowed`}
             >
-              <Undo className="w-5 h-5" />
+              <Undo className="w-3 h-3 sm:w-4 sm:h-4" />
             </button>
           )}
           {config?.enableRedo !== false && (
             <button 
               onClick={redo}
               disabled={historyStep >= history.length - 1}
-              className={`w-10 h-10 ${historyStep >= history.length - 1 ? 'bg-gray-100 text-gray-300' : 'bg-white text-gray-600 border border-gray-100'} rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all disabled:cursor-not-allowed`}
+              className={`w-8 h-8 sm:w-10 sm:h-10 ${historyStep >= history.length - 1 ? 'bg-gray-100 text-gray-300' : 'bg-white text-gray-600 border border-gray-100'} rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all disabled:cursor-not-allowed`}
             >
-              <Redo className="w-5 h-5" />
+              <Redo className="w-3 h-3 sm:w-4 sm:h-4" />
             </button>
           )}
           <button 
             onClick={() => setCurrentTool('pen')}
-            className={`w-10 h-10 ${currentTool === 'pen' ? 'bg-[#2D9CDB]' : 'bg-white text-gray-400 border border-gray-100'} rounded-xl flex items-center justify-center shadow-lg hover:shadow-blue-200 transition-all transform hover:-translate-y-1`}
+            className={`w-8 h-8 sm:w-10 sm:h-10 ${currentTool === 'pen' ? 'bg-[#2D9CDB]' : 'bg-white text-gray-400 border border-gray-100'} rounded-xl flex items-center justify-center shadow-lg hover:shadow-blue-200 transition-all transform hover:-translate-y-1`}
           >
-            <Pen className="w-5 h-5" />
+            <Pen className="w-3 h-3 sm:w-4 sm:h-4" />
           </button>
           <button 
             onClick={() => setCurrentTool('eraser')}
-            className={`w-10 h-10 ${currentTool === 'eraser' ? 'bg-[#2D9CDB] text-white' : 'bg-white text-gray-400 border border-gray-100'} rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all`}
+            className={`w-8 h-8 sm:w-10 sm:h-10 ${currentTool === 'eraser' ? 'bg-[#2D9CDB] text-white' : 'bg-white text-gray-400 border border-gray-100'} rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all`}
           >
-            <Eraser className="w-5 h-5" />
+            <Eraser className="w-3 h-3 sm:w-4 sm:h-4" />
           </button>
           {config?.enableClearCanvas !== false && (
             <button 
               onClick={clearCanvas}
-              className="w-10 h-10 bg-white text-red-400 border border-red-100 rounded-xl flex items-center justify-center shadow-sm hover:bg-red-50 transition-all"
+              className="w-8 h-8 sm:w-10 sm:h-10 bg-white text-red-400 border border-red-100 rounded-xl flex items-center justify-center shadow-sm hover:bg-red-50 transition-all"
             >
-              <Trash2 className="w-5 h-5" />
+              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
             </button>
           )}
         </div>
 
-        {/* Color Picker Modal (Absolute Positioned as per design) */}
+        {/* Color Picker Modal */}
         {showColorPicker && config?.enableColorPalette !== false && (
-          <div className="absolute top-16 left-0 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 w-[320px] animate-in fade-in zoom-in-95 duration-200">
-             <div className="flex justify-between items-center mb-3">
+          <div className="absolute top-12 sm:top-16 left-0 sm:left-2 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 sm:p-4 w-[280px] sm:w-[320px] animate-in fade-in zoom-in-95 duration-200">
+             <div className="flex justify-between items-center mb-2 sm:mb-3">
                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Color Palette</h4>
-                 <div className="w-4 h-4 rounded-full bg-[#1F4B43]"></div>
-             </div>
+                 <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-[#1F4B43]"></div>
+                 </div>
              
-             <div className="space-y-2 mb-4">
+             <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
                  {Object.entries(paletteGrid).map(([category, shades]) => (
-                     <div key={category} className="flex gap-1 items-center">
-                         <span className="text-[10px] text-gray-400 w-10 text-right pr-2">{category}</span>
-                         <div className="flex gap-1 flex-1">
+                     <div key={category} className="flex gap-1 sm:gap-2 items-center">
+                         <span className="text-[8px] sm:text-xs text-gray-400 w-8 sm:w-10 text-right pr-2">{category}</span>
+                         <div className="flex gap-1 sm:gap-2 flex-1">
                              {shades.map((shade, i) => (
                                  <button
                                     key={i}
@@ -392,7 +389,7 @@ const fetchArtJournals = async () => {
                                         setCurrentColor(shade);
                                         setShowColorPicker(false);
                                     }}
-                                    className="w-4 h-4 rounded-[2px] hover:scale-125 transition-transform"
+                                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-[2px] hover:scale-125 transition-transform"
                                     style={{ backgroundColor: shade }}
                                  />
                              ))}
@@ -400,17 +397,16 @@ const fetchArtJournals = async () => {
                      </div>
                  ))}
              </div>
-
-             <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+             <div className="flex items-center gap-1 sm:gap-2 bg-gray-50 p-2 sm:p-3 rounded-lg border border-gray-100">
                  <span className="text-gray-400">
-                     <Pen className="w-3 h-3" />
+                     <Pen className="w-3 h-3 sm:w-4 sm:h-4" />
                  </span>
-                 <div className="w-6 h-6 rounded-md shadow-inner" style={{ backgroundColor: currentColor }}></div>
+                 <div className="w-4 h-4 sm:w-6 sm:h-6 rounded-md shadow-inner" style={{ backgroundColor: currentColor }}></div>
                  <input 
                     type="text" 
                     value={currentColor} 
                     readOnly 
-                    className="bg-transparent text-xs font-mono text-gray-600 outline-none flex-1"
+                    className="bg-transparent text-xs sm:text-sm font-mono text-gray-600 outline-none flex-1"
                  />
              </div>
           </div>
@@ -419,7 +415,7 @@ const fetchArtJournals = async () => {
         {/* Canvas Area */}
         <canvas
           ref={canvasRef}
-          className="w-full h-[400px] border border-orange-200 rounded-2xl bg-white cursor-crosshair"
+          className="w-full h-[300px] sm:h-[400px] border border-orange-200 rounded-2xl bg-white cursor-crosshair"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}

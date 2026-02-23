@@ -1,8 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/src/contexts/AuthContext'
-// import { ClientRouteGuard } from '@/src/components/RBAC/ClientRouteGuard'
-// import { AppProvider } from '@/src/providers'
+import { Toaster } from '@/components/ui/toaster'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -27,6 +26,7 @@ export default function RootLayout({
             {/* </AppProvider> */}
           </AuthProvider>
         {/* </ClientRouteGuard> */}
+        <Toaster />
       </body>
     </html>
   )

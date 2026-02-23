@@ -29,6 +29,7 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
   const [error, setError] = useState<string | null>(null);
   const [userRating, setUserRating] = useState<number>(0);
   const [hasRated, setHasRated] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
   
   // Initialize isSaved state with a safer approach
   const [isSaved, setIsSaved] = useState(false);
@@ -48,6 +49,8 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
       fetchBlocks(articleId);
       // Check save status immediately without delay
       checkIfArticleIsSaved(articleId);
+      // Check completion status
+      checkCompletionStatus(articleId);
     }
   }, [articleId]);
 
@@ -241,6 +244,60 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
     }
   };
 
+  const checkCompletionStatus = async (articleId: string) => {
+    try {
+      const studentId = localStorage.getItem('studentId') || null;
+      if (!studentId) return;
+
+      const response = await fetch(`/api/articles/${articleId}/complete/check?studentId=${studentId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setIsCompleted(data.data.isCompleted);
+      }
+    } catch (error) {
+      console.error('Failed to check completion status:', error);
+    }
+  };
+
+  const handleComplete = async () => {
+    try {
+      if (isCompleted) {
+        console.log('Article already marked as completed');
+        return;
+      }
+
+      const studentId = localStorage.getItem('studentId') || null;
+      if (!studentId) {
+        console.error('No student ID found');
+        return;
+      }
+
+      const response = await fetch(`/api/articles/${articleId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data.alreadyCompleted) {
+          console.log('Article was already completed by this student');
+        } else {
+          console.log('✅ Article marked as completed:', data);
+        }
+        setIsCompleted(true);
+      } else {
+        // Log the response details to debug
+        const errorText = await response.text();
+        console.error('❌ Failed to mark article as completed');
+        console.error('Response status:', response.status);
+        console.error('Response body:', errorText);
+      }
+    } catch (error) {
+      console.error('❌ Failed to complete article:', error);
+    }
+  };
+
   const handleSaveArticle = async () => {
     try {
       const studentId = localStorage.getItem('studentId') || null;
@@ -302,28 +359,28 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
     switch (block.type) {
       case 'section':
         return (
-          <div key={block.id} className="bg-white rounded-[32px] shadow-sm p-8">
+          <div key={block.id} className="bg-white rounded-[20px] sm:rounded-[24px] lg:rounded-[32px] shadow-sm p-4 sm:p-6 lg:p-8">
             {block.title && (
-              <h2 className="text-[20px] font-bold text-[#2F3D43] mb-4">{block.title}</h2>
+              <h2 className="text-[16px] sm:text-[18px] lg:text-[20px] font-bold text-[#2F3D43] mb-3 sm:mb-4">{block.title}</h2>
             )}
             {block.content && (
-              <p className="text-[#655E61] leading-relaxed text-[16px]">{block.content}</p>
+              <p className="text-[#655E61] leading-relaxed text-[14px] sm:text-[15px] lg:text-[16px]">{block.content}</p>
             )}
           </div>
         );
 
       case 'bullet-list':
         return (
-          <div key={block.id} className="bg-white rounded-[32px] shadow-sm p-8">
+          <div key={block.id} className="bg-white rounded-[20px] sm:rounded-[24px] lg:rounded-[32px] shadow-sm p-4 sm:p-6 lg:p-8">
             {block.title && (
-              <h2 className="text-[20px] font-bold text-[#2F3D43] mb-6">{block.title}</h2>
+              <h2 className="text-[16px] sm:text-[18px] lg:text-[20px] font-bold text-[#2F3D43] mb-4 sm:mb-6">{block.title}</h2>
             )}
             {block.items && block.items.length > 0 && (
-              <ul className="space-y-4">
+              <ul className="space-y-3 sm:space-y-4">
                 {block.items.map((point: string, index: number) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
-                    <span className="text-[#655E61] text-[16px] leading-relaxed">{point}</span>
+                  <li key={index} className="flex items-start gap-2 sm:gap-3">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 mt-1.5 sm:mt-2 shrink-0" />
+                    <span className="text-[#655E61] text-[14px] sm:text-[15px] lg:text-[16px] leading-relaxed">{point}</span>
                   </li>
                 ))}
               </ul>
@@ -333,7 +390,7 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
 
       case 'image':
         return (
-          <div key={block.id} className="bg-white rounded-[32px] shadow-sm p-8">
+          <div key={block.id} className="bg-white rounded-[20px] sm:rounded-[24px] lg:rounded-[32px] shadow-sm p-4 sm:p-6 lg:p-8">
             {block.src && (
               <img
                 src={block.src}
@@ -342,25 +399,25 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
               />
             )}
             {block.altText && (
-              <p className="text-sm text-gray-500 mt-4 text-center italic">{block.altText}</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-3 sm:mt-4 text-center italic">{block.altText}</p>
             )}
           </div>
         );
 
       case 'key-takeaways':
         return (
-          <div key={block.id} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[32px] p-8 border border-blue-100">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 flex items-center justify-center">
-                <Star className="h-5 w-5 text-[#f59f0a] fill-[#f59f0a]" />
+          <div key={block.id} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[20px] sm:rounded-[24px] lg:rounded-[32px] p-4 sm:p-6 lg:p-8 border border-blue-100">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
+                <Star className="h-4 w-4 sm:h-5 sm:w-5 text-[#f59f0a] fill-[#f59f0a]" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Key Takeaways</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900">Key Takeaways</h3>
             </div>
-            <ul className="space-y-4">
+            <ul className="space-y-3 sm:space-y-4">
               {(block.items || []).map((point: string, index: number) => (
-                <li key={index} className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-1" />
-                  <span className="text-[#655E61] text-[16px] leading-relaxed">{point}</span>
+                <li key={index} className="flex items-start gap-2 sm:gap-3">
+                  <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 shrink-0 mt-0.5 sm:mt-1" />
+                  <span className="text-[#655E61] text-[14px] sm:text-[15px] lg:text-[16px] leading-relaxed">{point}</span>
                 </li>
               ))}
             </ul>
@@ -369,15 +426,15 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
 
       case 'reflection':
         return (
-          <div key={block.id} className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-[32px] p-8 border border-purple-100">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
-                <Edit2 className="h-5 w-5 text-white" />
+          <div key={block.id} className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-[20px] sm:rounded-[24px] lg:rounded-[32px] p-4 sm:p-6 lg:p-8 border border-purple-100">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                <Edit2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Reflect & Think</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900">Reflect & Think</h3>
             </div>
-            <div className="bg-white/70 rounded-lg p-6 border border-purple-100">
-              <p className="text-[#655E61] text-[16px] leading-relaxed italic text-center">{block.content}</p>
+            <div className="bg-white/70 rounded-lg p-4 sm:p-6 border border-purple-100">
+              <p className="text-[#655E61] text-[14px] sm:text-[15px] lg:text-[16px] leading-relaxed italic text-center">{block.content}</p>
             </div>
           </div>
         );
@@ -427,71 +484,70 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       
-      <div className="max-w-[1154px] mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <button
                     onClick={() => router.push('/students/content/library')}
-                    className="flex cursor-pointer items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 sm:mb-9 transition-colors"
+                    className="flex cursor-pointer items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 sm:mb-6 lg:mb-9 transition-colors"
                   >
-                    <ArrowLeft size={16} className="sm:w-[18px] sm:h-[18px]" />
-                    <span className="text-[14px] sm:text-[16px]">Back to Library</span>
+                    <ArrowLeft size={14} className="sm:w-[16px] sm:h-[16px] lg:w-[18px] lg:h-[18px]" />
+                    <span className="text-[12px] sm:text-[14px] lg:text-[16px]">Back to Library</span>
                   </button>
         {/* Article Header */}
-        <div className="bg-linear-to-r from-[#EC2C92] to-[#FF64B7] h-[208px] rounded-[16px] shadow-sm p-8 mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            {/* <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-600 font-semibold text-lg">
-                {article?.authorName?.[0] || authorName?.[0] || 'A'}
-              </span>
-            </div> */}
-            {/* <div>
-              <p className="text-sm text-gray-600">Written by</p>
-              <p className="font-semibold text-gray-900">{article?.authorName || authorName || 'Anonymous'}</p>
-            </div> */}
-            <Badge variant="secondary" className="bg-white/20 text-[10px] text-white border-white/50 font-base">
+        <div className="bg-linear-to-r from-[#EC2C92] to-[#FF64B7] h-auto rounded-[12px] sm:rounded-[14px] lg:rounded-[16px] shadow-sm p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8">
+          <div className="flex flex-row sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <Badge variant="secondary" className="bg-white/20 text-[8px] sm:text-[9px] lg:text-[10px] text-white border-white/50 font-base w-fit">
               {categoryName}
             </Badge>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-white " />
-              <span className='text-white text-[12px]'>{article?.readTime || readTime || 5} min read</span>
+            
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+              <span className='text-white text-[10px] sm:text-[11px] lg:text-[12px]'>{article?.readTime || readTime || 5} min read</span>
             </div>
+            <div className="flex items-center gap-2 text-white text-xs sm:text-sm ml-2">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="truncate">{article?.author || 'Unknown Author'}</span>
+                </div>
+            {/* <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"> */}
+                
+
           </div>
           
-          <h1 className="text-[32px] font-bold text-white mb-2 leading-tight">
+          <h1 className="text-[20px] sm:text-[26px] lg:text-[32px] font-bold text-white mb-2 leading-tight">
             {article?.title || 'Untitled Article'}
           </h1>
           
-          <p className="text-[14px] text-[#F5F5F5] mb-6 leading-relaxed">
+          <p className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#F5F5F5] mb-4 sm:mb-6 leading-relaxed">
             {article?.description || introText || 'No description available.'}
           </p>
           
-          <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-white text-sm">
-                    <User className="h-4 w-4" />
-                    <span>{article?.author || 'Unknown Author'}</span>
-                  </div>
-                  
-                </div>
-                <div className="flex items-center gap-2 ">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                {/* <div className="flex items-center gap-2 text-white text-xs sm:text-sm">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="truncate">{article?.author || 'Unknown Author'}</span>
+                </div> */}
+                
+                <div className="flex items-center gap-2 sm:justify-end">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleSaveArticle}
-                    className={`flex items-center gap-2 ${
+                    className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${
                       isSaved 
                         ? 'text-green-600 hover:bg-green-50' 
-                        : 'text-white hover:text-gray-800'
+                        : 'text-black hover:text-gray-800'
                     }`}
                   >
                     {isSaved ? (
                       <>
-                        <BookmarkCheck className="h-4 w-4" />
-                        Saved
+                        <BookmarkCheck className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden xs:block sm:block">Saved</span>
+                        <span className="block xs:hidden sm:hidden">Save</span>
                       </>
                     ) : (
                       <>
-                        <Bookmark className="h-4 w-4" />
-                        Save
+                        <Bookmark className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden xs:block sm:block">Save</span>
+                        <span className="block xs:hidden sm:hidden">Save</span>
                       </>
                     )}
                   </Button>
@@ -500,24 +556,24 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
         </div>
 
         {/* Article Content */}
-        <div className="space-y-8">
+        <div className="space-y-4 sm:space-y-6 lg:space-y-8">
           {blocks
             .sort((a, b) => a.order - b.order)
             .map((block) => renderBlock(block))}
         </div>
 
         {/* Rating Section */}
-        <div className="bg-background px-6 pb-8">
-          <div className="max-w-3xl mx-auto">
+        <div className="bg-background px-3 sm:px-4 lg:px-6 pb-6 m-3 sm:pb-8">
+          <div className="max-w-2xl sm:max-w-3xl mx-auto">
             <Card className="border-border">
-              <CardContent className="p-6 text-center">
-                <h3 className="font-semibold text-foreground mb-2">How helpful was this article?</h3>
-                <p className="text-sm text-muted-foreground mb-4">Your feedback helps us improve</p>
-                <div className="flex justify-center gap-2 mb-4">
+              <CardContent className="p-4 sm:p-6 text-center">
+                <h3 className="font-semibold text-foreground text-sm sm:text-base mb-2">How helpful was this article?</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">Your feedback helps us improve</p>
+                <div className="flex justify-center gap-1 sm:gap-2 mb-3 sm:mb-4">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star 
                       key={star} 
-                      className={`h-8 w-8 cursor-pointer transition-colors ${
+                      className={`h-6 w-6 sm:h-8 sm:w-8 cursor-pointer transition-colors ${
                         star <= (userRating || 0) 
                           ? 'text-yellow-400 fill-yellow-400' 
                           : 'text-gray-300 hover:text-yellow-200'
@@ -526,7 +582,7 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
                     />
                   ))}
                 </div>
-                <div className="flex justify-center gap-4">
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4">
                   <Badge variant="outline" className="text-xs">
                     {hasRated ? 'Thank you for your feedback!' : 'Click to rate this article'}
                   </Badge>
@@ -535,7 +591,7 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
                       variant="ghost" 
                       size="sm"
                       onClick={handleUndoRating}
-                      className="text-xs text-gray-500 hover:text-gray-700"
+                      className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
                     >
                       Undo Rating
                     </Button>
@@ -544,6 +600,35 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
               </CardContent>
             </Card>
             
+            {/* Complete Button */}
+            <div className="mt-4 sm:mt-6 text-center">
+              <Button
+                onClick={handleComplete}
+                disabled={isCompleted}
+                className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                  isCompleted 
+                    ? 'bg-green-100 text-green-700 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {isCompleted ? (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 mr-2" />
+                    Article Completed
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 mr-2" />
+                    Mark as Complete
+                  </>
+                )}
+              </Button>
+              {!isCompleted && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Mark this article as complete to track your progress
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

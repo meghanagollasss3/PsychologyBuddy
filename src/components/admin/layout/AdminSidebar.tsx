@@ -21,6 +21,7 @@ import {
   X,
   LogOut,
   Building2,
+  User,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -54,11 +55,13 @@ export function AdminSidebar() {
       label: "Dashboard",
       icon: LayoutDashboard,
       href: "/admin",
+      permission: 'dashboard.view',
     },
     {
       label: "Activity",
       icon: Activity,
       href: "/activity",
+      permission: 'activity.view',
     },
     {
       label: "Organizations",
@@ -71,14 +74,15 @@ export function AdminSidebar() {
       label: "Content Management",
       icon: BookOpen,
       children: [
-        { label: "Psychoeducation Library", href: "/admin/library", icon: BookOpen },
-        { label: "Self-help Tools", href: "/admin/selfhelptools", icon: Wrench },
+        { label: "Psychoeducation Library", href: "/admin/library", icon: BookOpen, permission: 'psycho.education.view' },
+        { label: "Self-help Tools", href: "/admin/selfhelptools", icon: Wrench, permission: 'selfhelp.view' },
       ],
     },
     {
       label: "Analytics & Reports",
       icon: BarChart3,
       href: "/analytics",
+      permission: 'analytics.view',
     },
     {
       label: "User Management",
@@ -92,12 +96,20 @@ export function AdminSidebar() {
       label: "Escalation & Alerts",
       icon: AlertTriangle,
       href: "/alerts",
+      permission: 'escalations.view',
       badge: 25,
     },
     {
       label: "Badges & Streaks",
       icon: Trophy,
-      href: "/gamification",
+      href: "/admin/badges-streaks",
+      permission: 'badges.view',
+    },
+    {
+      label: "Profile",
+      icon: User,
+      href: "/admin/profile",
+      permission: 'settings.view',
     },
     {
       label: "Settings",
@@ -114,31 +126,44 @@ export function AdminSidebar() {
 
   // Filter navigation items based on permissions
   const filterNavItems = (items: NavItem[]): NavItem[] => {
+    console.log('Filtering nav items with permissions:', permissions.userPermissions);
+    console.log('User role:', permissions.userRole);
+    
     return items.filter(item => {
+      console.log('Checking item:', item.label, 'permission:', item.permission);
+      
       // Check role restrictions
       if (item.role && permissions.userRole && !item.role.includes(permissions.userRole)) {
+        console.log('Filtered out by role:', item.label);
         return false;
       }
       
       // Check permission requirements
       if (item.permission && !permissions.hasPermission(item.permission)) {
+        console.log('Filtered out by permission:', item.label, 'needed:', item.permission, 'has:', permissions.hasPermission(item.permission));
         return false;
       }
       
       // Filter children if they exist
       if (item.children) {
         item.children = item.children.filter(child => {
+          console.log('Checking child:', child.label, 'permission:', child.permission);
+          
           if (child.role && permissions.userRole && !child.role.includes(permissions.userRole)) {
+            console.log('Child filtered out by role:', child.label);
             return false;
           }
           if (child.permission && !permissions.hasPermission(child.permission)) {
+            console.log('Child filtered out by permission:', child.label, 'needed:', child.permission, 'has:', permissions.hasPermission(child.permission));
             return false;
           }
           return true;
         });
         
         // Only show parent if it has children after filtering
-        return item.children.length > 0;
+        const hasChildren = item.children.length > 0;
+        console.log('Parent', item.label, 'has children after filtering:', hasChildren);
+        return hasChildren;
       }
       
       return true;

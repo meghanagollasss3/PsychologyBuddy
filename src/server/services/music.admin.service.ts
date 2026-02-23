@@ -33,9 +33,7 @@ export class MusicAdminService {
 
   async createMusicResource(data: CreateMusicResourceInput & { schoolId?: string }) {
     try {
-      console.log('Service creating music resource with data:', JSON.stringify(data, null, 2));
       const resource = await this.musicRepository.createMusicResource(data);
-      console.log('Service created resource:', resource);
       
       return {
         success: true,

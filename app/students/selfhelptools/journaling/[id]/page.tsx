@@ -153,7 +153,7 @@ export default function JournalViewPage() {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/students/journaling')}
+            onClick={() => router.push('/students/selfhelptools/journaling')}
             className="flex items-center gap-2 text-slate-400 hover:text-blue-600 transition-colors group mb-6"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

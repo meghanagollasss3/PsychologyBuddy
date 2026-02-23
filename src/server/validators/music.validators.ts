@@ -8,13 +8,14 @@ export const CreateMusicResourceSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
   description: z.string().optional(),
   url: z.string().min(1, "Audio URL is required").refine((url) => {
-    // Accept both absolute URLs (http/https) and relative URLs (starting with /)
-    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
+    // Accept absolute URLs (http/https), relative URLs (starting with /), and data URLs
+    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/') || url.startsWith('data:');
   }, "Invalid audio URL format"),
   duration: z.number().int().positive("Duration must be positive").optional(),
   artist: z.string().optional(),
   album: z.string().optional(),
   coverImage: z.string().url("Invalid cover image URL").optional().or(z.literal("")),
+  thumbnailUrl: z.string().url("Invalid thumbnail URL").optional(),
   isPublic: z.boolean().default(true),
   status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
   categoryIds: z.array(z.string()).optional(),

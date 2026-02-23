@@ -6,7 +6,7 @@ import { Play, Clock, Music } from 'lucide-react';
 export interface MusicCardProps {
   id: string;
   title: string;
-  description: string;
+  description: string; 
   url: string;
   duration: number;
   artist?: string;
@@ -25,10 +25,12 @@ export interface CardProps {
   image?: string;
   coverImage?: string;
   thumbnail?: string;
+  thumbnailUrl?: string;
   coverArt?: string;
   url: string;
   artist?: string;
   album?: string;
+  type?: 'music' | 'meditation';
 }
 
 export default function MusicCard({
@@ -51,14 +53,14 @@ export default function MusicCard({
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      className="group w-auto sm:w-[399px] bg-white rounded-[13px] hover:shadow-xl hover:shadow-[#15A0EA33]/20 transition-all duration-300 flex flex-col h-full cursor-pointer"
     >
-      <div className="relative aspect-video bg-gray-100">
+      <div className="h-[120px] sm:h-[140px] lg:h-[160px] w-full relative">
         {coverImage ? (
           <img
             src={coverImage}
             alt={title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover opacity-90 rounded-tl-[13px] rounded-tr-[13px]"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

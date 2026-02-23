@@ -1,7 +1,11 @@
 export interface Role {
   id: string;
   name: string;
-  permissions: string[];
+  rolePermissions?: {
+    permission: {
+      name: string;
+    };
+  }[];
 }
 
 export interface Admin {
@@ -20,6 +24,12 @@ export interface Admin {
     department?: string;
     lastActive?: string;
     status?: string;
+    profileImageUrl?: string;
+    adminPermissions?: {
+      permission: {
+        name: string;
+      };
+    }[];
   };
   createdAt: string;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';

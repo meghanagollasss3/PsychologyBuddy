@@ -22,27 +22,37 @@ export class BadgeStudentController {
       const badges = await BadgeService.getUserBadges(session.userId);
 
       // Simple pagination for earned badges
-      const earnedBadges = badges.filter(b => b.progress === 100);
-      const inProgressBadges = badges.filter(b => b.progress < 100);
+      const earnedBadges = badges.filter(b => b.progress === 100).map(badge => ({
+        id: badge.badge.id,
+        icon: badge.badge.icon,
+        iconBg: "bg-amber-50",
+        name: badge.badge.name,
+        description: badge.badge.description,
+        date: new Date(badge.earnedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      }));
 
-      const startIndex = (parsed.page - 1) * parsed.limit;
-      const endIndex = startIndex + parsed.limit;
+      const inProgressBadges = badges.filter(b => b.progress < 100).map(badge => ({
+        id: badge.badge.id,
+        icon: badge.badge.icon,
+        iconBg: "bg-rose-50",
+        name: badge.badge.name,
+        description: badge.badge.description,
+        progress: badge.progress,
+        color: "bg-blue-400",
+      }));
 
-      const paginatedBadges = badges.slice(startIndex, endIndex);
+      // Get current streak
+      const streak = await prisma.streak.findUnique({
+        where: { userId: session.userId },
+      });
 
       return NextResponse.json({
         success: true,
         message: 'User badges retrieved successfully',
         data: {
-          badges: paginatedBadges,
-          earnedCount: earnedBadges.length,
-          inProgressCount: inProgressBadges.length,
-          pagination: {
-            page: parsed.page,
-            limit: parsed.limit,
-            total: badges.length,
-            totalPages: Math.ceil(badges.length / parsed.limit),
-          },
+          earnedBadges,
+          inProgressBadges,
+          currentStreak: streak?.count || 0,
         },
       });
     } catch (err) {

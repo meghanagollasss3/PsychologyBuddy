@@ -1,6 +1,3 @@
-// ====================================
-//  GENERATOR & DATASOURCE
-// ====================================
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,9 +7,824 @@ datasource db {
   provider = "postgresql"
 }
 
-// ====================================
-//            ENUMS
-// ====================================
+model User {
+  id                     String                           @id @default(cuid())
+  studentId              String?                          @unique
+  firstName              String
+  lastName               String
+  email                  String                           @unique
+  phone                  String?
+  password               String?
+  roleId                 String
+  schoolId               String?
+  classId                String?
+  status                 String                           @default("ACTIVE")
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+  emailVerified          Boolean                          @default(false)
+  adminProfile           AdminProfile?
+  artJournals            ArtJournal[]
+  articles               Article[]                        @relation("UserArticles")
+  audioJournals          AudioJournal[]
+  createdBadges          Badge[]                          @relation("BadgeCreator")
+  chatSessions           ChatSession[]
+  dailyLogins            DailyLogin[]
+  highRiskAlerts         HighRiskAlert[]
+  meditations            Meditation[]                     @relation("UserMeditations")
+  meditationInstructions MeditationListeningInstruction[] @relation("UserMeditationInstruction")
+  moodCheckins           MoodCheckin[]
+  musicInstructions      MusicInstruction[]               @relation("UserMusicInstruction")
+  musicTherapy           MusicTherapy[]                   @relation("UserMusic")
+  ratings                Rating[]                         @relation("UserRatings")
+  resourceAccess         ResourceAccess[]
+  savedArticles          SavedArticle[]                   @relation("UserSaves")
+  sessions               Session[]
+  streaks                Streak?
+  studentProfile         StudentProfile?
+  summaries              Summary[]
+  triggerSelections      TriggerSelection[]
+  userBadges             UserBadge[]
+  writingJournals        WritingJournal[]
+  completions            ArticleCompletion[]               @relation("UserCompletions")
+  classRef               Class?                           @relation(fields: [classId], references: [id])
+  role                   Role                             @relation(fields: [roleId], references: [id])
+  school                 School?                          @relation(fields: [schoolId], references: [id])
+
+  @@map("Users")
+}
+
+model StudentProfile {
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  profileImage String?
+  status       String  @default("ACTIVE")
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("StudentProfiles")
+}
+
+model AdminProfile {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  department       String            @default("Student Wellness")
+  profileImageUrl  String?
+  adminPermissions AdminPermission[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("AdminProfiles")
+}
+
+model School {
+  id                     String                           @id @default(cuid())
+  name                   String
+  address                String?
+  phone                  String?
+  email                  String?
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+  classes                Class[]
+  journalingConfig       JournalingToolConfig?
+  meditationResources    Meditation[]
+  meditationInstructions MeditationListeningInstruction[]
+  musicInstructions      MusicInstruction[]
+  musicResources         MusicResource[]
+  users                  User[]
+
+  @@map("Schools")
+}
+
+model Class {
+  id        String   @id @default(cuid())
+  name      String
+  grade     Int
+  section   String?
+  schoolId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  users     User[]
+
+  @@unique([schoolId, grade, section])
+  @@map("Classes")
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  description     String?
+  rolePermissions RolePermission[]
+  users           User[]
+
+  @@map("Roles")
+}
+
+model Permission {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  module           String
+  adminPermissions AdminPermission[]
+  rolePermissions  RolePermission[]
+
+  @@map("Permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("RolePermissions")
+}
+
+model AdminPermission {
+  id             String       @id @default(cuid())
+  adminProfileId String
+  permissionId   String
+  adminProfile   AdminProfile @relation(fields: [adminProfileId], references: [id], onDelete: Cascade)
+  permission     Permission   @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([adminProfileId, permissionId])
+  @@map("AdminPermissions")
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  userId    String
+  mood      String?
+  triggers  String?
+  startedAt DateTime      @default(now())
+  endedAt   DateTime?
+  isActive  Boolean       @default(true)
+  messages  ChatMessage[]
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  summaries Summary[]
+
+  @@map("ChatSessions")
+}
+
+model ChatMessage {
+  id         String      @id @default(cuid())
+  sessionId  String
+  senderType SenderType
+  content    String
+  createdAt  DateTime    @default(now())
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("ChatMessages")
+}
+
+model MoodCheckin {
+  id        String   @id @default(cuid())
+  userId    String
+  mood      String
+  notes     String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("MoodCheckins")
+}
+
+model TriggerSelection {
+  id        String   @id @default(cuid())
+  userId    String
+  triggers  String[]
+  notes     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("TriggerSelections")
+}
+
+model Summary {
+  id                String      @id @default(cuid())
+  userId            String
+  sessionId         String
+  mainTopic         String
+  conversationStart String
+  conversationAbout String
+  reflection        String
+  createdAt         DateTime    @default(now())
+  session           ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Summaries")
+}
+
+model JournalingToolConfig {
+  id                String  @id @default(cuid())
+  schoolId          String  @unique
+  enableWriting     Boolean @default(true)
+  enableAudio       Boolean @default(true)
+  enableArt         Boolean @default(true)
+  maxAudioDuration  Int     @default(300)
+  autoSaveAudio     Boolean @default(true)
+  enableUndo        Boolean @default(true)
+  enableRedo        Boolean @default(true)
+  enableClearCanvas Boolean @default(true)
+  school            School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("JournalingToolConfig")
+}
+
+model WritingJournal {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("WritingJournals")
+}
+
+model AudioJournal {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  audioUrl  String
+  duration  Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("AudioJournals")
+}
+
+model ArtJournal {
+  id        String   @id @default(cuid())
+  userId    String
+  imageUrl  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("ArtJournals")
+}
+
+model JournalingPrompt {
+  id        String   @id @default(cuid())
+  text      String
+  moodIds   String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isEnabled Boolean  @default(true)
+
+  @@map("JournalingPrompts")
+}
+
+model MusicTherapy {
+  id             String         @id @default(cuid())
+  title          String
+  subtitle       String?
+  thumbnailUrl   String?
+  audioUrl       String
+  durationSec    Int
+  category       String?
+  supportedMoods String[]
+  goal           String?
+  status         ResourceStatus @default(DRAFT)
+  createdBy      String
+  createdAt      DateTime       @default(now())
+  admin          User           @relation("UserMusic", fields: [createdBy], references: [id])
+}
+
+model Meditation {
+  id           String                         @id @default(cuid())
+  title        String
+  description  String
+  thumbnailUrl String?
+  format       MeditationFormat
+  audioUrl     String?
+  videoUrl     String?
+  durationSec  Int?
+  instructor   String?
+  type         String                         @default("GUIDED")
+  status       ResourceStatus                 @default(DRAFT)
+  schoolId     String?
+  createdBy    String
+  createdAt    DateTime                       @default(now())
+  updatedAt    DateTime                       @updatedAt
+  deletedAt    DateTime?
+  admin        User                           @relation("UserMeditations", fields: [createdBy], references: [id])
+  school       School?                        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  categories   MeditationMeditationCategory[] @relation("MeditationCategories")
+  goals        MeditationMeditationGoal[]     @relation("MeditationGoals")
+  moods        MeditationMood[]
+}
+
+model MeditationMood {
+  id           String     @id @default(cuid())
+  meditationId String
+  moodId       String
+  meditation   Meditation @relation(fields: [meditationId], references: [id], onDelete: Cascade)
+  mood         MoodLabel  @relation(fields: [moodId], references: [id], onDelete: Cascade)
+
+  @@unique([meditationId, moodId])
+}
+
+model MusicInstruction {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  steps       Json
+  duration    Int?
+  difficulty  String   @default("BEGINNER")
+  status      String   @default("DRAFT")
+  schoolId    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  proTip      String?
+  creator     User     @relation("UserMusicInstruction", fields: [createdBy], references: [id])
+  school      School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("MusicInstructions")
+}
+
+model MeditationListeningInstruction {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  steps       Json
+  duration    Int?
+  difficulty  String   @default("BEGINNER")
+  status      String   @default("DRAFT")
+  createdBy   String?
+  schoolId    String?
+  resourceId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  proTip      String?
+  creator     User?    @relation("UserMeditationInstruction", fields: [createdBy], references: [id])
+  school      School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("MeditationListeningInstructions")
+}
+
+model MeditationMeditationCategory {
+  id           String             @id @default(cuid())
+  meditationId String
+  categoryId   String
+  createdAt    DateTime           @default(now())
+  category     MeditationCategory @relation("MeditationCategories", fields: [categoryId], references: [id], onDelete: Cascade)
+  meditation   Meditation         @relation("MeditationCategories", fields: [meditationId], references: [id], onDelete: Cascade)
+
+  @@unique([meditationId, categoryId])
+  @@map("MeditationMeditationCategories")
+}
+
+model MeditationMeditationGoal {
+  id           String         @id @default(cuid())
+  meditationId String
+  goalId       String
+  createdAt    DateTime       @default(now())
+  goal         MeditationGoal @relation("MeditationGoals", fields: [goalId], references: [id], onDelete: Cascade)
+  meditation   Meditation     @relation("MeditationGoals", fields: [meditationId], references: [id], onDelete: Cascade)
+
+  @@unique([meditationId, goalId])
+  @@map("MeditationMeditationGoals")
+}
+
+model MeditationCategory {
+  id          String                         @id @default(cuid())
+  name        String                         @unique
+  description String?
+  icon        String?
+  color       String?
+  status      String                         @default("ACTIVE")
+  createdAt   DateTime                       @default(now())
+  updatedAt   DateTime                       @updatedAt
+  meditations MeditationMeditationCategory[] @relation("MeditationCategories")
+
+  @@map("MeditationCategories")
+}
+
+model MeditationGoal {
+  id          String                     @id @default(cuid())
+  name        String                     @unique
+  description String?
+  icon        String?
+  color       String?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  meditations MeditationMeditationGoal[] @relation("MeditationGoals")
+
+  @@map("MeditationGoals")
+}
+
+model Article {
+  id                 String              @id @default(cuid())
+  title              String
+  subtitle           String?
+  author             String
+  thumbnailUrl       String?
+  description        String
+  readTime           Int?
+  status             ResourceStatus      @default(DRAFT)
+  createdBy          String
+  averageRating      Float?
+  ratingCount        Int?
+  views              Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  blocks             ArticleBlock[]
+  categories         ArticleCategory[]
+  goals              ArticleGoal[]
+  moods              ArticleMood[]
+  admin              User                @relation("UserArticles", fields: [createdBy], references: [id])
+  bulletListBlocks   BulletListBlock[]
+  imageBlocks        ImageBlock[]
+  keyTakeawaysBlocks KeyTakeawaysBlock[]
+  linkBlocks         LinkBlock[]
+  ratings            Rating[]            @relation("ArticleRatings")
+  reflectionBlocks   ReflectionBlock[]
+  savedArticles      SavedArticle[]      @relation("ArticleSaves")
+  sectionBlocks      SectionBlock[]
+  completions        ArticleCompletion[] @relation("ArticleCompletions")
+
+  @@map("Articles")
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  articleId String
+  score     Int
+  studentId String?
+  createdAt DateTime @default(now())
+  article   Article  @relation("ArticleRatings", fields: [articleId], references: [id], onDelete: Cascade)
+  student   User?    @relation("UserRatings", fields: [studentId], references: [id])
+
+  @@unique([articleId, studentId])
+  @@map("Ratings")
+}
+
+model SavedArticle {
+  id        String   @id @default(cuid())
+  articleId String
+  studentId String?
+  createdAt DateTime @default(now())
+  article   Article  @relation("ArticleSaves", fields: [articleId], references: [id], onDelete: Cascade)
+  student   User?    @relation("UserSaves", fields: [studentId], references: [id])
+
+  @@unique([articleId, studentId])
+  @@map("SavedArticles")
+}
+
+model ArticleCompletion {
+  id        String   @id @default(cuid())
+  articleId String
+  studentId String?
+  createdAt DateTime @default(now())
+  article   Article  @relation("ArticleCompletions", fields: [articleId], references: [id], onDelete: Cascade)
+  student   User?    @relation("UserCompletions", fields: [studentId], references: [id])
+
+  @@unique([articleId, studentId])
+  @@map("ArticleCompletions")
+}
+
+model MeditationSave {
+  id           String   @id @default(cuid())
+  meditationId String
+  studentId    String?
+  createdAt    DateTime @default(now())
+
+  @@unique([meditationId, studentId])
+  @@map("MeditationSaves")
+}
+
+model MusicSave {
+  id        String   @id @default(cuid())
+  musicId   String
+  studentId String?
+  createdAt DateTime @default(now())
+
+  @@unique([musicId, studentId])
+  @@map("MusicSaves")
+}
+
+model ArticleMood {
+  id        String    @id @default(cuid())
+  articleId String
+  moodId    String
+  article   Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  mood      MoodLabel @relation(fields: [moodId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, moodId])
+}
+
+model ArticleGoal {
+  id        String    @id @default(cuid())
+  articleId String
+  goalId    String
+  article   Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  goal      GoalLabel @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, goalId])
+}
+
+model ArticleCategory {
+  id         String        @id @default(cuid())
+  articleId  String
+  categoryId String
+  article    Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  category   CategoryLabel @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, categoryId])
+}
+
+model DailyLogin {
+  id     String   @id @default(cuid())
+  userId String
+  date   DateTime @default(now())
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("DailyLogins")
+}
+
+model ResourceAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  resource  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("ResourceAccess")
+}
+
+model Streak {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  count      Int      @default(0)
+  lastActive DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@map("Streaks")
+}
+
+model HighRiskAlert {
+  id        String   @id @default(cuid())
+  userId    String
+  reason    String
+  createdAt DateTime @default(now())
+  resolved  Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("HighRiskAlerts")
+}
+
+model MoodLabel {
+  id         String           @id @default(cuid())
+  name       String           @unique
+  type       String           @default("GENERAL")
+  articles   ArticleMood[]
+  meditation MeditationMood[]
+}
+
+model GoalLabel {
+  id       String        @id @default(cuid())
+  name     String        @unique
+  status   String        @default("ACTIVE")
+  articles ArticleGoal[]
+
+  @@map("GoalLabels")
+}
+
+model CategoryLabel {
+  id       String            @id @default(cuid())
+  name     String            @unique
+  status   String            @default("ACTIVE")
+  articles ArticleCategory[]
+
+  @@map("CategoryLabels")
+}
+
+model ArticleBlock {
+  id        String  @id @default(cuid())
+  articleId String
+  type      String
+  order     Int
+  content   Json
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("ArticleBlocks")
+}
+
+model ImageBlock {
+  id        String  @id @default(cuid())
+  articleId String
+  order     Int
+  src       String
+  altText   String?
+  caption   String?
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("ImageBlocks")
+}
+
+model KeyTakeawaysBlock {
+  id        String   @id @default(cuid())
+  articleId String
+  order     Int
+  title     String?
+  items     String[]
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("KeyTakeawaysBlocks")
+}
+
+model ReflectionBlock {
+  id        String  @id @default(cuid())
+  articleId String
+  order     Int
+  heading   String
+  content   String
+  prompt    String?
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("ReflectionBlocks")
+}
+
+model LinkBlock {
+  id          String  @id @default(cuid())
+  articleId   String
+  order       Int
+  title       String
+  url         String
+  description String?
+  article     Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("LinkBlocks")
+}
+
+model SectionBlock {
+  id        String  @id @default(cuid())
+  articleId String
+  order     Int
+  title     String
+  content   String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("SectionBlocks")
+}
+
+model BulletListBlock {
+  id        String   @id @default(cuid())
+  articleId String
+  order     Int
+  title     String
+  items     String[]
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("BulletListBlocks")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MusicMood {
+  id             String              @id @default(cuid())
+  name           String              @unique
+  description    String?
+  icon           String?
+  color          String?
+  status         String              @default("ACTIVE")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  musicResources MusicResourceMood[] @relation("MusicMoods")
+
+  @@map("MusicMoods")
+}
+
+model MusicResourceMood {
+  id              String        @id @default(cuid())
+  musicResourceId String
+  moodId          String
+  createdAt       DateTime      @default(now())
+  mood            MusicMood     @relation("MusicMoods", fields: [moodId], references: [id], onDelete: Cascade)
+  musicResource   MusicResource @relation("ResourceMoods", fields: [musicResourceId], references: [id], onDelete: Cascade)
+
+  @@unique([musicResourceId, moodId])
+  @@map("MusicResourceMoods")
+}
+
+model MusicResource {
+  id           String                  @id @default(cuid())
+  title        String
+  description  String?
+  url          String
+  duration     Int?
+  artist       String?
+  album        String?
+  coverImage   String?
+  isPublic     Boolean                 @default(true)
+  schoolId     String?
+  categoryId   String?
+  status       String                  @default("DRAFT")
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  thumbnailUrl String?
+  categories   MusicResourceCategory[] @relation("ResourceCategories")
+  goals        MusicResourceGoal[]     @relation("ResourceGoals")
+  moods        MusicResourceMood[]     @relation("ResourceMoods")
+  category     MusicCategory?          @relation("ResourceCategory", fields: [categoryId], references: [id])
+  school       School?                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("MusicResources")
+}
+
+model MusicCategory {
+  id             String                  @id @default(cuid())
+  name           String                  @unique
+  description    String?
+  icon           String?
+  color          String?
+  status         String                  @default("ACTIVE")
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  musicResources MusicResourceCategory[] @relation("CategoryResources")
+  resources      MusicResource[]         @relation("ResourceCategory")
+
+  @@map("MusicCategories")
+}
+
+model MusicResourceCategory {
+  id              String        @id @default(cuid())
+  musicResourceId String
+  categoryId      String
+  createdAt       DateTime      @default(now())
+  category        MusicCategory @relation("CategoryResources", fields: [categoryId], references: [id], onDelete: Cascade)
+  musicResource   MusicResource @relation("ResourceCategories", fields: [musicResourceId], references: [id], onDelete: Cascade)
+
+  @@unique([musicResourceId, categoryId])
+  @@map("MusicResourceCategories")
+}
+
+model MusicGoal {
+  id             String              @id @default(cuid())
+  name           String              @unique
+  description    String?
+  icon           String?
+  color          String?
+  status         String              @default("ACTIVE")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  musicResources MusicResourceGoal[] @relation("MusicGoals")
+
+  @@map("MusicGoals")
+}
+
+model MusicResourceGoal {
+  id              String        @id @default(cuid())
+  musicResourceId String
+  goalId          String
+  createdAt       DateTime      @default(now())
+  goal            MusicGoal     @relation("MusicGoals", fields: [goalId], references: [id], onDelete: Cascade)
+  musicResource   MusicResource @relation("ResourceGoals", fields: [musicResourceId], references: [id], onDelete: Cascade)
+
+  @@unique([musicResourceId, goalId])
+  @@map("MusicResourceGoals")
+}
+
+model Badge {
+  id             String      @id @default(cuid())
+  name           String
+  icon           String
+  description    String
+  requirement    String
+  isActive       Boolean     @default(true)
+  type           BadgeType
+  conditionValue Int?
+  createdBy      String
+  createdAt      DateTime    @default(now())
+  schoolId       String?     // School ID for badge filtering
+  admin          User        @relation("BadgeCreator", fields: [createdBy], references: [id])
+  userBadges     UserBadge[]
+
+  @@map("Badges")
+}
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@map("UserBadges")
+}
+
 enum SenderType {
   STUDENT
   BOT
@@ -37,929 +849,4 @@ enum BadgeType {
   MEDITATION_COUNT
   MUSIC_COUNT
   MOOD_CHECKIN
-}
-
-// ====================================
-//        USER & AUTH MODELS
-// ====================================
-model User {
-  id            String   @id @default(cuid())
-  studentId     String?  @unique
-  firstName     String
-  lastName      String
-  email         String   @unique
-  phone         String?
-  password      String?
-  roleId        String
-  schoolId      String?
-  classId       String?
-  status        String   @default("ACTIVE")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  emailVerified Boolean  @default(false)
-
-  // Relations
-  role     Role    @relation(fields: [roleId], references: [id])
-  school   School? @relation(fields: [schoolId], references: [id])
-  classRef Class?  @relation(fields: [classId], references: [id])
-
-  studentProfile StudentProfile?
-  adminProfile   AdminProfile?
-
-  chatSessions      ChatSession[]
-  moodCheckins      MoodCheckin[]
-  triggerSelections TriggerSelection[]
-  summaries         Summary[]
-  dailyLogins       DailyLogin[]
-  resourceAccess    ResourceAccess[]
-  streaks           Streak[]
-  writingJournals   WritingJournal[]
-  audioJournals     AudioJournal[]
-  artJournals       ArtJournal[]
-  highRiskAlerts    HighRiskAlert[]
-  ratings          Rating[] @relation("UserRatings")
-  savedArticles    SavedArticle[] @relation("UserSaves")
-  // savedMeditations  SavedMeditation[] @relation("UserMeditationSaves")
-
-  // Badge relations
-  createdBadges    Badge[] @relation("BadgeCreator")
-  userBadges        UserBadge[]
-
-  // Creator relations (must be explicitly named)
-  articles     Article[]      @relation("UserArticles")
-  musicTherapy MusicTherapy[] @relation("UserMusic")
-  meditations  Meditation[]   @relation("UserMeditations")
-  meditationInstructions MeditationListeningInstruction[] @relation("UserMeditationInstruction")
-  musicInstructions MusicInstruction[] @relation("UserMusicInstruction")
-
-  sessions Session[]
-
-  @@map("Users")
-}
-
-model StudentProfile {
-  id           String  @id @default(cuid())
-  userId       String  @unique
-  profileImage String?
-  status       String  @default("ACTIVE")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("StudentProfiles")
-}
-
-model AdminProfile {
-  id              String  @id @default(cuid())
-  userId          String  @unique
-  department      String  @default("Student Wellness")
-  profileImageUrl String?
-
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  adminPermissions AdminPermission[]
-
-  @@map("AdminProfiles")
-}
-
-// ====================================
-//         SCHOOL & CLASS MODELS
-// ====================================
-model School {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  phone     String?
-  email     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  classes          Class[]
-  users            User[]
-  journalingConfig JournalingToolConfig?
-  musicResources   MusicResource[]
-  meditationResources Meditation[]
-  meditationInstructions MeditationListeningInstruction[]
-  musicInstructions MusicInstruction[]
-
-  @@map("Schools")
-}
-
-model Class {
-  id        String   @id @default(cuid())
-  name      String
-  grade     Int
-  section   String?
-  schoolId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  users  User[]
-
-  @@unique([schoolId, grade, section])
-  @@map("Classes")
-}
-
-// ====================================
-//            RBAC MODELS
-// ====================================
-model Role {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  description String?
-
-  rolePermissions RolePermission[]
-  users           User[]
-
-  @@map("Roles")
-}
-
-model Permission {
-  id     String @id @default(cuid())
-  name   String @unique
-  module String
-
-  rolePermissions  RolePermission[]
-  adminPermissions AdminPermission[]
-
-  @@map("Permissions")
-}
-
-model RolePermission {
-  id           String @id @default(cuid())
-  roleId       String
-  permissionId String
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@unique([roleId, permissionId])
-  @@map("RolePermissions")
-}
-
-model AdminPermission {
-  id             String @id @default(cuid())
-  adminProfileId String
-  permissionId   String
-
-  adminProfile AdminProfile @relation(fields: [adminProfileId], references: [id], onDelete: Cascade)
-  permission   Permission   @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@unique([adminProfileId, permissionId])
-  @@map("AdminPermissions")
-}
-
-// ====================================
-//            CHAT SYSTEM
-// ====================================
-model ChatSession {
-  id        String    @id @default(cuid())
-  userId    String
-  mood      String?
-  triggers  String?
-  startedAt DateTime  @default(now())
-  endedAt   DateTime?
-  isActive  Boolean   @default(true)
-
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  ChatMessage[]
-  summaries Summary[]
-
-  @@map("ChatSessions")
-}
-
-model ChatMessage {
-  id         String     @id @default(cuid())
-  sessionId  String
-  senderType SenderType
-  content    String
-  createdAt  DateTime   @default(now())
-
-  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@map("ChatMessages")
-}
-
-model MoodCheckin {
-  id        String   @id @default(cuid())
-  userId    String
-  mood      String
-  notes     String?
-  date      DateTime @default(now())
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("MoodCheckins")
-}
-
-model TriggerSelection {
-  id        String   @id @default(cuid())
-  userId    String
-  triggers  String[]
-  notes     String?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("TriggerSelections")
-}
-
-model Summary {
-  id                String   @id @default(cuid())
-  userId            String
-  sessionId         String
-  mainTopic         String
-  conversationStart String
-  conversationAbout String
-  reflection        String
-  createdAt         DateTime @default(now())
-
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@map("Summaries")
-}
-
-// ====================================
-//         JOURNALING MODULE
-// ====================================
-model JournalingToolConfig {
-  id                String  @id @default(cuid())
-  schoolId          String  @unique
-  enableWriting     Boolean @default(true)
-  enableAudio       Boolean @default(true)
-  enableArt         Boolean @default(true)
-  maxAudioDuration  Int     @default(300)
-  autoSaveAudio     Boolean @default(true)
-  enableUndo        Boolean @default(true)
-  enableRedo        Boolean @default(true)
-  enableClearCanvas Boolean @default(true)
-
-  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-
-  @@map("JournalingToolConfig")
-}
-
-model WritingJournal {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String?
-  content   String
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("WritingJournals")
-}
-
-model AudioJournal {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String?
-  audioUrl  String
-  duration  Int
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("AudioJournals")
-}
-
-model ArtJournal {
-  id        String   @id @default(cuid())
-  userId    String
-  imageUrl  String
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("ArtJournals")
-}
-
-model JournalingPrompt {
-  id        String   @id @default(cuid())
-  text      String
-  moodIds   String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("JournalingPrompts")
-}
-
-// ====================================
-//         MUSIC THERAPY
-// ====================================
-model MusicTherapy {
-  id             String         @id @default(cuid())
-  title          String
-  subtitle       String?
-  thumbnailUrl   String?
-  audioUrl       String
-  durationSec    Int
-  category       String?
-  supportedMoods String[]
-  goal           String?
-  status         ResourceStatus @default(DRAFT)
-  createdBy      String
-  createdAt      DateTime       @default(now())
-
-  admin User @relation("UserMusic", fields: [createdBy], references: [id])
-}
-
-// ====================================
-//         MEDITATION
-// ====================================
-model Meditation {
-  id             String           @id @default(cuid())
-  title          String
-  description    String
-  thumbnailUrl   String?
-  format         MeditationFormat
-  audioUrl       String?
-  videoUrl       String?
-  durationSec    Int?
-  instructor     String?
-  type           String   @default("GUIDED") // GUIDED | MUSIC | BREATHING | BODY_SCAN
-  status         ResourceStatus   @default(DRAFT)
-  schoolId       String?
-  createdBy      String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  deletedAt      DateTime?
-
-  // Relations
-  school         School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  admin          User @relation("UserMeditations", fields: [createdBy], references: [id])
-  moods          MeditationMood[]
-  categories     MeditationMeditationCategory[] @relation("MeditationCategories")
-  goals          MeditationMeditationGoal[] @relation("MeditationGoals")
-  // savedMeditations SavedMeditation[] @relation("MeditationSaves")
-}
-
-model MeditationMood {
-  id           String @id @default(cuid())
-  meditationId String
-  moodId       String
-
-  meditation Meditation @relation(fields: [meditationId], references: [id], onDelete: Cascade)
-  mood       MoodLabel @relation(fields: [moodId], references: [id], onDelete: Cascade)
-
-  @@unique([meditationId, moodId])
-}
-
-// Music Listening Instructions - Step-by-step guidance for students
-model MusicInstruction {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  steps       Json      // Array of instruction steps
-  duration    Int?     // Estimated time in minutes
-  difficulty  String   @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
-  status      String   @default("DRAFT") // DRAFT | PUBLISHED
-  proTip      String?  // Professional tip for learners
-  schoolId    String?
-  createdBy    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  creator User? @relation("UserMusicInstruction", fields: [createdBy], references: [id])
-  school  School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-
-  @@map("MusicInstructions")
-}
-
-// Meditation Listening Instructions - Step-by-step guidance for students
-model MeditationListeningInstruction {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  steps       Json      // Array of instruction steps
-  duration    Int?     // Estimated time in minutes
-  difficulty  String   @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
-  status      String   @default("DRAFT") // DRAFT | PUBLISHED
-  proTip      String?  // Professional tip for learners
-  createdBy   String?
-  schoolId    String?
-  resourceId  String?  // Optional: Link to specific meditation resource
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  creator User? @relation("UserMeditationInstruction", fields: [createdBy], references: [id])
-  school  School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-
-  @@map("MeditationListeningInstructions")
-}
-
-// ====================================
-//     MEDITATION JUNCTION TABLES
-// ====================================
-
-model MeditationMeditationCategory {
-  id             String @id @default(cuid())
-  meditationId   String
-  categoryId     String
-  createdAt      DateTime @default(now())
-
-  meditation   Meditation   @relation("MeditationCategories", fields: [meditationId], references: [id], onDelete: Cascade)
-  category     MeditationCategory @relation("MeditationCategories", fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([meditationId, categoryId])
-  @@map("MeditationMeditationCategories")
-}
-
-model MeditationMeditationGoal {
-  id             String @id @default(cuid())
-  meditationId   String
-  goalId         String
-  createdAt      DateTime @default(now())
-
-  meditation   Meditation   @relation("MeditationGoals", fields: [meditationId], references: [id], onDelete: Cascade)
-  goal         MeditationGoal @relation("MeditationGoals", fields: [goalId], references: [id], onDelete: Cascade)
-
-  @@unique([meditationId, goalId])
-  @@map("MeditationMeditationGoals")
-}
-
-// ====================================
-//     MEDITATION CATEGORIES & GOALS
-// ====================================
-
-model MeditationCategory {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  icon        String?
-  color       String?
-  status      String   @default("ACTIVE") // ACTIVE | INACTIVE
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  meditations MeditationMeditationCategory[] @relation("MeditationCategories")
-
-  @@map("MeditationCategories")
-}
-
-model MeditationGoal {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  icon        String?
-  color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  meditations MeditationMeditationGoal[] @relation("MeditationGoals")
-
-  @@map("MeditationGoals")
-}
-
-// ====================================
-//       PSYCHO-EDUCATION ARTICLES
-// ====================================
-model Article {
-  id           String         @id @default(cuid())
-  title        String
-  subtitle     String?
-  author       String
-  thumbnailUrl String?
-  description  String
-  readTime     Int?           // Read time in minutes
-  status       ResourceStatus @default(DRAFT)
-  createdBy    String
-  averageRating Float?         // Average rating from all users
-  ratingCount   Int?           // Total number of ratings
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-
-  admin      User              @relation("UserArticles", fields: [createdBy], references: [id])
-  moods      ArticleMood[]
-  goals      ArticleGoal[]
-  categories ArticleCategory[]
-  blocks     ArticleBlock[]
-  ratings    Rating[] @relation("ArticleRatings")
-  savedArticles SavedArticle[] @relation("ArticleSaves")
-  
-  // New separate block relationships
-  sectionBlocks    SectionBlock[]
-  bulletListBlocks BulletListBlock[]
-  imageBlocks      ImageBlock[]
-  keyTakeawaysBlocks KeyTakeawaysBlock[]
-  reflectionBlocks ReflectionBlock[]
-  linkBlocks       LinkBlock[]
-
-  @@map("Articles")
-}
-
-model Rating {
-  id        String   @id @default(cuid())
-  articleId String
-  score      Int      // 1-5 star rating
-  studentId  String?  // Optional: track which student rated
-  createdAt DateTime @default(now())
-
-  article Article @relation("ArticleRatings", fields: [articleId], references: [id], onDelete: Cascade)
-  student  User?    @relation("UserRatings", fields: [studentId], references: [id])
-
-  @@unique([articleId, studentId]) // One rating per student per article
-  @@map("Ratings")
-}
-
-model SavedArticle {
-  id        String   @id @default(cuid())
-  articleId String
-  studentId  String?  // Optional: track which student saved
-  createdAt DateTime @default(now())
-
-  article Article @relation("ArticleSaves", fields: [articleId], references: [id], onDelete: Cascade)
-  student  User?    @relation("UserSaves", fields: [studentId], references: [id])
-
-  @@unique([articleId, studentId]) // One save per student per article (allows null studentId)
-  @@map("SavedArticles")
-}
-
-model MeditationSave {
-  id           String   @id @default(cuid())
-  meditationId String
-  studentId    String?
-  createdAt    DateTime @default(now())
-
-  @@unique([meditationId, studentId])
-  @@map("MeditationSaves")
-}
-
-model MusicSave {
-  id        String   @id @default(cuid())
-  musicId   String
-  studentId String?
-  createdAt DateTime @default(now())
-
-  @@unique([musicId, studentId])
-  @@map("MusicSaves")
-}
-
-model ArticleMood {
-  id        String @id @default(cuid())
-  articleId String
-  moodId    String
-
-  article Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  mood    MoodLabel @relation(fields: [moodId], references: [id], onDelete: Cascade)
-
-  @@unique([articleId, moodId])
-}
-
-model ArticleGoal {
-  id        String @id @default(cuid())
-  articleId String
-  goalId    String
-
-  article Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  goal    GoalLabel @relation(fields: [goalId], references: [id], onDelete: Cascade)
-
-  @@unique([articleId, goalId])
-}
-
-model ArticleCategory {
-  id         String @id @default(cuid())
-  articleId  String
-  categoryId String
-
-  article  Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  category CategoryLabel @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([articleId, categoryId])
-}
-
-// ====================================
-//       ANALYTICS MODELS
-// ====================================
-model DailyLogin {
-  id     String   @id @default(cuid())
-  userId String
-  date   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, date])
-  @@map("DailyLogins")
-}
-
-model ResourceAccess {
-  id        String   @id @default(cuid())
-  userId    String
-  resource  String
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("ResourceAccess")
-}
-
-model Streak {
-  id         String   @id @default(cuid())
-  userId     String   @unique
-  count      Int      @default(0)
-  lastActive DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("Streaks")
-}
-
-model HighRiskAlert {
-  id        String   @id @default(cuid())
-  userId    String
-  reason    String
-  createdAt DateTime @default(now())
-  resolved  Boolean  @default(false)
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("HighRiskAlerts")
-}
-
-// ====================================
-//       TAXONOMY LABEL TABLES
-// ====================================
-model MoodLabel {
-  id     String @id @default(cuid())
-  name   String @unique
-  type   String @default("GENERAL") // GENERAL, MEDITATION, MUSIC
-
-  articles   ArticleMood[]
-  meditation MeditationMood[]
-
-}
-
-model GoalLabel {
-  id     String  @id @default(cuid())
-  name   String  @unique
-  status String  @default("ACTIVE")
-
-  articles   ArticleGoal[]
-
-  @@map("GoalLabels")
-}
-
-model CategoryLabel {
-  id     String  @id @default(cuid())
-  name   String  @unique
-  status String  @default("ACTIVE")
-
-  articles   ArticleCategory[]
-
-  @@map("CategoryLabels")
-}
-
-model ArticleBlock {
-  id        String @id @default(cuid())
-  articleId String
-  type      String // "section" | "image" | "list" | "takeaways" | "reflection" | "link" | "divider"
-  order     Int
-  content   Json   // { title?, text?, items?, src?, alt?, points?, link?, ... }
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@map("ArticleBlocks")
-}
-
-// Separate block type models for better database structure
-model ImageBlock {
-  id        String @id @default(cuid())
-  articleId String
-  order     Int
-  src        String
-  altText    String?
-  caption    String?
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@map("ImageBlocks")
-}
-
-model KeyTakeawaysBlock {
-  id        String @id @default(cuid())
-  articleId String
-  order     Int
-  title      String?
-  items      String[] // Array of takeaway points
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@map("KeyTakeawaysBlocks")
-}
-
-model ReflectionBlock {
-  id        String @id @default(cuid())
-  articleId String
-  order     Int
-  heading    String
-  content    String
-  prompt     String?
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@map("ReflectionBlocks")
-}
-
-model LinkBlock {
-  id          String @id @default(cuid())
-  articleId   String
-  order       Int
-  title       String
-  url         String
-  description String?
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@map("LinkBlocks")
-}
-
-model SectionBlock {
-  id        String @id @default(cuid())
-  articleId String
-  order     Int
-  title     String
-  content   String
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@map("SectionBlocks")
-}
-
-model BulletListBlock {
-  id        String @id @default(cuid())
-  articleId String
-  order     Int
-  title     String
-  items      String[] // Array of bullet points
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  @@map("BulletListBlocks")
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  sessionId String   @unique
-  userId    String
-  roleId    String
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model MusicMood {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  icon        String?
-  color       String?
-  status      String   @default("ACTIVE") // ACTIVE | INACTIVE
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  musicResources MusicResourceMood[] @relation("MusicMoods")
-
-  @@map("MusicMoods")
-}
-
-model MusicResourceMood {
-  id             String @id @default(cuid())
-  musicResourceId String
-  moodId         String
-  createdAt      DateTime @default(now())
-
-  musicResource MusicResource @relation("ResourceMoods", fields: [musicResourceId], references: [id], onDelete: Cascade)
-  mood         MusicMood    @relation("MusicMoods", fields: [moodId], references: [id], onDelete: Cascade)
-
-  @@unique([musicResourceId, moodId])
-  @@map("MusicResourceMoods")
-}
-
-model MusicResource {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  url         String
-  duration    Int?     // in seconds
-  artist      String?
-  album       String?
-  coverImage  String?
-  isPublic    Boolean  @default(true)
-  schoolId    String?
-  categoryId  String?  // Direct category link for simpler filtering
-  status      String   @default("DRAFT") // DRAFT | PUBLISHED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  school     School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  category   MusicCategory? @relation("ResourceCategory", fields: [categoryId], references: [id], onDelete: SetNull)
-  categories MusicResourceCategory[] @relation("ResourceCategories")
-  goals      MusicResourceGoal[] @relation("ResourceGoals")
-  moods      MusicResourceMood[] @relation("ResourceMoods")
-
-  @@map("MusicResources")
-}
-
-// ====================================
-//         MUSIC CATEGORIES & GOALS
-// ====================================
-
-model MusicCategory {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  icon        String?
-  color       String?
-  status      String   @default("ACTIVE") // ACTIVE | INACTIVE
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  musicResources MusicResourceCategory[] @relation("CategoryResources")
-  resources      MusicResource[] @relation("ResourceCategory")
-
-  @@map("MusicCategories")
-}
-
-model MusicResourceCategory {
-  id             String @id @default(cuid())
-  musicResourceId String
-  categoryId     String
-  createdAt      DateTime @default(now())
-
-  musicResource MusicResource @relation("ResourceCategories", fields: [musicResourceId], references: [id], onDelete: Cascade)
-  category     MusicCategory @relation("CategoryResources", fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([musicResourceId, categoryId])
-  @@map("MusicResourceCategories")
-}
-
-model MusicGoal {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  icon        String?
-  color       String?
-  status      String   @default("ACTIVE") // ACTIVE | INACTIVE
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  musicResources MusicResourceGoal[] @relation("MusicGoals")
-
-  @@map("MusicGoals")
-}
-
-model MusicResourceGoal {
-  id             String @id @default(cuid())
-  musicResourceId String
-  goalId         String
-  createdAt      DateTime @default(now())
-
-  musicResource MusicResource @relation("ResourceGoals", fields: [musicResourceId], references: [id], onDelete: Cascade)
-  goal         MusicGoal    @relation("MusicGoals", fields: [goalId], references: [id], onDelete: Cascade)
-
-  @@unique([musicResourceId, goalId])
-  @@map("MusicResourceGoals")
-}
-
-// ====================================
-//         BADGE SYSTEM MODELS
-// ====================================
-
-model Badge {
-  id            String   @id @default(cuid())
-  name          String
-  icon          String   // emoji
-  description   String
-  requirement   String   // human-readable text
-  isActive      Boolean  @default(true)
-  type          BadgeType
-  conditionValue Int?     // e.g. 7 days for streak badges
-  createdBy     String
-  createdAt     DateTime @default(now())
-
-  // Relations
-  admin      User       @relation("BadgeCreator", fields: [createdBy], references: [id])
-  userBadges UserBadge[]
-
-  @@map("Badges")
-}
-
-model UserBadge {
-  id       String   @id @default(cuid())
-  userId   String
-  badgeId  String
-  earnedAt DateTime @default(now())
-
-  // Relations
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, badgeId])
-  @@map("UserBadges")
 }

@@ -52,7 +52,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { 
   JournalPrompt, 
@@ -89,6 +89,14 @@ export default function JournalingTools({
 }: JournalingToolsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Helper function to extract error messages
+  const getErrorMessage = (error: any): string => {
+    if (typeof error === 'string') return error;
+    if (error?.message) return error.message;
+    if (error?.error?.message) return error.error.message;
+    return "An unknown error occurred";
+  };
   
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
@@ -137,21 +145,18 @@ export default function JournalingTools({
   
   // Form states
   const [journalForm, setJournalForm] = useState({ 
-    prompt: "", 
-    moods: [] as string[], 
-    journalTypes: ["writing"] as ("writing" | "art")[] 
+    text: "", 
+    moodIds: [] as string[]
   });
+  const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
   
-  // Dialog states
-  const [isAddJournalOpen, setIsAddJournalOpen] = useState(false);
+  // Dialog states - use props instead of local state
+  // const [isAddJournalingPromptOpen, setIsAddJournalingPromptOpen] = useState(false);
 
   // API Functions
   const fetchJournalingConfig = async () => {
     try {
       let url = '/api/admin/journaling/config';
-      
-      console.log('=== FETCH CONFIG START ===');
-      console.log('fetchJournalingConfig called:', { selectedSchool, isSuperAdmin, userSchoolId: user?.school?.id });
       
       // Add schoolId parameter if a specific school is selected
       if (selectedSchool !== "all") {
@@ -161,29 +166,22 @@ export default function JournalingTools({
       else if (user?.school?.id && !isSuperAdmin) {
         url += `?schoolId=${user.school.id}`;
       }
-      // If super admin selects "all", we need to handle this differently
-      // For now, we'll skip fetching config for "all" as it's ambiguous
+      // If super admin selects "all", fetch global configuration
       else if (selectedSchool === "all" && isSuperAdmin) {
-        console.log('Super admin selected "all schools", setting defaults');
-        // Reset to default values when "all schools" is selected
-        setJournalingConfig({
-          writingEnabled: true,
-          audioEnabled: true,
-          artEnabled: true,
-        });
-        setAudioConfig({
-          maxRecordingDuration: 180,
-          autoDeleteBehavior: "manual",
-        });
-        setArtConfig({
-          undoRedoEnabled: true,
-          colorPaletteEnabled: true,
-          clearCanvasEnabled: true,
+        // For super admins with "all schools", fetch the global configuration
+        // This will show the actual saved settings for all schools
+        url += '?schoolId=all';
+      }
+      // If we reach here, user doesn't have a school assigned and shouldn't be fetching config
+      else {
+        toast({ 
+          title: "Configuration Error", 
+          description: "Unable to determine school for configuration. Please contact system administrator.", 
+          variant: "destructive" 
         });
         return;
       }
       
-      console.log('Fetching config from:', url);
       const response = await fetch(url, {
         headers: {
           "x-user-id": user?.id || "admin@calmpath.ai",
@@ -192,57 +190,70 @@ export default function JournalingTools({
         },
       });
       const data: ApiResponse<any> = await response.json();
-      console.log('Config API response:', data);
+      
+      console.log('Fetch response:', data);
       
       if (data.success && data.data) {
-        console.log('Updating config state with:', data.data);
-        console.log('Current local state before update:', { journalingConfig, audioConfig, artConfig });
         
         // Update the config state with fetched data
+        console.log('Updating state with data:', data.data);
         const newJournalingConfig = { ...journalingConfig };
         const newAudioConfig = { ...audioConfig };
         const newArtConfig = { ...artConfig };
         
         if (data.data.enableWriting !== undefined) {
+          console.log('Setting writingEnabled to:', data.data.enableWriting);
           newJournalingConfig.writingEnabled = data.data.enableWriting;
-          console.log('Set writingEnabled to:', data.data.enableWriting);
         }
         if (data.data.enableAudio !== undefined) {
+          console.log('Setting audioEnabled to:', data.data.enableAudio);
           newJournalingConfig.audioEnabled = data.data.enableAudio;
-          console.log('Set audioEnabled to:', data.data.enableAudio);
         }
         if (data.data.enableArt !== undefined) {
+          console.log('Setting artEnabled to:', data.data.enableArt);
           newJournalingConfig.artEnabled = data.data.enableArt;
-          console.log('Set artEnabled to:', data.data.enableArt);
         }
         if (data.data.maxAudioDuration !== undefined) {
+          console.log('Setting maxRecordingDuration to:', data.data.maxAudioDuration);
           newAudioConfig.maxRecordingDuration = data.data.maxAudioDuration;
-          console.log('Set maxRecordingDuration to:', data.data.maxAudioDuration);
+        }
+        if (data.data.autoSaveAudio !== undefined) {
+          console.log('Setting autoDeleteBehavior to:', data.data.autoSaveAudio ? '7days' : 'manual');
+          newAudioConfig.autoDeleteBehavior = data.data.autoSaveAudio ? '7days' : 'manual';
         }
         if (data.data.enableUndo !== undefined) {
+          console.log('Setting undoRedoEnabled to:', data.data.enableUndo);
           newArtConfig.undoRedoEnabled = data.data.enableUndo;
-          console.log('Set undoRedoEnabled to:', data.data.enableUndo);
         }
         if (data.data.enableRedo !== undefined) {
+          console.log('Setting undoRedoEnabled to:', data.data.enableRedo);
           newArtConfig.undoRedoEnabled = data.data.enableRedo;
-          console.log('Set undoRedoEnabled to:', data.data.enableRedo);
         }
         if (data.data.enableClearCanvas !== undefined) {
+          console.log('Setting clearCanvasEnabled to:', data.data.enableClearCanvas);
           newArtConfig.clearCanvasEnabled = data.data.enableClearCanvas;
-          console.log('Set clearCanvasEnabled to:', data.data.enableClearCanvas);
         }
         // enableColorPalette is not stored in DB yet, so we don't load it from backend
         // if (data.data.enableColorPalette !== undefined) {
         //   newArtConfig.colorPaletteEnabled = data.data.enableColorPalette;
-        //   console.log('Set colorPaletteEnabled to:', data.data.enableColorPalette);
         // }
         
-        console.log('Final states to set:', { newJournalingConfig, newAudioConfig, newArtConfig });
+        console.log('Final state before setting:', {
+          journaling: newJournalingConfig,
+          audio: newAudioConfig,
+          art: newArtConfig
+        });
+        
         setJournalingConfig(newJournalingConfig);
         setAudioConfig(newAudioConfig);
         setArtConfig(newArtConfig);
+        
+        console.log('State after setting:', {
+          journaling: journalingConfig,
+          audio: audioConfig,
+          art: artConfig
+        });
       } else {
-        console.log('Config API returned no data, setting defaults');
         // Set default values if no config exists
         setJournalingConfig({
           writingEnabled: true,
@@ -259,7 +270,6 @@ export default function JournalingTools({
           clearCanvasEnabled: true,
         });
       }
-      console.log('=== FETCH CONFIG END ===');
     } catch (error) {
       console.error('Failed to fetch journaling config:', error);
       toast({ title: "Error", description: "Failed to fetch journaling config", variant: "destructive" });
@@ -311,39 +321,51 @@ export default function JournalingTools({
     setIsSubmitting(true);
     try {
       const payload: any = {
-        text: journalForm.prompt,
-        moodIds: journalForm.moods,
-        journalTypes: journalForm.journalTypes,
-        isEnabled: true
+        text: journalForm.text,
+        moodIds: journalForm.moodIds,
       };
 
-      // Add schoolId based on selection
-      if (selectedSchool !== "all") {
-        payload.schoolId = selectedSchool;
-      }
-      // For regular admins, always use their school
-      else if (user?.school?.id && !isSuperAdmin) {
-        payload.schoolId = user.school.id;
+      let response;
+      if (editingPrompt) {
+        // Update existing prompt
+        response = await fetch(`/api/admin/journaling/prompts/${editingPrompt}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            "x-user-id": user?.id || "admin@calmpath.ai",
+            ...(user?.school?.id && { "x-school-id": user.school.id }),
+          },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        // Create new prompt
+        response = await fetch('/api/admin/journaling/prompts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            "x-user-id": user?.id || "admin@calmpath.ai",
+            ...(user?.school?.id && { "x-school-id": user.school.id }),
+          },
+          body: JSON.stringify(payload)
+        });
       }
 
-      const response = await fetch('/api/admin/journaling/prompts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          "x-user-id": user?.id || "admin@calmpath.ai",
-          ...(selectedSchool !== "all" && { "x-school-id": selectedSchool }),
-          ...(user?.school?.id && !isSuperAdmin && { "x-school-id": user.school.id }),
-        },
-        body: JSON.stringify(payload)
-      });
       const data: ApiResponse<JournalPrompt> = await response.json();
       if (data.success) {
-        toast({ title: "Success", description: "Journal prompt created successfully" });
-        setJournalForm({ prompt: "", moods: [], journalTypes: ["writing"] });
-        setIsAddJournalOpen(false);
+        toast({ title: "Success", description: editingPrompt ? "Journal prompt updated successfully" : "Journal prompt created successfully" });
+        setJournalForm({ text: "", moodIds: [] });
+        setEditingPrompt(null);
+        setIsAddJournalingPromptOpen?.(false);
         await fetchJournalPrompts();
       } else {
-        toast({ title: "Error", description: data.error || "Failed to create prompt", variant: "destructive" });
+        const getErrorMessage = (error: any): string => {
+  if (typeof error === 'string') return error;
+  if (error?.message) return error.message;
+  if (error?.error?.message) return error.error.message;
+  return "An unknown error occurred";
+};
+
+toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to create prompt", variant: "destructive" });
       }
     } catch (error) {
       console.error('Failed to create journal prompt:', error);
@@ -351,6 +373,15 @@ export default function JournalingTools({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const editJournalPrompt = async (prompt: JournalPrompt) => {
+    setJournalForm({
+      text: prompt.text,
+      moodIds: prompt.moodIds
+    });
+    setEditingPrompt(prompt.id);
+    setIsAddJournalingPromptOpen?.(true);
   };
 
   const updateJournalPromptStatus = async (id: string, isEnabled: boolean) => {
@@ -372,7 +403,7 @@ export default function JournalingTools({
         });
         await fetchJournalPrompts();
       } else {
-        toast({ title: "Error", description: data.error || "Failed to update prompt status", variant: "destructive" });
+        toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to update prompt status", variant: "destructive" });
       }
     } catch (error) {
       console.error('Failed to update journal prompt status:', error);
@@ -394,7 +425,7 @@ export default function JournalingTools({
         toast({ title: "Success", description: "Journal prompt deleted successfully" });
         await fetchJournalPrompts();
       } else {
-        toast({ title: "Error", description: data.error || "Failed to delete prompt", variant: "destructive" });
+        toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to delete prompt", variant: "destructive" });
       }
     } catch (error) {
       console.error('Failed to delete journal prompt:', error);
@@ -403,6 +434,12 @@ export default function JournalingTools({
   };
 
   const saveJournalingConfig = async (updatedConfig?: JournalingConfig, updatedArtConfig?: ArtJournalingConfig, updatedAudioConfig?: AudioJournalingConfig) => {
+    // Prevent multiple simultaneous saves
+    if (isSavingConfig) {
+      console.log('Save already in progress, skipping...');
+      return;
+    }
+    
     try {
       setIsSavingConfig(true);
       
@@ -411,20 +448,16 @@ export default function JournalingTools({
       const artConfigToUse = updatedArtConfig || artConfig;
       const audioConfigToUse = updatedAudioConfig || audioConfig;
       
-      console.log('=== SAVE JOURNALING CONFIG START ===');
-      console.log('configToSave:', configToSave);
-      console.log('artConfigToUse:', artConfigToUse);
-      console.log('audioConfigToUse:', audioConfigToUse);
-      
       const payload: any = {
         enableWriting: configToSave.writingEnabled,
         enableAudio: configToSave.audioEnabled,
         enableArt: configToSave.artEnabled,
         maxAudioDuration: audioConfigToUse.maxRecordingDuration,
+        autoSaveAudio: audioConfigToUse.autoDeleteBehavior !== 'manual', // Convert any non-manual value to true
         enableUndo: artConfigToUse.undoRedoEnabled,
         enableRedo: artConfigToUse.undoRedoEnabled,
         enableClearCanvas: artConfigToUse.clearCanvasEnabled,
-        // enableColorPalette: artConfigToUse.colorPaletteEnabled, // Temporarily disabled - DB schema doesn't support this field yet
+        // enableColorPalette: artConfigToUse.colorPaletteEnabled, // Field doesn't exist in database schema
       };
 
       // Add schoolId based on selection
@@ -435,8 +468,23 @@ export default function JournalingTools({
       else if (user?.school?.id && !isSuperAdmin) {
         payload.schoolId = user.school.id;
       }
+      // Super admins with "all schools" selected - can do global update
+      else if (selectedSchool === "all" && isSuperAdmin) {
+        payload.schoolId = 'all'; // Global update
+      }
+      // If we reach here, user doesn't have a school assigned
+      else {
+        toast({ 
+          title: "Configuration Error", 
+          description: "Unable to determine school for configuration. Please contact system administrator.", 
+          variant: "destructive" 
+        });
+        setIsSavingConfig(false);
+        return;
+      }
 
-      console.log('Final payload being sent to API:', payload);
+      console.log('Saving payload:', payload);
+      console.log('Selected school:', selectedSchool, 'Is super admin:', isSuperAdmin);
 
       const response = await fetch('/api/admin/journaling/config', {
         method: 'PUT',
@@ -449,16 +497,27 @@ export default function JournalingTools({
         body: JSON.stringify(payload)
       });
       const data: ApiResponse<any> = await response.json();
-      console.log('Save config response:', data);
+      
+      console.log('Server response:', data);
+      
+      const isGlobalUpdate = selectedSchool === "all" && isSuperAdmin;
       
       if (data.success) {
-        console.log('Save successful, keeping local state as-is');
-        // Don't override local state with server response to prevent toggle reversion
-        // The local state should already be correct since we set it before saving
+        console.log('Save successful, refetching data...', data);
         
-        toast({ title: "Success", description: "Journaling configuration saved successfully" });
+        // Refetch data to get latest state from server
+        console.log('Starting refetch...');
+        await Promise.all([
+          fetchJournalingConfig(),
+          fetchJournalPrompts(),
+          fetchJournalMoods()
+        ]);
+        console.log('Refetch completed');
+        
+        toast({ title: "Success", description: isGlobalUpdate ? "Configuration saved for all schools" : "Configuration saved successfully" });
       } else {
-        toast({ title: "Error", description: data.error || "Failed to save configuration", variant: "destructive" });
+        console.error('Save failed:', data);
+        toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to save configuration", variant: "destructive" });
       }
     } catch (error) {
       console.error('Failed to save journaling config:', error);
@@ -484,17 +543,12 @@ export default function JournalingTools({
 
   // Handlers
   const handleJournalingConfigChange = async (key: keyof JournalingConfig, value: boolean) => {
-    console.log('=== TOGGLE CHANGE START ===');
-    console.log('handleJournalingConfigChange called:', { key, value, currentConfig: journalingConfig });
-    
     // Update local state immediately for UI feedback
     const newConfig = { ...journalingConfig, [key]: value };
-    console.log('Local state updated to:', newConfig);
     setJournalingConfig(newConfig);
     
-    console.log('State updated, calling saveJournalingConfig with new values');
-    await saveJournalingConfig(newConfig); // Pass the updated config directly
-    console.log('=== TOGGLE CHANGE END ===');
+    // Pass all current configs to save
+    await saveJournalingConfig(newConfig, artConfig, audioConfig);
     
     toast({
       title: value ? "Enabled" : "Disabled",
@@ -506,53 +560,28 @@ export default function JournalingTools({
     const newAudioConfig = { ...audioConfig, [key]: value };
     setAudioConfig(newAudioConfig);
     
-    // Create updated config with the new audio settings
-    const updatedConfig = {
-      ...journalingConfig,
-      // Audio settings are mapped from audioConfig in saveJournalingConfig
-    };
-    
-    // Pass the updated audio config directly to avoid race condition
-    await saveJournalingConfig(updatedConfig, undefined, newAudioConfig);
+    // Pass all current configs to save
+    await saveJournalingConfig(journalingConfig, artConfig, newAudioConfig);
     toast({ title: "Settings Updated", description: "Audio journaling configuration has been saved." });
   };
 
   const handleArtConfigChange = async (key: keyof ArtJournalingConfig, value: boolean) => {
-    console.log('=== ART CONFIG CHANGE START ===');
-    console.log('Key:', key, 'Value:', value);
-    console.log('Current artConfig before update:', artConfig);
-    
     const newArtConfig = { ...artConfig, [key]: value };
-    console.log('New artConfig after update:', newArtConfig);
     setArtConfig(newArtConfig);
     
     // Save color palette to localStorage if that's what changed
     if (key === 'colorPaletteEnabled') {
       saveColorPaletteToStorage(value);
-      console.log('Color palette setting saved to localStorage:', value);
     }
     
-    // Create updated config with the new art settings
-    const updatedConfig = {
-      ...journalingConfig,
-      // Art settings are mapped from artConfig in saveJournalingConfig
-    };
-    
-    console.log('Updated config being passed to save:', updatedConfig);
-    
-    // Pass the updated art config directly to avoid race condition
-    await saveJournalingConfig(updatedConfig, newArtConfig);
-    console.log('=== ART CONFIG CHANGE END ===');
+    // Pass all current configs to save
+    await saveJournalingConfig(journalingConfig, newArtConfig, audioConfig);
     
     toast({ title: "Settings Updated", description: "Art journaling configuration has been saved." });
   };
 
   const handleSaveJournal = async () => {
     await createJournalPrompt();
-  };
-
-  const handleTogglePromptStatus = async (id: string, currentStatus: boolean) => {
-    await updateJournalPromptStatus(id, !currentStatus);
   };
 
   const handleDeletePrompt = async (id: string) => {
@@ -583,8 +612,8 @@ export default function JournalingTools({
   };
 
   const filteredPrompts = journalPrompts.filter(p => 
-    p.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.moods.some(m => m.toLowerCase().includes(searchQuery.toLowerCase()))
+    (p.text && p.text.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (p.moodIds && p.moodIds.some((m: string) => m && m.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   if (isLoading) {
@@ -619,7 +648,7 @@ export default function JournalingTools({
           <p className="text-sm text-blue-700 dark:text-blue-300">
             {isSuperAdmin 
               ? selectedSchool === "all" 
-                ? "Please select a specific school from the dropdown to manage its journaling settings."
+                ? "You are configuring journaling settings for ALL schools. Changes will apply globally."
                 : `You are currently managing journaling settings for: ${schools.find((s: { id: string; name: string }) => s.id === selectedSchool)?.name || selectedSchool}`
               : `You can manage journaling settings for ${userSchoolName} only.`
             }
@@ -633,10 +662,10 @@ export default function JournalingTools({
           <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-              School Selection Required
+              Global Configuration Mode
             </p>
             <p className="text-sm text-amber-700 dark:text-amber-300">
-              To manage journaling settings, please select a specific school from the dropdown above. Configuration changes apply per school.
+              You are configuring settings for ALL schools. Changes will be applied to every school in the system. To configure individual schools, select a specific school from the dropdown.
             </p>
           </div>
         </div>
@@ -799,8 +828,6 @@ export default function JournalingTools({
                   <Switch 
                     checked={artConfig.undoRedoEnabled}
                     onCheckedChange={(v) => {
-                      console.log('Undo/Redo toggle clicked, value:', v);
-                      console.log('Current artConfig before update:', artConfig);
                       handleArtConfigChange("undoRedoEnabled", v);
                     }}
                   />
@@ -813,7 +840,6 @@ export default function JournalingTools({
                   <Switch 
                     checked={artConfig.colorPaletteEnabled}
                     onCheckedChange={(v) => {
-                      console.log('Color Palette toggle clicked, value:', v);
                       handleArtConfigChange("colorPaletteEnabled", v);
                     }}
                   />
@@ -826,7 +852,6 @@ export default function JournalingTools({
                   <Switch 
                     checked={artConfig.clearCanvasEnabled}
                     onCheckedChange={(v) => {
-                      console.log('Clear Canvas toggle clicked, value:', v);
                       handleArtConfigChange("clearCanvasEnabled", v);
                     }}
                   />
@@ -863,11 +888,11 @@ export default function JournalingTools({
         {/* Prompts Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredPrompts.map((prompt) => (
-            <Card key={prompt.id} className={cn("transition-all duration-200", !prompt.isEnabled && "opacity-60")}>
+            <Card key={prompt.id} className="transition-all duration-200">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-wrap gap-1">
-                    {prompt.moods.map((mood) => (
+                    {prompt.moodIds.map((mood: string) => (
                       <Badge key={mood} variant="outline" className="text-xs">{mood}</Badge>
                     ))}
                   </div>
@@ -878,7 +903,9 @@ export default function JournalingTools({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2"><Edit className="h-4 w-4" /> Edit</DropdownMenuItem>
+                      <DropdownMenuItem className="gap-2" onClick={() => editJournalPrompt(prompt)}>
+                      <Edit className="h-4 w-4" /> Edit
+                    </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="gap-2 text-destructive" 
                         onClick={() => handleDeletePrompt(prompt.id)}
@@ -890,112 +917,86 @@ export default function JournalingTools({
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-foreground mb-3">{prompt.prompt}</p>
+                <p className="text-sm text-foreground mb-3">{prompt.text}</p>
                 <div className="flex items-center justify-between">
                   <div className="flex gap-1">
-                    {prompt.journalTypes.includes("writing") && (
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <PenTool className="h-3 w-3" />
-                        Writing
-                      </Badge>
-                    )}
-                    {prompt.journalTypes.includes("art") && (
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Palette className="h-3 w-3" />
-                        Art
-                      </Badge>
-                    )}
+                    <Badge variant="secondary" className="text-xs gap-1">
+                      <PenTool className="h-3 w-3" />
+                      Writing
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Power className={cn("h-4 w-4", prompt.isEnabled ? "text-success" : "text-muted-foreground")} />
-                    <Switch 
-                      checked={prompt.isEnabled} 
-                      onCheckedChange={() => handleTogglePromptStatus(prompt.id, prompt.isEnabled)}
+                    <Switch
+                      checked={prompt.isEnabled}
+                      onCheckedChange={(checked) => updateJournalPromptStatus(prompt.id, checked)}
                     />
+                    <span className="text-xs text-muted-foreground">
+                      {prompt.isEnabled ? "Enabled" : "Disabled"}
+                    </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+  </div>
+</div>
+
+{/* Add Journal Prompt Dialog */}
+<Dialog open={isAddJournalingPromptOpen} onOpenChange={(open) => {
+        if (!open) {
+          setEditingPrompt(null);
+          setJournalForm({ text: "", moodIds: [] });
+        }
+        setIsAddJournalingPromptOpen?.(open);
+      }}>
+  <DialogContent className="sm:max-w-lg">
+    <DialogHeader>
+      <DialogTitle>{editingPrompt ? "Edit Journal Prompt" : "Add Journal Prompt"}</DialogTitle>
+      <DialogDescription>{editingPrompt ? "Edit an existing prompt for student journaling." : "Create a new prompt for student journaling. Prompts can be used across writing and art journaling."}</DialogDescription>
+    </DialogHeader>
+    <div className="grid gap-4 py-4">
+      <div className="grid gap-2">
+        <Label>Prompt</Label>
+        <Textarea 
+          placeholder="Enter the journal prompt..."
+          value={journalForm.text}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setJournalForm((prev: any) => ({ ...prev, text: e.target.value }))}
+          rows={3}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label>Mood(s)</Label>
+        <div className="flex flex-wrap gap-2">
+          {journalMoods.map((mood) => (
+            <Button
+              key={mood}
+              variant={journalForm.moodIds.includes(mood) ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                if (journalForm.moodIds.includes(mood)) {
+                  setJournalForm((prev: any) => ({ ...prev, moodIds: prev.moodIds.filter((m: string) => m !== mood) }));
+                } else {
+                  setJournalForm((prev: any) => ({ ...prev, moodIds: [...prev.moodIds, mood] }));
+                }
+              }}
+            >
+              {mood}
+            </Button>
+          ))}
         </div>
       </div>
-
-      {/* Add Journal Prompt Dialog */}
-      <Dialog open={isAddJournalOpen} onOpenChange={setIsAddJournalOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Journal Prompt</DialogTitle>
-            <DialogDescription>Create a new prompt for student journaling. Prompts can be used across writing and art journaling.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Prompt</Label>
-              <Textarea 
-                placeholder="Enter the journal prompt..."
-                value={journalForm.prompt}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setJournalForm((prev: any) => ({ ...prev, prompt: e.target.value }))}
-                rows={3}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Journaling Type(s)</Label>
-              <div className="flex gap-2">
-                {["writing", "art"].map((type) => (
-                  <Button
-                    key={type}
-                    variant={journalForm.journalTypes.includes(type as "writing" | "art") ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      if (journalForm.journalTypes.includes(type as "writing" | "art")) {
-                        setJournalForm((prev: any) => ({ ...prev, journalTypes: prev.journalTypes.filter((t: string) => t !== type) }));
-                      } else {
-                        setJournalForm((prev: any) => ({ ...prev, journalTypes: [...prev.journalTypes, type as "writing" | "art"] }));
-                      }
-                    }}
-                  >
-                    {type === "writing" ? <PenTool className="h-4 w-4 mr-1" /> : <Palette className="h-4 w-4 mr-1" />}
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>Mood(s)</Label>
-              <div className="flex flex-wrap gap-2">
-                {journalMoods.map((mood) => (
-                  <Button
-                    key={mood}
-                    variant={journalForm.moods.includes(mood) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      if (journalForm.moods.includes(mood)) {
-                        setJournalForm((prev: any) => ({ ...prev, moods: prev.moods.filter((m: string) => m !== mood) }));
-                      } else {
-                        setJournalForm((prev: any) => ({ ...prev, moods: [...prev.moods, mood] }));
-                      }
-                    }}
-                  >
-                    {mood}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddJournalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveJournal} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Prompt"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setIsAddJournalingPromptOpen?.(false)}>Cancel</Button>
+      <Button 
+              onClick={createJournalPrompt} 
+              disabled={isSubmitting || !journalForm.text.trim()}
+            >
+              {isSubmitting ? "Saving..." : (editingPrompt ? "Update" : "Create")}
+            </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+</div>
   );
 }

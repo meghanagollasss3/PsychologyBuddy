@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -24,6 +24,14 @@ interface AdminHeaderProps {
   actions?: React.ReactNode;
 }
 
+interface AdminProfile {
+  firstName: string;
+  lastName: string;
+  adminProfile?: {
+    profileImageUrl?: string;
+  };
+}
+
 export function AdminHeader({ 
   title, 
   subtitle, 
@@ -35,6 +43,28 @@ export function AdminHeader({
   actions 
 }: AdminHeaderProps) {
   const router = useRouter();
+  const [profile, setProfile] = useState<AdminProfile | null>(null);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch('/api/admin/profile');
+      const result = await response.json();
+      
+      if (result.success) {
+        setProfile(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin profile for header:', error);
+    }
+  };
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  };
 
   return (
     <header className="sticky top-0 z-30 flex flex-col gap-4 border-b border-border bg-white backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4">
@@ -90,8 +120,12 @@ export function AdminHeader({
             className="rounded-full ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
-              <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100" />
-              <AvatarFallback>AD</AvatarFallback>
+              {profile?.adminProfile?.profileImageUrl ? (
+                <AvatarImage src={profile.adminProfile.profileImageUrl} />
+              ) : null}
+              <AvatarFallback className="text-sm">
+                {profile ? getInitials(profile.firstName, profile.lastName) : 'AD'}
+              </AvatarFallback>
             </Avatar>
           </button>
         </div>

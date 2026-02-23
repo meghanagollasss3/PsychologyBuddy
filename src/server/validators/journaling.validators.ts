@@ -40,14 +40,14 @@ export const UpdateJournalingConfigSchema = z.object({
   enableUndo: z.boolean().optional(),
   enableRedo: z.boolean().optional(),
   enableClearCanvas: z.boolean().optional(),
-  enableColorPalette: z.boolean().optional(),
+  // enableColorPalette: z.boolean().optional(), // Field doesn't exist in database schema
   schoolId: z.string().optional(),
 });
 
 // Admin Prompt Validators
 export const CreateJournalingPromptSchema = z.object({
   text: z.string().min(1, 'Prompt text is required'),
-  moodIds: z.array(z.string()).min(1, 'At least one mood ID is required'),
+  moodIds: z.array(z.string()).optional(),
   journalTypes: z.array(z.enum(['writing', 'art'])).optional(),
   isEnabled: z.boolean().optional(),
   schoolId: z.string().optional(),

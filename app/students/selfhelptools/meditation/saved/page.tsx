@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Heart, Play, Clock, User } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from "@/src/hooks/use-toast";
+import { getStudentId } from "@/src/utils/auth";
 
 interface MeditationResource {
   id: string;
@@ -148,6 +149,7 @@ export default function SavedMeditationsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<CardProps | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
+  const { toast } = useToast();
 
   // Fetch saved meditations on component mount
   useEffect(() => {
@@ -157,7 +159,7 @@ export default function SavedMeditationsPage() {
   const fetchSavedMeditations = async () => {
     try {
       setLoading(true);
-      const studentId = 'student-123'; // Replace with actual student ID from auth
+      const studentId = getStudentId();
       const response = await fetch(`/api/student/saved-meditations?studentId=${studentId}`);
       const result = await response.json();
       
@@ -165,11 +167,17 @@ export default function SavedMeditationsPage() {
         setSavedMeditations(result.data);
         console.log('📚 Loaded saved meditations:', result.data.length);
       } else {
-        toast.error(result.message || 'Failed to fetch saved meditations');
+        toast({
+          title: result.message || 'Failed to fetch saved meditations',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       console.error('Error fetching saved meditations:', error);
-      toast.error('Failed to fetch saved meditations');
+      toast({
+        title: 'Failed to fetch saved meditations',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
     }
@@ -177,7 +185,7 @@ export default function SavedMeditationsPage() {
 
   const toggleSave = async (meditationId: string) => {
     try {
-      const studentId = 'student-123'; // Replace with actual student ID from auth
+      const studentId = getStudentId();
       
       const response = await fetch('/api/student/saved-meditations', {
         method: 'POST',
@@ -195,17 +203,27 @@ export default function SavedMeditationsPage() {
       if (result.success) {
         // Update local state
         if (result.isSaved) {
-          toast.success('Added to saved items');
+          toast({
+            title: 'Added to saved items'
+          });
         } else {
           setSavedMeditations(prev => prev.filter(m => m.id !== meditationId));
-          toast.success('Removed from saved items');
+          toast({
+            title: 'Removed from saved items'
+          });
         }
       } else {
-        toast.error(result.message || 'Failed to save meditation');
+        toast({
+          title: result.message || 'Failed to save meditation',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       console.error('Error toggling save:', error);
-      toast.error('Failed to save meditation');
+      toast({
+        title: 'Failed to save meditation',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -252,20 +270,6 @@ export default function SavedMeditationsPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={goBack}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Saved Meditations</h1>
-            <p className="text-gray-600">Your personal collection of saved meditations</p>
-          </div>
-        </div>
-
         {/* Saved Meditations Grid */}
         {savedMeditations.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

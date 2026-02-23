@@ -10,3 +10,11 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   return badgeAdminController.getBadges(req);
 }
+
+export async function PATCH(req: NextRequest) {
+  return badgeAdminController.updateBadge(req);
+}
+
+export async function DELETE(req: NextRequest) {
+  return badgeAdminController.deleteBadge(req);
+}

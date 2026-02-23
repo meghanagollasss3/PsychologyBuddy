@@ -13,29 +13,52 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // For now, return a simple test response to get the frontend working
-    // We'll implement the full database query later
+    // Use raw SQL to get saved music since Prisma model is not generating properly
+    const savedMusic = await prisma.$queryRaw<Array<any>>`
+      SELECT ms.*, mr.* 
+      FROM "MusicSaves" ms
+      JOIN "MusicResources" mr ON ms."musicId" = mr.id
+      WHERE ms."studentId" = ${studentId}
+      ORDER BY ms."createdAt" DESC
+    `;
+
+    // If no saved music, return empty array
+    if (!savedMusic || savedMusic.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
+    }
+
+    // Transform the data to match expected format
+    const music = (savedMusic as any[]).map((item: any) => {
+      return {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        url: item.url,
+        audioUrl: item.audioUrl,
+        videoUrl: item.videoUrl,
+        duration: item.duration,
+        artist: item.artist,
+        album: item.album,
+        coverImage: item.coverImage,
+        thumbnailUrl: item.thumbnailUrl,
+        schoolId: item.schoolId,
+        createdBy: item.createdBy,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        savedAt: item.createdAt,
+        isSaved: true,
+        categories: [],
+        goals: [],
+        moods: []
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      data: [
-        {
-          id: "cmlpkh89s0003nwf0jbkjg2oe",
-          title: "Relaxing Melody",
-          description: "Calming instrumental music for relaxation and stress relief",
-          url: "https://example.com/music.mp3",
-          duration: 300,
-          artist: "Various Artists",
-          album: "Relaxation Collection",
-          coverImage: "https://picsum.photos/seed/music/400/400",
-          schoolId: null,
-          createdBy: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          savedAt: new Date().toISOString(),
-          isSaved: true,
-          categories: []
-        }
-      ]
+      data: music
     });
 
   } catch (error) {
@@ -63,7 +86,7 @@ export async function POST(request: NextRequest) {
     const existingSave = await prisma.$queryRaw<Array<any>>`
       SELECT * FROM "MusicSaves" 
       WHERE "musicId" = ${musicId} 
-      AND ("studentId" = ${studentId} OR "studentId" IS NULL)
+      AND "studentId" = ${studentId}
       LIMIT 1
     `;
 
@@ -72,7 +95,7 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         DELETE FROM "MusicSaves" 
         WHERE "musicId" = ${musicId} 
-        AND ("studentId" = ${studentId} OR "studentId" IS NULL)
+        AND "studentId" = ${studentId}
       `;
 
       return NextResponse.json({

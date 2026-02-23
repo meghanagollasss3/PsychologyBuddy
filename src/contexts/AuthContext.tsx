@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface User {
+  adminProfile: any;
   id: string;
   email?: string;
   studentId?: string;
@@ -42,6 +43,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = (userData: User) => {
     setUser(userData);
+    // Store studentId in localStorage for easy access
+    if (userData.studentId) {
+      localStorage.setItem('studentId', userData.studentId);
+    }
   };
 
   const logout = async () => {
@@ -53,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      // Clear studentId from localStorage
+      localStorage.removeItem('studentId');
     }
   };
 
@@ -63,12 +70,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (data.success && data.data?.user) {
         setUser(data.data.user);
+        // Store studentId in localStorage for easy access
+        if (data.data.user.studentId) {
+          localStorage.setItem('studentId', data.data.user.studentId);
+        }
       } else {
         setUser(null);
+        // Clear studentId from localStorage if no user
+        localStorage.removeItem('studentId');
       }
     } catch (error) {
       console.error('Refresh user error:', error);
       setUser(null);
+      // Clear studentId from localStorage on error
+      localStorage.removeItem('studentId');
     } finally {
       setLoading(false);
     }
