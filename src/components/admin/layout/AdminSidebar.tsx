@@ -60,7 +60,7 @@ export function AdminSidebar() {
     {
       label: "Activity",
       icon: Activity,
-      href: "/activity",
+      href: "/admin/activities",
       permission: 'activity.view',
     },
     {

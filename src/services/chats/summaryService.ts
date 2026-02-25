@@ -24,16 +24,24 @@ export class SummaryService {
    */
   static async generateSummary(summaryData: SummaryGenerationData): Promise<StructuredSummaryResponse> {
     try {
+      console.log('[SummaryService] Starting summary generation for session:', summaryData.sessionId);
+      
       // Verify session exists and belongs to student
       const session = await DatabaseService.getChatSession(summaryData.sessionId, summaryData.studentId)
       
       if (!session) {
+        console.error('[SummaryService] Session not found:', summaryData.sessionId);
         throw new ValidationError('Session not found')
       }
+      
+      console.log('[SummaryService] Session verified, generating AI summary...');
       
       // Generate AI structured summary
       const aiSummary = await AIService.generateStructuredSummary(summaryData.conversation)
       
+      console.log('[SummaryService] AI summary generated:', aiSummary);
+      
+      console.log('[SummaryService] Creating database record...');
       // Create summary in database
       const summary = await DatabaseService.createStructuredSummary({
         sessionId: summaryData.sessionId,
@@ -44,16 +52,19 @@ export class SummaryService {
         reflection: aiSummary.reflection
       })
       
+      console.log('[SummaryService] Database record created:', summary);
+      
       return {
         id: summary.id,
         mainTopic: summary.mainTopic,
         conversationStart: summary.conversationStart,
         conversationAbout: summary.conversationAbout,
         reflection: summary.reflection,
-        createdAt: summary.createdAt.toISOString(),
+        createdAt: summary.createdAt,
         sessionId: summary.sessionId
       }
     } catch (error) {
+      console.error('[SummaryService] Error in generateSummary:', error);
       if (error instanceof ValidationError) {
         throw error
       }

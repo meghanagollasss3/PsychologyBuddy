@@ -16,8 +16,17 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Get all articles and filter for published ones only
-    const result = await LibraryService.getAllArticles();
+    // Get user details to determine schoolId
+    const userResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/me`, {
+      headers: { cookie: req.headers.get('cookie') || '' }
+    });
+    const userData = await userResponse.json();
+    
+    // Use the student's schoolId to filter articles
+    const userSchoolId = userData.data?.user?.schoolId;
+    
+    // Get articles filtered by student's school
+    const result = await LibraryService.getAllArticles(userSchoolId);
     
     // Filter only published articles for students
     const publishedArticles = result.data.filter((article: any) => article.status === 'PUBLISHED');

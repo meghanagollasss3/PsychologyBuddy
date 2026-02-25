@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 interface School {
   id: string;
@@ -33,8 +34,15 @@ export function SchoolFilterProvider({ children }: { children: ReactNode }) {
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>('all');
   const [schools, setSchools] = useState<School[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const searchParams = useSearchParams();
 
-  console.log('SchoolFilterContext state:', { selectedSchoolId, schoolsCount: schools.length, isSuperAdmin });
+  // Check for school query parameter on mount and set selected school
+  useEffect(() => {
+    const schoolParam = searchParams.get('school');
+    if (schoolParam && schoolParam !== 'all') {
+      setSelectedSchoolId(schoolParam);
+    }
+  }, [searchParams]);
 
   // Fetch schools and check user role on mount
   useEffect(() => {
@@ -59,7 +67,6 @@ export function SchoolFilterProvider({ children }: { children: ReactNode }) {
           const isSuper = userRole === 'SUPERADMIN' || 
                          userRole === 'SUPER_ADMIN' || 
                          userRole === 'SUPER-ADMIN' ||
-                         userRole === 'ADMIN' ||
                          userRole?.toLowerCase().includes('super');
           
           setIsSuperAdmin(isSuper);
@@ -72,7 +79,6 @@ export function SchoolFilterProvider({ children }: { children: ReactNode }) {
             const schoolsData = await schoolsResponse.json();
             
             if (schoolsData.success) {
-              console.log('Schools API response:', schoolsData);
               let schoolsList = schoolsData.data;
               
               // Map API response to expected interface
@@ -85,11 +91,9 @@ export function SchoolFilterProvider({ children }: { children: ReactNode }) {
               }));
               
               setSchools(schoolsList);
-              console.log('Schools set:', schoolsList);
               
               // For super admins, ensure selectedSchoolId is 'all' if not already set to a specific school
               if (isSuper && selectedSchoolId === 'all') {
-                console.log('Super admin detected, keeping selectedSchoolId as "all"');
                 setSelectedSchoolId('all');
               }
             } else {

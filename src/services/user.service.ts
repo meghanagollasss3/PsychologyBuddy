@@ -185,6 +185,80 @@ export class UserService {
     }
   }
 
+  // Get schools with metrics (alerts and check-ins per school)
+  static async getSchoolsWithMetrics() {
+    try {
+      const schools = await prisma.school.findMany({
+        include: {
+          _count: {
+            select: {
+              users: {
+                where: {
+                  role: {
+                    name: 'STUDENT'
+                  }
+                }
+              },
+              classes: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Get today's date range
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Get alerts and check-ins per school
+      const schoolsWithMetrics = await Promise.all(
+        schools.map(async (school) => {
+          const [alertCount, checkInsToday] = await Promise.all([
+            // Count unresolved alerts for students in this school
+            prisma.highRiskAlert.count({
+              where: {
+                user: {
+                  schoolId: school.id,
+                  role: {
+                    name: 'STUDENT'
+                  }
+                },
+                resolved: false
+              }
+            }),
+            // Count check-ins today for students in this school
+            prisma.moodCheckin.count({
+              where: {
+                user: {
+                  schoolId: school.id,
+                  role: {
+                    name: 'STUDENT'
+                  }
+                },
+                createdAt: {
+                  gte: today,
+                  lt: tomorrow
+                }
+              }
+            })
+          ]);
+
+          return {
+            ...school,
+            alertCount,
+            checkInsToday
+          };
+        })
+      );
+
+      return ApiResponse.success(schoolsWithMetrics, 'Schools with metrics retrieved successfully');
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Get school by ID
   static async getSchoolById(schoolId: string) {
     try {
@@ -646,19 +720,6 @@ export class UserService {
     schoolId: string;
   }) {
     try {
-      // Check if class with same grade and section already exists in this school
-      const existingClass = await prisma.class.findFirst({
-        where: {
-          schoolId: data.schoolId,
-          grade: data.grade,
-          section: data.section || null,
-        },
-      });
-
-      if (existingClass) {
-        throw new Error('A class with this grade and section already exists in this school');
-      }
-
       const newClass = await prisma.class.create({
         data: {
           name: data.name,
@@ -675,11 +736,7 @@ export class UserService {
       });
 
       return ApiResponse.success(newClass, 'Class created successfully');
-    } catch (error: any) {
-      // Handle unique constraint violation as fallback
-      if (error.code === 'P2002' && error.meta?.target?.includes('schoolId')) {
-        throw new Error('A class with this grade and section already exists in this school');
-      }
+    } catch (error) {
       throw error;
     }
   }
@@ -706,26 +763,6 @@ export class UserService {
         throw AuthError.forbidden('Cannot update class from another school');
       }
 
-      // Check if updating grade/section would create a duplicate
-      if (data.grade !== undefined || data.section !== undefined) {
-        const newGrade = data.grade ?? existingClass.grade;
-        const newSection = data.section ?? existingClass.section;
-
-        // Check if another class with the same grade and section already exists
-        const duplicateClass = await prisma.class.findFirst({
-          where: {
-            schoolId: existingClass.schoolId,
-            grade: newGrade,
-            section: newSection || null,
-            id: { not: classId }, // Exclude the current class
-          },
-        });
-
-        if (duplicateClass) {
-          throw new Error('A class with this grade and section already exists in this school');
-        }
-      }
-
       const updatedClass = await prisma.class.update({
         where: { id: classId },
         data: {
@@ -742,10 +779,6 @@ export class UserService {
 
       return ApiResponse.success(updatedClass, 'Class updated successfully');
     } catch (error: any) {
-      // Handle unique constraint violation as fallback
-      if (error.code === 'P2002' && error.meta?.target?.includes('schoolId')) {
-        throw new Error('A class with this grade and section already exists in this school');
-      }
       throw error;
     }
   }

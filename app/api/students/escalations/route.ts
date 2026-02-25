@@ -115,14 +115,24 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
+    const schoolId = searchParams.get('schoolId');
 
-    console.log('[EscalationAPI] Fetching escalation alerts:', { status, limit, offset });
+    console.log('[EscalationAPI] Fetching escalation alerts:', { status, limit, offset, schoolId });
 
     // Build where clause
     const whereClause: any = {};
     if (status && status !== 'all') {
       whereClause.status = status;
     }
+    
+    // Add school filtering if provided
+    if (schoolId && schoolId !== 'all') {
+      whereClause.user = {
+        schoolId: schoolId
+      };
+    }
+
+    console.log('[EscalationAPI] Final where clause:', JSON.stringify(whereClause, null, 2));
 
     // Get alerts from database
     const alerts = await prisma.escalationAlert.findMany({
@@ -143,6 +153,7 @@ export async function GET(req: Request) {
     });
 
     console.log('[EscalationAPI] Found alerts:', alerts.length);
+    console.log('[EscalationAPI] Alert IDs:', alerts.map(a => a.id));
 
     // Get total count for pagination
     const totalCount = await prisma.escalationAlert.count({

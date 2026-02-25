@@ -1,513 +1,419 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { usePermissions } from '@/src/hooks/usePermissions';
-import { useAuth } from '@/src/contexts/AuthContext';
-import { useSchoolFilter } from '@/src/contexts/SchoolFilterContext';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Filter, 
-  Eye, 
-  Edit, 
-  Trash2,
-  UserPlus,
-  Calendar,
-  TrendingUp,
-  AlertTriangle
-} from 'lucide-react';
-import { AddStudentModal } from '../modals/AddStudentModal';
-import { EditStudentModal } from '../modals/EditStudentModal';
-import { ViewStudentModal } from '../modals/ViewStudentModal';
-import { AdminHeader } from '../layout/AdminHeader';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { MoreVertical, Archive } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { debounce } from "lodash";
 
+import {
+  Users, Plus, Search, Filter, Eye, Edit, Archive,
+  MoreVertical,
+} from "lucide-react";
+
+import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
+import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
+import { usePermissions } from "@/src/hooks/usePermissions";
+import { useAuth } from "@/src/contexts/AuthContext";
+
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select, SelectTrigger, SelectContent, SelectValue, SelectItem,
+} from "@/components/ui/select";
+
+import {
+  Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
+} from "@/components/ui/table";
+
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/src/utils/date.util";
+
+import { AddStudentModal } from "../modals/AddStudentModal";
+import { EditStudentModal } from "../modals/EditStudentModal";
+import { ViewStudentModal } from "../modals/ViewStudentModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+interface Class {
+  id: string;
+  name: string;
+  grade?: number;
+  section?: string;
+  schoolId?: string;
+}
 interface Student {
   id: string;
   studentId: string;
   firstName: string;
   lastName: string;
   email?: string;
-  phone?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-  classRef?: {
-    id: string;
-    name: string;
-    grade: number;
-    section: string;
-  };
-  school?: {
-    id: string;
-    name: string;
-  };
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  classRef?: { id: string; name: string };
+  school?: { id: string; name: string };
   studentProfile?: {
     lastMoodCheckin?: string;
     averageMood?: number;
-    riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+    riskLevel?: "LOW" | "MEDIUM" | "HIGH";
     profileImage?: string;
   };
-  _count?: {
-    chatSessions: number;
-    moodCheckins: number;
+  _count?: { sessions: number };
+}
+
+interface StudentApiResponse {
+  students: Student[];
+  nextOffset: number | null;
+  hasMore: boolean;
+}
+
+// -----------------------------------------
+// API CALL
+// -----------------------------------------
+async function fetchStudents({ pageParam = 0, filters }: any): Promise<StudentApiResponse> {
+  const params = new URLSearchParams({
+    limit: "30",
+    offset: pageParam.toString(),
+  });
+
+  Object.entries(filters).forEach(([key, val]) => {
+    if (val !== "all" && val) params.append(key, String(val));
+  });
+
+  const res = await fetch(`/api/students?${params.toString()}`, { credentials: "include" });
+  const json = await res.json();
+
+  if (!json.success) throw new Error("Failed to fetch students");
+
+  return {
+    students: json.data,
+    nextOffset: json.pagination?.hasMore ? pageParam + 30 : null,
+    hasMore: json.pagination?.hasMore || false,
   };
 }
 
-export function StudentsManagementSection() {
-  const { selectedSchoolId, setSelectedSchoolId, schools, setSchools, isSuperAdmin } = useSchoolFilter();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [classFilter, setClassFilter] = useState<string>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [classes, setClasses] = useState<any[]>([]);
-  
-  const { user } = useAuth();
-  const { hasPermission } = usePermissions();
+// -----------------------------------------
+// STUDENT ROW (Memoized)
+// -----------------------------------------
+const StudentRow = React.memo(function StudentRow({
+  student,
+  onView,
+  onEdit,
+  onArchive,
+  permissions,
+}: {
+  student: Student;
+  onView: (s: Student) => void;
+  onEdit: (s: Student) => void;
+  onArchive: (s: Student) => void;
+  permissions: any;
+}) {
+  const riskColor =
+    (student.studentProfile?.averageMood ?? 0) >= 3.5
+      ? "text-[#10B981]"
+      : (student.studentProfile?.averageMood ?? 0) >= 2.5
+      ? "text-[#F59E0B]"
+      : "text-[#EF4444]";
 
-  console.log('StudentsManagementSection - School filter state:', { selectedSchoolId, isSuperAdmin, schoolsCount: schools.length });
-
-  // Add debugging to track when selectedSchoolId changes
-  React.useEffect(() => {
-    console.log('selectedSchoolId changed to:', selectedSchoolId);
-  }, [selectedSchoolId]);
-
-  // Permission checks
-  const canCreateStudents = hasPermission('users.create');
-  const canViewStudents = hasPermission('users.view');
-  const canUpdateStudents = hasPermission('users.update');
-  const canDeleteStudents = hasPermission('users.delete');
-
-  const statusStyles = {
-    ACTIVE: { bg: 'bg-[#10B981]/10', text: 'text-[#10B981]', label: 'Active' },
-    INACTIVE: { bg: 'bg-[#6B7280]/10', text: 'text-[#64748B]', label: 'Inactive' },
-    SUSPENDED: { bg: 'bg-[#EF4444]/10', text: 'text-[#EF4444]', label: 'Suspended' }
+  const statusBadge = {
+    ACTIVE: "text-[#10B981] bg-[#10B981]/10",
+    INACTIVE: "text-[#6B7280] bg-[#6B7280]/10",
+    SUSPENDED: "text-[#EF4444] bg-[#EF4444]/10",
   };
-
-  useEffect(() => {
-    if (canViewStudents) {
-      console.log('Main useEffect called - canViewStudents:', canViewStudents);
-      
-      // For super admins, ensure we start with 'all' schools
-      if (isSuperAdmin && selectedSchoolId !== 'all') {
-        console.log('Super admin detected but selectedSchoolId is not "all", resetting to "all"');
-        setSelectedSchoolId('all');
-        return; // Don't fetch yet, wait for the state update
-      }
-      
-      fetchStudents();
-      fetchClasses();
-      if (isSuperAdmin) {
-        fetchSchools();
-      }
-    }
-  }, [canViewStudents, isSuperAdmin]);
-
-  // Auto-set school ID for regular admins ONLY
-  useEffect(() => {
-    console.log('School ID auto-set check:', { 
-      isSuperAdmin, 
-      userSchoolId: user?.school?.id, 
-      currentSelectedSchoolId: selectedSchoolId,
-      userRole: user?.role?.name 
-    });
-    
-    // Only set school ID for regular admins, NOT for super admins
-    if (!isSuperAdmin && user?.school?.id && selectedSchoolId === 'all') {
-      console.log('Auto-setting schoolId for regular admin:', user.school.id);
-      setSelectedSchoolId(user.school.id);
-    } else if (isSuperAdmin && selectedSchoolId !== 'all') {
-      // If super admin has a specific school selected (not 'all'), keep it as is
-      console.log('Super admin has specific school selected:', selectedSchoolId);
-    } else if (isSuperAdmin && selectedSchoolId === 'all') {
-      // Ensure super admin stays on 'all' 
-      console.log('Super admin is on all schools');
-    }
-  }, [isSuperAdmin, user, selectedSchoolId, setSelectedSchoolId]);
-
-  useEffect(() => {
-    if (canViewStudents) {
-      console.log('useEffect triggered - fetching students due to filter change');
-      fetchStudents();
-    }
-  }, [searchTerm, statusFilter, classFilter, selectedSchoolId, canViewStudents]);
-
-  const fetchStudents = async () => {
-    try {
-      setLoading(true);
-      
-      console.log('fetchStudents called with state:', { 
-        selectedSchoolId, 
-        isSuperAdmin, 
-        userSchoolId: user?.school?.id,
-        userRole: user?.role?.name 
-      });
-      
-      const params = new URLSearchParams();
-      
-      // Always add search and status filters
-      if (searchTerm) params.append('search', searchTerm);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (classFilter !== 'all') params.append('classId', classFilter);
-      
-      console.log('School filter condition check:', { selectedSchoolId, isNotAll: selectedSchoolId !== 'all', shouldAdd: selectedSchoolId && selectedSchoolId !== 'all' });
-      
-      if (selectedSchoolId && selectedSchoolId !== 'all') {
-        params.append('schoolId', selectedSchoolId);
-        console.log('Added schoolId to params:', selectedSchoolId);
-      } else {
-        console.log('NOT adding schoolId to params - selectedSchoolId is:', selectedSchoolId);
-      }
-
-      console.log('Fetching students with params:', params.toString());
-      console.log('Selected school ID:', selectedSchoolId);
-
-      const response = await fetch(`/api/students?${params.toString()}`, {
-        credentials: 'include'
-      });
-      const data = await response.json();
-      
-      console.log('Students API response:', data);
-      
-      if (data.success) {
-        console.log('Students fetched:', data.data.length);
-        setStudents(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching students:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchClasses = async () => {
-    try {
-      const response = await fetch('/api/classes', {
-        credentials: 'include'
-      });
-      const data = await response.json();
-      if (data.success) {
-        setClasses(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching classes:', error);
-    }
-  };
-
-  const fetchSchools = async () => {
-    try {
-      const response = await fetch('/api/schools', {
-        credentials: 'include'
-      });
-      const data = await response.json();
-      if (data.success) {
-        let schoolsData = data.data;
-        
-        // Map API response to expected interface
-        schoolsData = schoolsData.map((school: any) => ({
-          ...school,
-          location: school.address || 'Unknown Location',
-          studentCount: school._count?.users || 0,
-          alertCount: 0,
-          checkInsToday: 0,
-        }));
-        
-        setSchools(schoolsData); // Set global schools for filter
-      }
-    } catch (error) {
-      console.error('Error fetching schools:', error);
-    }
-  };
-
-  const handleAddStudent = () => {
-    setSelectedStudent(null);
-    setShowAddModal(true);
-  };
-
-  const handleEditStudent = (student: Student) => {
-    setSelectedStudent(student);
-    setShowEditModal(true);
-  };
-
-  const handleViewStudent = (student: Student) => {
-    setSelectedStudent(student);
-    setShowViewModal(true);
-  };
-
-  const handleDeleteStudent = async (studentId: string) => {
-    if (!confirm('Are you sure you want to deactivate this student?')) return;
-
-    try {
-      const response = await fetch(`/api/students/${studentId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        fetchStudents();
-      }
-    } catch (error) {
-      console.error('Error deleting student:', error);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'text-[#10B981] bg-[#10B981]/10';
-      case 'INACTIVE': return 'text-[#6B7280] bg-[#6B7280]/10';
-      case 'SUSPENDED': return 'text-[#EF4444] bg-[#EF4444]/10';
-      default: return 'text-[#6B7280] bg-[#6B7280]/10';
-    }
-  };
-
-  const getRiskColor = (riskLevel?: string) => {
-    switch (riskLevel) {
-      case 'HIGH': return 'text-[#EF4444]';
-      case 'MEDIUM': return 'text-[#F59E0B]';
-      case 'LOW': return 'text-[#10B981]';
-      default: return 'text-[#6B7280]';
-    }
-  };
-
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  };
-
-  if (!canViewStudents) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Users className="w-12 h-12 text-[#9CA3AF] mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-[#111827] mb-2">Access Denied</h3>
-          <p className="text-[#6B7280]">You don't have permission to view students.</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="">
-      <AdminHeader 
-        title="Student Management" 
-        subtitle="View and manage student profiles"
+    <TableRow className="hover:bg-muted/30">
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={student.studentProfile?.profileImage || ""} />
+            <AvatarFallback>
+              {student.firstName[0]}
+              {student.lastName[0]}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="font-medium">{student.firstName} {student.lastName}</p>
+            <p className="text-xs text-muted-foreground">{student.email}</p>
+            <p className="text-xs text-muted-foreground">{student.studentId}</p>
+          </div>
+        </div>
+      </TableCell>
+
+      <TableCell>{student.classRef?.name || "-"}</TableCell>
+
+      <TableCell>
+        <span className={cn("px-2 py-1 rounded-md text-xs", statusBadge[student.status])}>
+          {student.status}
+        </span>
+      </TableCell>
+
+      <TableCell>
+        {student.studentProfile?.lastMoodCheckin
+          ? formatRelativeTime(student.studentProfile.lastMoodCheckin)
+          : "Never"}
+      </TableCell>
+
+      <TableCell className="text-center">
+        <span className={cn("font-semibold", riskColor)}>
+          {student.studentProfile?.averageMood?.toFixed(1) || "-"}
+        </span>
+      </TableCell>
+
+      <TableCell className="text-center">{student._count?.sessions || 0}</TableCell>
+
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem className="gap-2" onClick={() => onView(student)}>
+              <Eye className="h-4 w-4" /> View Profile
+            </DropdownMenuItem>
+            {permissions.canUpdateUsers && (
+              <DropdownMenuItem className="gap-2" onClick={() => onEdit(student)}>
+                <Edit className="h-4 w-4" /> Edit
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive" onClick={() => onArchive(student)}>
+              <Archive className="h-4 w-4" /> Archive
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+});
+
+// -----------------------------------------
+// MAIN PAGE
+// -----------------------------------------
+export default function StudentsPage() {
+  const router = useRouter();
+  const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } = useSchoolFilter();
+  const { user } = useAuth();
+  const permissions = usePermissions();
+
+  // ----------------------------
+  // Filters (With Debounce)
+  // ----------------------------
+  const [search, setSearch] = useState("");
+  const [debouncedSearch] = useState(() => debounce((v) => setSearch(v), 300));
+
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [classFilter, setClassFilter] = useState("all");
+
+  // ----------------------------
+  // Fetch Classes
+  // ----------------------------
+  const { data: classesData } = useQuery<Class[]>({
+    queryKey: ["classes", selectedSchoolId],
+    queryFn: async () => {
+      const url = selectedSchoolId && selectedSchoolId !== 'all' 
+        ? `/api/classes?schoolId=${selectedSchoolId}` 
+        : '/api/classes';
+      const response = await fetch(url, { credentials: 'include' });
+      const data = await response.json();
+      return data.success ? data.data : [];
+    },
+  });
+
+  const classes: Class[] = classesData || [];
+
+  // ----------------------------
+  // Fetch Students
+  // ----------------------------
+  const filters = {
+    search,
+    status: statusFilter,
+    classId: classFilter,
+    schoolId: selectedSchoolId,
+  };
+
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isLoading,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["students", filters],
+    queryFn: ({ pageParam }) => fetchStudents({ pageParam, filters }),
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    initialPageParam: 0,
+    staleTime: 1000 * 20,
+  });
+
+  const students = data?.pages.flatMap((p) => p.students) ?? [];
+
+  // ----------------------------
+  // Modals
+  // ----------------------------
+  const [showAdd, setShowAdd] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showView, setShowView] = useState(false);
+  const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
+
+  const handleArchive = (student: Student) => {
+    // TODO: Implement archive functionality
+    console.log('Archive student', student);
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen">
+
+      <AdminHeader
+        title="Students"
+        subtitle="Manage student profiles"
         showSchoolFilter={isSuperAdmin}
+        schools={schools}
         schoolFilterValue={selectedSchoolId}
         onSchoolFilterChange={setSelectedSchoolId}
-        schools={schools}
-        showTimeFilter={false}
-        actions={canCreateStudents && (
-          <Button
-            onClick={handleAddStudent}
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Student</span>
-          </Button>
-        )}
+        actions={
+          permissions.canManageStudents && (
+            <Button onClick={() => setShowAdd(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Add Student
+            </Button>
+          )
+        }
       />
-      {/* Header */}
-      {/* <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Student Management</h2>
-          <p className="text-gray-600">Manage students and their information</p>
-        </div>
-        {canCreateStudents && (
-          <button
-            onClick={handleAddStudent}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Add Student</span>
-          </button>
-        )}
-      </div> */}
 
-      {/* Filters and Search */}
-      <div className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-            <Input 
-              placeholder="Search students..." 
-              className="pl-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+      <div className="p-6">
+
+        {/* FILTER BAR */}
+        <div className="flex flex-wrap gap-4 mb-6">
+
+          {/* SEARCH */}
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-10"
+              placeholder="Search students..."
+              onChange={(e) => debouncedSearch(e.target.value)}
             />
           </div>
+
+          {/* STATUS FILTER */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40">
-              <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="all">All</SelectItem>
               <SelectItem value="ACTIVE">Active</SelectItem>
               <SelectItem value="INACTIVE">Inactive</SelectItem>
               <SelectItem value="SUSPENDED">Suspended</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* CLASS FILTER */}
           <Select value={classFilter} onValueChange={setClassFilter}>
-            <SelectTrigger className="w-36">
+            <SelectTrigger className="w-40">
               <SelectValue placeholder="Class" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Classes</SelectItem>
-              {classes.map((cls) => (
-                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-              ))}
-            </SelectContent>
+{classes.map((cls) => ( <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem> ))}            </SelectContent>
           </Select>
+        </div>
+
+        {/* TABLE */}
+        <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Student</TableHead>
+                <TableHead>Class</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Check-in</TableHead>
+                <TableHead className="text-center">Avg Mood</TableHead>
+                <TableHead className="text-center">Sessions</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {/* LOADING */}
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12 text-center">
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {/* EMPTY */}
+              {!isLoading && students.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                    No students found
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {/* ROWS */}
+              {students.map((student) => (
+                <StudentRow
+                  key={student.id}
+                  student={student}
+                  onView={(s: Student) => {
+                    setCurrentStudent(s);
+                    setShowView(true);
+                  }}
+                  onEdit={(s: Student) => {
+                    setCurrentStudent(s);
+                    setShowEdit(true);
+                  }}
+                  onArchive={handleArchive}
+                  permissions={permissions}
+                />
+              ))}
+            </TableBody>
+          </Table>
+
+          {/* LOAD MORE */}
+          {hasNextPage && (
+            <div className="p-4 text-center">
+              <Button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="w-full"
+              >
+                {isFetchingNextPage ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
+
         </div>
       </div>
 
-      {/* Students Table */}
-      <div className="rounded-xl ml-6 mr-6 border border-[#D1D5DB] bg-[#FFFFFF] overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-[#E2E8F0]/50">
-              <TableHead>Student</TableHead>
-              <TableHead>Class</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Check-in</TableHead>
-              <TableHead className="text-center">Avg Mood</TableHead>
-              <TableHead className="text-center">Sessions</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {students.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-[#64748B] py-12">
-                  No students found
-                </TableCell>
-              </TableRow>
-            ) : (
-              students.map((student) => (
-                <TableRow key={student.id} className="hover:bg-[#E2E8F0]/30">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage 
-                          src={student.studentProfile?.profileImage || ''} 
-                          alt={`${student.firstName} ${student.lastName}`}
-                        />
-                        <AvatarFallback className="bg-[#3B82F6]/10 text-[#3B82F6] text-sm">
-                          {getInitials(student.firstName, student.lastName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-[#1E293B]">{student.firstName} {student.lastName}</p>
-                        <p className="text-xs text-[#64748B]">{student.email}</p>
-                        <p className="text-xs text-[#64748B]">{student.studentId}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-[#64748B]">{student.classRef?.name || '-'}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="secondary"
-                      className={cn("text-xs", statusStyles[student.status].bg, statusStyles[student.status].text)}
-                    >
-                      {statusStyles[student.status].label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-[#64748B]">
-                    {student.studentProfile?.lastMoodCheckin ? (
-                      new Date(student.studentProfile.lastMoodCheckin).toLocaleDateString()
-                    ) : (
-                      'Never'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className={cn(
-                      "font-medium",
-                      (student.studentProfile?.averageMood ?? 0) >= 3.5 ? "text-[#10B981]" : 
-                      (student.studentProfile?.averageMood ?? 0) >= 2.5 ? "text-[#F59E0B]" : "text-[#EF4444]"
-                    )}>
-                      {student.studentProfile?.averageMood?.toFixed(1) || '-'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center text-[#64748B]">{student._count?.chatSessions || 0}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2" onClick={() => handleViewStudent(student)}>
-                          <Eye className="h-4 w-4" /> View Profile
-                        </DropdownMenuItem>
-                        {canUpdateStudents && (
-                          <DropdownMenuItem className="gap-2" onClick={() => handleEditStudent(student)}>
-                            <Edit className="h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        {canDeleteStudents && (
-                          <DropdownMenuItem className="gap-2 text-[#EF4444] focus:text-[#EF4444]">
-                            <Archive className="h-4 w-4" /> Archive
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Add Student Modal */}
-      {showAddModal && (
+      {/* MODALS */}
+      {showAdd && (
         <AddStudentModal
-          onClose={() => setShowAddModal(false)}
+          onClose={() => setShowAdd(false)}
           onSuccess={() => {
-            setShowAddModal(false);
-            fetchStudents();
-          }}
-          schools={schools}
-          classes={classes}
-        />
+            setShowAdd(false);
+          } }
+          schools={schools} classes={[]}        />
       )}
 
-      {/* Edit Student Modal */}
-      {showEditModal && selectedStudent && (
+      {showEdit && currentStudent && (
         <EditStudentModal
-          student={selectedStudent}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={() => {
-            setShowEditModal(false);
-            fetchStudents();
-          }}
-          schools={schools}
-          classes={classes}
-        />
+          student={currentStudent}
+          onClose={() => setShowEdit(false)}
+          onSuccess={() => setShowEdit(false)} schools={[]} classes={[]}        />
       )}
 
-      {/* View Student Modal */}
-      {showViewModal && selectedStudent && (
-        <ViewStudentModal
-          student={selectedStudent}
-          onClose={() => setShowViewModal(false)}
-        />
+      {showView && currentStudent && (
+        <ViewStudentModal student={currentStudent} onClose={() => setShowView(false)} />
       )}
     </div>
   );

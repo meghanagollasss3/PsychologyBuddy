@@ -84,8 +84,6 @@ export const StudentRepository = {
       }
     }
 
-    console.log('Student repository query:', { schoolId, filters, whereCondition });
-
     const students = await prisma.user.findMany({
       where: whereCondition,
       include: {
@@ -109,13 +107,22 @@ export const StudentRepository = {
           select: {
             chatSessions: true,
             moodCheckins: true,
+            escalationAlerts: {
+              where: {
+                status: 'resolved'
+              }
+            }
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        { firstName: 'asc' },
+        { lastName: 'asc' },
+      ],
     });
+
+    console.log('Query executed, found students:', students.length);
+    console.log('Sample student data:', students.slice(0, 2));
 
     console.log('Student repository raw results:', students.length);
     console.log('Student details:', students.map(s => ({

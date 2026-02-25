@@ -120,16 +120,24 @@ async function main() {
     });
   }
 
-  const classA = await prisma.class.upsert({
-    where: { schoolId_grade_section: { schoolId: school.id, grade: 10, section: "A" } },
-    update: {},
-    create: {
+  let classA = await prisma.class.findFirst({
+    where: { 
       schoolId: school.id,
-      name: "Class 10-A",
       grade: 10,
-      section: "A",
-    },
+      section: "A"
+    }
   });
+
+  if (!classA) {
+    classA = await prisma.class.create({
+      data: {
+        schoolId: school.id,
+        name: "Class 10-A",
+        grade: 10,
+        section: "A",
+      },
+    });
+  }
 
   // ------------------------------------------------
   // 5. Create Super Admin

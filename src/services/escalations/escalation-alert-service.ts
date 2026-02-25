@@ -112,13 +112,28 @@ export class EscalationAlertService {
     try {
       console.log(`[EscalationAlert] Creating alert for student ${studentId}, session ${sessionId}`)
       
+      // Resolve the user ID from the studentId
+      const user = await prisma.user.findUnique({
+        where: { studentId: studentId },
+        select: { id: true, firstName: true, lastName: true }
+      });
+
+      if (!user) {
+        throw new Error(`User not found for studentId: ${studentId}`);
+      }
+
+      const userId = user.id;
+      const studentName = `${user.firstName} ${user.lastName}`;
+
+      console.log(`[EscalationAlert] Resolved user ID: ${userId} for studentId: ${studentId}`);
+      
       // Create alert record in database
       const alert = await prisma.escalationAlert.create({
         data: {
-          studentId,
+          studentId: userId, // Use the resolved user ID
           sessionId,
-          studentName: await this.getStudentName(studentId), // Get student name for display
-          studentClass: await this.getStudentClass(studentId), // Get student class
+          studentName: studentName, // Use the resolved name
+          studentClass: await this.getStudentClass(studentId), // Get student class using the original studentId
           category: detection.category.type,
           level: detection.level.level,
           severity: detection.level.severity,

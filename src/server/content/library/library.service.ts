@@ -4,7 +4,7 @@ import { CreateArticleData, UpdateArticleData } from './library.validators';
 
 export class LibraryService {
   // Create new article
-  static async createArticle(data: CreateArticleData, userId: string) {
+  static async createArticle(data: CreateArticleData, userId: string, userSchoolId?: string) {
     try {
       const article = await prisma.article.create({
         data: {
@@ -15,6 +15,7 @@ export class LibraryService {
           description: data.description,
           status: data.status,
           createdBy: userId,
+          schoolId: userSchoolId,
           // Create relations if provided
           ...(data.categoryIds && {
             categories: {
@@ -77,9 +78,23 @@ export class LibraryService {
   }
 
   // Get all articles
-  static async getAllArticles() {
+  static async getAllArticles(userSchoolId?: string) {
     try {
+      let whereClause: any = {};
+      
+      // For regular admins: show articles from their school + superadmin articles (null schoolId)
+      // For super admins: no filtering (can see all articles)
+      if (userSchoolId) {
+        whereClause = {
+          OR: [
+            { schoolId: userSchoolId },  // Articles from their school
+            { schoolId: null }           // Superadmin articles
+          ]
+        };
+      }
+      
       const articles = await prisma.article.findMany({
+        where: whereClause,
         include: {
           categories: {
             include: {

@@ -9,6 +9,7 @@ interface AddStudentModalProps {
   onSuccess: () => void;
   schools: any[];
   classes: any[];
+  onClassesUpdated?: () => void; // Add callback to refresh classes (optional)
 }
 
 interface FormData {
@@ -23,7 +24,7 @@ interface FormData {
   schoolId: string;
 }
 
-export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStudentModalProps) {
+export function AddStudentModal({ onClose, onSuccess, schools, classes, onClassesUpdated }: AddStudentModalProps) {
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const { user } = useAuth();
@@ -69,10 +70,12 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStu
   };
 
   const createOrFindClass = async (grade: string, section: string) => {
+    console.log('=== CREATE OR FIND CLASS ===');
     const className = `Class ${grade}-${section}`;
     
     // Use schoolId from form instead of user
     const schoolId = formData.schoolId;
+    console.log('Selected school ID from form:', schoolId);
     
     if (!schoolId) {
       console.error('No schoolId selected for class creation');
@@ -81,6 +84,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStu
     
     try {
       // First, check if class already exists in local classes array
+      console.log('Checking for existing class in local array...');
       const existingClass = classes.find(cls => 
         cls.schoolId === schoolId && 
         cls.grade === parseInt(grade) && 
@@ -93,6 +97,13 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStu
       }
       
       // Try to create/find class via API
+      console.log('Calling API to create class with:', {
+        name: className,
+        grade: parseInt(grade),
+        section,
+        schoolId
+      });
+      
       const response = await fetch('/api/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,6 +117,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStu
       });
       
       const data = await response.json();
+      console.log('API Response:', JSON.stringify(data, null, 2));
       
       if (data.success) {
         console.log('Class operation successful:', data.message);
@@ -113,6 +125,10 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStu
           console.log('Using existing class:', data.data);
         } else {
           console.log('Created new class:', data.data);
+          // Call callback to refresh classes list
+          if (onClassesUpdated) {
+            onClassesUpdated();
+          }
         }
         return data.data.id;
       } else {
@@ -127,6 +143,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStu
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
     // Clear error for this field
     if (errors[field as keyof FormData]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -134,6 +151,13 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes }: AddStu
     // Clear submit error when user makes changes
     if (submitError) {
       setSubmitError('');
+    }
+    
+    // Special handling for schoolId field to ensure it updates properly
+    if (field === 'schoolId') {
+      console.log('SchoolId changed to:', value);
+      console.log('Current formData.schoolId:', formData.schoolId);
+      setFormData(prev => ({ ...prev, schoolId: value }));
     }
   };
 

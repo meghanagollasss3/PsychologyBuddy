@@ -17,7 +17,18 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, conversation } = await request.json()
+    let requestBody;
+    try {
+      requestBody = await request.json()
+    } catch (jsonError) {
+      console.error('Failed to parse request JSON:', jsonError)
+      return NextResponse.json(
+        { success: false, error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
+    }
+
+    const { sessionId, conversation } = requestBody
 
     console.log('Summary generate request:', { sessionId, conversationLength: conversation?.length })
 

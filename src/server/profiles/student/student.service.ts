@@ -75,9 +75,63 @@ export class StudentService {
   static async getStudentsBySchool(schoolId?: string, filters?: { search?: string; status?: string; classId?: string }) {
     try {
       const students = await StudentRepository.getStudentsBySchool(schoolId, filters);
-      
+
+      // Define mood scores for calculations
+      const moodScores: Record<string, number> = {
+        'Happy': 5,
+        'Okay': 4,
+        'Sad': 2,
+        'Anxious': 1,
+        'Tired': 3
+      };
+
+      // Calculate mood metrics for each student
+      const studentsWithMetrics = await Promise.all(
+        students.map(async (student) => {
+          // Get all mood check-ins for this student
+          const moodCheckins = await prisma.moodCheckin.findMany({
+            where: {
+              userId: student.id
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          });
+
+          // Calculate metrics
+          let lastCheckinDate = null;
+          let totalCheckins = moodCheckins.length;
+          let averageMoodScore = 0;
+
+          if (moodCheckins.length > 0) {
+            // Last check-in date
+            lastCheckinDate = moodCheckins[0].createdAt;
+
+            // Calculate average mood score
+            const totalScore = moodCheckins.reduce((sum, checkin) => {
+              return sum + (moodScores[checkin.mood] || 3); // Default to 3 if mood not found
+            }, 0);
+            averageMoodScore = totalScore / moodCheckins.length;
+          }
+
+          return {
+            ...student,
+            studentProfile: {
+              ...student.studentProfile,
+              lastMoodCheckin: lastCheckinDate,
+              averageMood: averageMoodScore
+            },
+            _count: {
+              ...student._count,
+              // Use resolved escalation alerts as session count
+              sessions: student._count.escalationAlerts
+            }
+          };
+        })
+      );
+
       // Remove passwords from response
-      const studentsWithoutPasswords = students.map(student => {
+      const studentsWithoutPasswords = studentsWithMetrics.map(student => {
         const { password, ...studentWithoutPassword } = student;
         return studentWithoutPassword;
       });

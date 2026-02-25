@@ -21,6 +21,8 @@ export async function POST(req: Request) {
   try {
     const { message, studentId, sessionId } = await req.json();
 
+    console.log('[ChatStream] Request received:', { studentId, sessionId, messageLength: message?.length });
+
     if (!message || !studentId || !sessionId) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -112,18 +114,40 @@ export async function POST(req: Request) {
 
       // If this is a valid escalation, create an alert
       if (ContentEscalationDetector.isValidEscalation(detection)) {
-        console.log('[EscalationCheck] Valid escalation detected, creating alert');
+        console.log('[EscalationCheck] Valid escalation detected, checking for existing alerts');
         
         try {
-          const alert = await EscalationAlertService.createEscalationAlert(
-            studentId,
-            sessionId,
-            detection,
-            message,
-            studentMessage.createdAt.toISOString()
-          );
+          // Check if an alert already exists for this student with the same message content
+          // Use a more robust deduplication strategy across all sessions
+          const existingAlert = await prisma.escalationAlert.findFirst({
+            where: {
+              studentId: user.id, // Use the resolved user ID instead of studentId
+              messageContent: message,
+              createdAt: {
+                gte: new Date(Date.now() - 5 * 60 * 1000) // Within last 5 minutes
+              }
+            },
+            orderBy: { createdAt: 'desc' }
+          });
 
-          console.log('[EscalationCheck] Alert created successfully:', alert.id);
+          if (existingAlert) {
+            console.log('[EscalationCheck] Alert already exists for this student with similar message, skipping creation:', existingAlert.id);
+            console.log('[EscalationCheck] Existing alert details:', {
+              sessionId: existingAlert.sessionId,
+              messageContent: existingAlert.messageContent,
+              createdAt: existingAlert.createdAt
+            });
+          } else {
+            const alert = await EscalationAlertService.createEscalationAlert(
+              studentId,
+              sessionId,
+              detection,
+              message,
+              studentMessage.createdAt.toISOString()
+            );
+
+            console.log('[EscalationCheck] Alert created successfully:', alert.id);
+          }
           
           // If immediate action is required, we might want to modify the AI response
           if (detection.level.requiresImmediateAction) {

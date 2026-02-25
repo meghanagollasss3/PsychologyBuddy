@@ -17,9 +17,17 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // For now, allow any authenticated user to view articles
-    // TODO: Add proper role-based filtering if needed
-    const result = await LibraryService.getAllArticles();
+    // Get user details to determine schoolId
+    const userResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/me`, {
+      headers: { cookie: req.headers.get('cookie') || '' }
+    });
+    const userData = await userResponse.json();
+    
+    // For regular admins, use their schoolId
+    // For super admins, no school filtering (can see all articles)
+    const userSchoolId = userData.data?.user?.role?.name === 'SUPERADMIN' ? undefined : userData.data?.user?.schoolId;
+    
+    const result = await LibraryService.getAllArticles(userSchoolId);
     
     return NextResponse.json(result);
   } catch (error) {
@@ -47,8 +55,17 @@ export async function POST(req: NextRequest) {
     // Validate the request body
     const validatedData = CreateArticleSchema.parse(body);
     
-    // TODO: Add role check for admin/superadmin if needed
-    const result = await LibraryService.createArticle(validatedData, session.userId);
+    // Get user details to determine schoolId
+    const userResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/me`, {
+      headers: { cookie: req.headers.get('cookie') || '' }
+    });
+    const userData = await userResponse.json();
+    
+    // For regular admins, use their schoolId
+    // For super admins, allow null (can create for all schools)
+    const userSchoolId = userData.data?.user?.role?.name === 'SUPERADMIN' ? null : userData.data?.user?.schoolId;
+    
+    const result = await LibraryService.createArticle(validatedData, session.userId, userSchoolId);
     
     return NextResponse.json(result);
   } catch (error) {

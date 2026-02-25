@@ -158,6 +158,17 @@ export function useChat({
     console.log(`[AutoTermination] Message count: ${state.messages.length}`);
 
     try {
+      const requestPayload = {
+        sessionId: sessionIdRef.current,
+        conversation: state.messages.map((msg: Message) => ({
+          role: msg.sender === "student" ? "user" : "assistant",
+          content: msg.content
+        })),
+      };
+      
+      console.log(`[AutoTermination] Request payload:`, requestPayload);
+      console.log(`[AutoTermination] Student ID: ${studentId}`);
+
       // Call summary generation API
       const response = await fetch("/api/students/summary/generate", {
         method: "POST",
@@ -165,21 +176,17 @@ export function useChat({
           "Content-Type": "application/json",
           "x-user-id": studentId
         },
-        body: JSON.stringify({
-          sessionId: sessionIdRef.current,
-          conversation: state.messages.map((msg: Message) => ({
-            role: msg.sender === "student" ? "user" : "assistant",
-            content: msg.content
-          })),
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       console.log(`[AutoTermination] Summary API response status: ${response.status}`);
 
       const data = await response.json();
       console.log(`[AutoTermination] Summary API response:`, data);
+      console.log(`[AutoTermination] Response data type:`, typeof data);
+      console.log(`[AutoTermination] Response data keys:`, Object.keys(data));
 
-      if (data.success) {
+      if (data && data.success) {
         // Store for last-session preview use
         sessionStorage.setItem("lastSummaryId", data.data.id);
         console.log(`[AutoTermination] Summary generated successfully, ID: ${data.data.id}`);

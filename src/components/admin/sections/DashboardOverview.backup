@@ -1,0 +1,491 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { usePermissions } from '@/src/hooks/usePermissions';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { useSchoolFilter } from '@/src/contexts/SchoolFilterContext';
+import type { User } from '@/src/contexts/AuthContext';
+import { 
+  Users, 
+  School, 
+  BookOpen, 
+  Heart, 
+  TrendingUp,
+  Activity,
+  Award,
+  Clock,
+  AlertTriangle,
+  Smile,
+  MessageSquare
+} from 'lucide-react';
+import { AdminHeader } from '../layout/AdminHeader';
+import { MoodDistributionChart } from '../charts/MoodDistributionChartChartJS';
+import { TriggerAnalysisChart } from '../charts/TriggerAnalysisChartChartJS';
+import { RecentActivity } from './RecentActivity';
+import { AlertsOverview } from './AlertsOverview';
+import SchoolInfo from './dashboard/SchoolInfo';
+
+interface DashboardStats {
+  totalStudents: number;
+  totalSchools: number;
+  articles: number;
+  activeSessions: number;
+  checkinsToday: number;
+  activeAlerts: number;
+}
+
+interface ClassData {
+  className: string;
+  studentCount: number;
+  alertCount: number;
+}
+
+export function DashboardOverview() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const permissions = usePermissions();
+  const { selectedSchoolId, setSelectedSchoolId, schools, setSchools, isSuperAdmin } = useSchoolFilter();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalStudents: 0,
+    totalSchools: 0,
+    articles: 0,
+    activeSessions: 0,
+    checkinsToday: 0,
+    activeAlerts: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [selectedSchool, setSelectedSchool] = useState<any>(null);
+  const [classData, setClassData] = useState<ClassData[]>([]);
+  const [moodData, setMoodData] = useState<any>(null);
+  const [triggerData, setTriggerData] = useState<any>(null);
+
+  // Fetch class-wise wellness data
+  const fetchClassWellnessData = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (selectedSchoolId && selectedSchoolId !== 'all' && isSuperAdmin) {
+        queryParams.append('schoolId', selectedSchoolId);
+      } else if (!isSuperAdmin && (user?.schoolId || user?.school?.id)) {
+        // For Admins, we should pass their schoolId too
+        queryParams.append('schoolId', user.schoolId || user.school?.id);
+      }
+      
+      const response = await fetch(`/api/admin/class-wellness?${queryParams.toString()}`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setClassData(data.data);
+        } else {
+          console.error('API returned error:', data.message);
+        }
+      } else {
+        console.error('API call failed with status:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching class wellness data:', error);
+    }
+  };
+
+  // Fetch mood distribution data
+  const fetchMoodDistribution = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (selectedSchoolId && selectedSchoolId !== 'all' && isSuperAdmin) {
+        queryParams.append('schoolId', selectedSchoolId);
+      } else if (!isSuperAdmin && (user?.schoolId || user?.school?.id)) {
+        queryParams.append('schoolId', user.schoolId || user.school?.id);
+      }
+
+      const response = await fetch(`/api/admin/mood-distribution?${queryParams.toString()}`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMoodData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching mood distribution:', error);
+    }
+  };
+
+  // Fetch emotional triggers data
+  const fetchEmotionalTriggers = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (selectedSchoolId && selectedSchoolId !== 'all' && isSuperAdmin) {
+        queryParams.append('schoolId', selectedSchoolId);
+      } else if (!isSuperAdmin && (user?.schoolId || user?.school?.id)) {
+        queryParams.append('schoolId', user.schoolId || user.school?.id);
+      }
+
+      const response = await fetch(`/api/admin/emotional-triggers?${queryParams.toString()}`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setTriggerData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching emotional triggers:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Check for selected school in sessionStorage
+    const storedSchool = sessionStorage.getItem('selectedSchool');
+    if (storedSchool) {
+      const school = JSON.parse(storedSchool);
+      setSelectedSchool(school);
+      // Clear sessionStorage after using it
+      sessionStorage.removeItem('selectedSchool');
+    }
+    
+    fetchSchoolsData();
+    fetchClassWellnessData();
+    fetchMoodDistribution();
+    fetchEmotionalTriggers();
+  }, []);
+
+  useEffect(() => {
+    // Update dashboard when school filter changes
+    updateDashboardStats();
+    fetchClassWellnessData();
+    fetchMoodDistribution();
+    fetchEmotionalTriggers();
+  }, [selectedSchoolId]);
+
+  const fetchSchoolsData = async () => {
+    try {
+      const response = await fetch('/api/schools', {
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (data.success) {
+        let schoolsData = data.data;
+        
+        // Map API response to expected interface
+        schoolsData = schoolsData.map((school: any) => ({
+          ...school,
+          location: school.address || 'Unknown Location',
+          studentCount: school._count?.users || 0,
+          alertCount: 0,
+          checkInsToday: 0,
+        }));
+        
+        setSchools(schoolsData);
+      }
+    } catch (error) {
+      console.error('Error fetching schools:', error);
+    }
+  };
+
+  const updateDashboardStats = async () => {
+    if (selectedSchoolId === 'all' || !isSuperAdmin) {
+      // Show overall stats
+      fetchDashboardStats();
+    } else {
+      // Show filtered stats for selected school - call API with schoolId
+      await fetchDashboardStats(selectedSchoolId);
+    }
+  };
+
+  const fetchDashboardStats = async (schoolId?: string) => {
+    try {
+      // Fetch metrics data from the API endpoint
+      const queryParams = new URLSearchParams();
+      if (schoolId) {
+        queryParams.append('schoolId', schoolId);
+      } else if (selectedSchoolId && selectedSchoolId !== 'all' && isSuperAdmin) {
+        queryParams.append('schoolId', selectedSchoolId);
+      }
+
+      const metricsResponse = await fetch(`/api/admin/metrics?${queryParams.toString()}`, {
+        credentials: 'include'
+      });
+
+      if (!metricsResponse.ok) {
+        throw new Error('Failed to fetch metrics');
+      }
+
+      const metricsData = await metricsResponse.json();
+      
+      if (metricsData.success) {
+        const metrics = metricsData.data;
+        
+        setStats({
+          totalStudents: metrics.totalStudents,
+          totalSchools: metrics.totalSchools,
+          articles: metrics.resourcesBreakdown?.articles || 0,
+          activeSessions: metrics.activeSessions,
+          checkinsToday: metrics.checkinsToday,
+          activeAlerts: metrics.highRiskAlerts,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statsCards = [
+    {
+      title: 'Total Students',
+      value: loading ? '...' : stats.totalStudents.toLocaleString(),
+      icon: <Users className="w-5 h-5" />,
+      color: 'bg-blue-500',
+      permission: 'users.view',
+    },
+    {
+      title: "Today's Check-ins",
+      value: loading ? '...' : stats.checkinsToday.toLocaleString(),
+      icon: <Smile className="w-5 h-5" />,
+      color: 'bg-green-500',
+      permission: 'analytics.view',
+    },
+    {
+      title: 'Counselling Sessions',
+      value: loading ? '...' : stats.activeSessions.toLocaleString(),
+      icon: <MessageSquare className="w-5 h-5" />,
+      color: 'bg-purple-500',
+      permission: 'analytics.view',
+    },
+    {
+      title: 'High-Risk Alerts',
+      value: loading ? '...' : stats.activeAlerts.toLocaleString(),
+      icon: <AlertTriangle className="w-5 h-5" />,
+      color: 'bg-red-500',
+      permission: 'analytics.view', // Changed from 'alerts.view' to 'analytics.view'
+    },
+    {
+      title: 'Resources Published',
+      value: loading ? '...' : stats.articles.toLocaleString(),
+      icon: <BookOpen className="w-5 h-5" />,
+      color: 'bg-orange-500',
+      permission: 'psycho.education.view',
+    },
+  ];
+
+  const quickActions = [
+    {
+      title: 'Add Student',
+      description: 'Create a new student account',
+      icon: <Users className="w-5 h-5" />,
+      action: 'students',
+      permission: 'users.create',
+    },
+    {
+      title: 'Create Article',
+      description: 'Add new psycho-education content',
+      icon: <BookOpen className="w-5 h-5" />,
+      action: 'psycho-education',
+      permission: 'psycho.education.create',
+    },
+    {
+      title: 'View Analytics',
+      description: 'Check platform usage statistics',
+      icon: <TrendingUp className="w-5 h-5" />,
+      action: 'analytics',
+      permission: 'analytics.view',
+    },
+    {
+      title: 'Manage Settings',
+      description: 'Configure platform features',
+      icon: <Activity className="w-5 h-5" />,
+      action: 'settings',
+      permission: 'settings.update',
+    },
+  ];
+
+  return (
+    <div>
+      {/* Header */}
+      <AdminHeader 
+        title="Welcome back, Sarah" 
+        subtitle="Here's what's happening with your students today"
+        showSchoolFilter={isSuperAdmin}
+        schoolFilterValue={selectedSchoolId}
+        onSchoolFilterChange={setSelectedSchoolId}
+        schools={schools}
+      />
+
+      {/* Stats Grid */}
+    <div className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {statsCards
+          .filter((stat: any) => !stat.permission || permissions.hasPermission(stat.permission))
+          .map((stat: any, index: number) => (
+            <div key={index} className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:shadow-card-hover hover:border-primary/20">
+              <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-muted-foreground">{stat.title}</span>
+                  <span className="text-2xl font-semibold tracking-tight text-foreground">{stat.value}</span>
+                </div>
+                <div className={`${stat.color} flex h-10 w-10 items-center justify-center rounded-lg text-white`}>
+                  {stat.icon}
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {/* School Information - Only for Admin users */}
+      {(permissions.isAdmin || permissions.isSuperAdmin) && (
+        <>
+          {/* Selected School Info (SuperAdmin) */}
+          {selectedSchool && permissions.isSuperAdmin && (
+            <SchoolInfo 
+              school={{
+                id: selectedSchool.id,
+                name: selectedSchool.name,
+                address: selectedSchool.address,
+                email: selectedSchool.email
+              }}
+              stats={{ totalStudents: selectedSchool._count?.users || 0 }}
+            />
+          )}
+
+          {/* Admin's Own School Info */}
+          {!selectedSchool && permissions.isAdmin && (user?.schoolId || user?.school?.id) && (
+            <SchoolInfo 
+              school={{
+                id: user.schoolId || user.school?.id || '',
+                name: user.school?.name || 'Your School',
+                address: user.school?.address,
+                email: user.school?.email
+              }}
+              stats={{ totalStudents: stats.totalStudents }}
+            />
+          )}
+        </>
+      )}
+
+      {/* Class-wise Wellness Heatmap - Only show for admins or when superadmin has selected a specific school */}
+      {(!isSuperAdmin || (selectedSchoolId && selectedSchoolId !== 'all')) && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Class-wise Wellness Heatmap</h3>
+              <p className="text-sm text-muted-foreground">Click a class to view student details</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="h-3 w-3 rounded border-[0.5px] border-success bg-transparent" />
+                <span className="text-muted-foreground">No Alerts</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="h-3 w-3 rounded border-[0.5px] border-destructive bg-transparent" />
+                <span className="text-muted-foreground">Has Alerts</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {classData.length > 0 ? (
+              classData.map((cls) => {
+                const hasAlerts = cls.alertCount > 0;
+                return (
+                  <button
+                    key={cls.className}
+                    onClick={() => {
+                      // Navigate to students filtered by class
+                      router.push(`/admin/users/students?class=${cls.className}`);
+                    }}
+                    className={`flex flex-col items-center justify-center rounded-lg border-[0.5px] p-4 transition-all duration-200 bg-card hover:bg-muted/50 ${
+                      hasAlerts 
+                        ? "border-destructive" 
+                        : "border-success"
+                    }`}
+                  >
+                    <span className="text-lg font-semibold text-foreground">{cls.className}</span>
+                    <span className="text-xs text-muted-foreground">{cls.studentCount} students</span>
+                    {hasAlerts && (
+                      <div className="flex items-center gap-1 mt-2 text-destructive">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        <span className="text-xs font-medium">{cls.alertCount} alert{cls.alertCount > 1 ? 's' : ''}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="col-span-full text-center py-8">
+                <p className="text-muted-foreground">No classes found for this school.</p>
+                <p className="text-sm text-muted-foreground/70 mt-2">Classes need to be created and assigned students to appear here.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Mood Distribution Chart */}
+        <MoodDistributionChart 
+          data={Array.isArray(moodData?.chartData) ? moodData.chartData : []}
+          totalCheckins={moodData?.totalCheckins || 0}
+          dominantMood={moodData?.dominantMood || null}
+        />
+
+        {/* Emotional Triggers Chart */}
+        <TriggerAnalysisChart 
+          data={Array.isArray(triggerData?.chartData) ? triggerData.chartData : []}
+          totalReports={triggerData?.totalReports || 0}
+          timeRange={triggerData?.timeRange || 'week'}
+        />
+      </div>
+        <div className="flex-1 overflow-auto space-y-6 animate-fade-in">
+
+        <RecentActivity/>
+        </div>
+        <div>
+          <AlertsOverview/>
+        </div>
+
+      
+
+      {/* SuperAdmin Only Info */}
+      {permissions.isSuperAdmin && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex items-start space-x-3">
+            <Award className="w-6 h-6 text-blue-600 mt-1" />
+            <div>
+              <h3 className="text-lg font-semibold text-blue-900">SuperAdmin Access</h3>
+              <p className="text-blue-700 mt-1">
+                You have full system access. You can manage all organizations, users, and platform settings.
+                Use the Access Control section to manage admin permissions and feature toggles.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Only Info */}
+      {permissions.isAdmin && user?.school && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <div className="flex items-start space-x-3">
+            <School className="w-6 h-6 text-green-600 mt-1" />
+            <div>
+              <h3 className="text-lg font-semibold text-green-900">School Admin Access</h3>
+              <p className="text-green-700 mt-1">
+                You are managing <strong>{user.school.name}</strong>. You can add students, 
+                create educational content, and manage self-help tools for your school.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+    </div>
+  );
+}

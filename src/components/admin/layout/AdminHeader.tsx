@@ -166,9 +166,9 @@ export function AdminHeader({
                     No notifications
                   </div>
                 ) : (
-                  notifications.slice(0, 5).map((notification: any) => (
+                  notifications.slice(0, 5).map((notification: any, index: number) => (
                     <DropdownMenuItem
-                      key={notification.id}
+                      key={notification.id || `notification-${index}`}
                       className="flex flex-col items-start p-3 cursor-pointer"
                       onClick={() => handleNotificationClick(notification)}
                     >

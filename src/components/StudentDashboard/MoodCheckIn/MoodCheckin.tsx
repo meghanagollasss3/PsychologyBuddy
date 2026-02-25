@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "lucide-react";
-// import { NavigationUtils } from "@/src/utils";
 import { cn } from "@/src/lib/cn";
 import { SearchParamsUtils } from "@/src/lib/ai/search-params";
 import { getAuthHeaders } from "@/src/utils";
 import BackToDashboard from "../Layout/BackToDashboard";
+import { useServerAuth } from "@/src/hooks";
 
 type Mood = "Happy" | "Okay" | "Sad" | "Anxious" | "Tired" | null;
 type Factor = "friends" | "exams" | "family" | "social" | "sleep" | "school" | "health" | "others";
@@ -45,6 +45,7 @@ const factorOptions: FactorOption[] = [
 
 export default function MoodCheckIn() {
   const router = useRouter();
+  const { user } = useServerAuth(); // Use proper authentication
   const [selectedMood, setSelectedMood] = useState<Mood>(null);
   const [selectedFactors, setSelectedFactors] = useState<Factor[]>([]);
   const [notes, setNotes] = useState("");
@@ -85,6 +86,11 @@ export default function MoodCheckIn() {
       return;
     }
 
+    if (!user) {
+      setError("User authentication required. Please log in again.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -93,9 +99,8 @@ export default function MoodCheckIn() {
         mood: selectedMood,
         triggers: selectedFactors,
         notes: notes.trim() || undefined,
-        studentId: 'debug-check' // Debug to see if context.id is available
       });
-      
+
       const response = await fetch('/api/students/mood/checkin', {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -107,9 +112,36 @@ export default function MoodCheckIn() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          console.error("Failed to parse error response:", parseError);
+          errorData = {};
+        }
+        
         console.error("API Error Response:", errorData);
-        throw new Error(errorData.message || 'Failed to submit mood check-in');
+        console.error("Response status:", response.status, response.statusText);
+        
+        // Handle specific status codes even if response body is empty
+        if (response.status === 409) {
+          throw new Error('You have already checked in today. Please try again tomorrow.');
+        }
+        
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in again.');
+        }
+        
+        if (response.status === 403) {
+          throw new Error('Access denied. You do not have permission to perform this action.');
+        }
+        
+        if (response.status === 404) {
+          throw new Error('The requested resource was not found.');
+        }
+        
+        const errorMessage = errorData?.message || errorData?.error || `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -211,12 +243,6 @@ export default function MoodCheckIn() {
               id="additional-questions"
               className="space-y-8"
             >
-              {/* Error Display */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-                  <p className="text-red-700 text-center">{error}</p>
-                </div>
-              )}
               {/* What's affecting your mood */}
               <div className="opacity-0 animate-[fadeInUp_0.6s_ease-out_0.2s_forwards]">
                 <p className="text-sm sm:text-[20px] text-[#2c3e50] font-medium mb-4 sm:mb-6">
@@ -272,6 +298,22 @@ export default function MoodCheckIn() {
                   className="min-h-[100px] sm:min-h-[180px] w-full resize-none rounded-xl border-2 border-[#E8EEF3] focus:border-[#3db9e8] active:border-[#3db9e8] text-[14px] sm:text-[18px] text-[#2c3e50] placeholder:text-[#9ca8b4] bg-[#F5F8FA] focus:bg-white transition-all duration-300 px-6 py-4 outline-none"
                 />
               </div>
+
+              {/* Error Display - Moved near submit button */}
+              {error && (
+                <div className="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-400 rounded-lg p-4 mb-6 shadow-sm">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 00016zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l2-2z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-red-800">{error}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Submit Button */}
               {selectedFactors.length > 0 && (

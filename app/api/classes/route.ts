@@ -2,20 +2,7 @@ import { NextRequest } from 'next/server';
 import { UserService } from '@/src/services/user.service';
 import { withPermission } from '@/src/middleware/permission.middleware';
 import { handleError } from '@/src/utils/errors';
-
-// Helper function to find class by grade and section
-async function findClassByGradeSection(schoolId: string, grade: number, section?: string) {
-  try {
-    const classes = await UserService.getClasses(schoolId, { grade, section });
-    if (classes.success && classes.data && classes.data.length > 0) {
-      return classes.data[0]; // Return the first matching class
-    }
-    return null;
-  } catch (error) {
-    console.error('Error finding class by grade/section:', error);
-    return null;
-  }
-}
+import prisma from '@/src/prisma';
 
 // POST /api/classes - Create class (Admin only)
 export const POST = withPermission({ 
@@ -37,17 +24,15 @@ export const POST = withPermission({
       );
     }
 
-    // For SUPERADMIN, we need to ensure they have a schoolId or get it from request
-    let schoolId = userSchoolId;
-    if (!schoolId && user.role.name === 'SUPERADMIN') {
-      // For SUPERADMIN, either require schoolId in body or use a default
-      if (!body.schoolId) {
-        return Response.json(
-          { success: false, message: 'School ID is required for SUPERADMIN' },
-          { status: 400 }
-        );
-      }
+    // For SUPERADMIN, use the schoolId from the request body (selected by user)
+    // For regular admins, use their assigned schoolId
+    let schoolId;
+    if (user.role.name === 'SUPERADMIN') {
+      // SUPERADMIN can create classes for any school - use the selected schoolId from form
       schoolId = body.schoolId;
+    } else {
+      // Regular admin can only create classes for their assigned school
+      schoolId = userSchoolId;
     }
 
     if (!schoolId) {
@@ -57,23 +42,38 @@ export const POST = withPermission({
       );
     }
 
-    // Check if class already exists before attempting creation
-    const existingClass = await findClassByGradeSection(schoolId, body.grade, body.section);
-    if (existingClass) {
-      return Response.json(
-        { 
-          success: true, 
-          message: 'Class already exists',
-          data: existingClass 
+    // Check if class already exists in the selected school
+    console.log('Checking for existing class in school:', schoolId, 'with grade:', body.grade, 'section:', body.section);
+    const existingClass = await prisma.class.findFirst({
+      where: {
+        schoolId: schoolId,
+        grade: body.grade,
+        section: body.section || null,
+      },
+      include: {
+        school: { select: { name: true } },
+        _count: {
+          select: { users: true },
         },
-        { status: 200 }
-      );
+      },
+    });
+
+    if (existingClass) {
+      console.log('Found existing class:', existingClass);
+      return Response.json({
+        success: true,
+        message: 'Class already exists',
+        data: existingClass,
+      });
     }
 
+    // Class doesn't exist, create new one
+    console.log('Class not found, creating new class');
     const newClass = await UserService.createClass({
       ...body,
       schoolId, // Use the determined schoolId
     });
+    console.log('New class created:', newClass);
     return Response.json(newClass);
   } catch (error) {
     console.error('Create class error:', error);
@@ -89,17 +89,18 @@ export const GET = withPermission({
 })(async (req: NextRequest, { user, userSchoolId }: any) => {
   try {
     const { searchParams } = new URL(req.url);
+    const querySchoolId = searchParams.get('schoolId');
     const filters = {
       grade: searchParams.get('grade') ? parseInt(searchParams.get('grade')!) : undefined,
       section: searchParams.get('section') || undefined,
       search: searchParams.get('search') || undefined,
     };
     
-    // For SUPERADMIN, if no schoolId is assigned, get all classes
+    // For SUPERADMIN, use query schoolId if provided, otherwise use userSchoolId or get all
     // For regular admins, use their assigned schoolId
     let schoolId;
     if (user.role.name === 'SUPERADMIN') {
-      schoolId = userSchoolId || undefined; // Convert null to undefined
+      schoolId = querySchoolId || userSchoolId || undefined; // Use query param first, then user school, then undefined for all
     } else {
       schoolId = userSchoolId; // Must exist for non-SUPERADMIN
     }

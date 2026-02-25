@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id                     String                           @id @default(cuid())
+  id                     String                           @id @default(uuid())
   studentId              String?                          @unique
   firstName              String
   lastName               String
@@ -56,7 +56,7 @@ model User {
 }
 
 model StudentProfile {
-  id           String  @id @default(cuid())
+  id           String  @id @default(uuid())
   userId       String  @unique
   profileImage String?
   status       String  @default("ACTIVE")
@@ -66,7 +66,7 @@ model StudentProfile {
 }
 
 model AdminProfile {
-  id               String            @id @default(cuid())
+  id               String            @id @default(uuid())
   userId           String            @unique
   department       String            @default("Student Wellness")
   profileImageUrl  String?
@@ -77,7 +77,7 @@ model AdminProfile {
 }
 
 model School {
-  id                     String                           @id @default(cuid())
+  id                     String                           @id @default(uuid())
   name                   String
   address                String?
   phone                  String?
@@ -91,12 +91,13 @@ model School {
   musicInstructions      MusicInstruction[]
   musicResources         MusicResource[]
   users                  User[]
+  articles               Article[]
 
   @@map("Schools")
 }
 
 model Class {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   name      String
   grade     Int
   section   String?
@@ -106,12 +107,11 @@ model Class {
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   users     User[]
 
-  @@unique([schoolId, grade, section])
   @@map("Classes")
 }
 
 model Role {
-  id              String           @id @default(cuid())
+  id              String           @id @default(uuid())
   name            String           @unique
   description     String?
   rolePermissions RolePermission[]
@@ -121,7 +121,7 @@ model Role {
 }
 
 model Permission {
-  id               String            @id @default(cuid())
+  id               String            @id @default(uuid())
   name             String            @unique
   module           String
   adminPermissions AdminPermission[]
@@ -131,7 +131,7 @@ model Permission {
 }
 
 model RolePermission {
-  id           String     @id @default(cuid())
+  id           String     @id @default(uuid())
   roleId       String
   permissionId String
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -142,7 +142,7 @@ model RolePermission {
 }
 
 model AdminPermission {
-  id             String       @id @default(cuid())
+  id             String       @id @default(uuid())
   adminProfileId String
   permissionId   String
   adminProfile   AdminProfile @relation(fields: [adminProfileId], references: [id], onDelete: Cascade)
@@ -153,7 +153,7 @@ model AdminPermission {
 }
 
 model ChatSession {
-  id        String        @id @default(cuid())
+  id        String        @id @default(uuid())
   userId    String
   mood      String?
   triggers  String?
@@ -168,7 +168,7 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id         String      @id @default(cuid())
+  id         String      @id @default(uuid())
   sessionId  String
   senderType SenderType
   content    String
@@ -179,7 +179,7 @@ model ChatMessage {
 }
 
 model MoodCheckin {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   mood      String
   notes     String?
@@ -191,7 +191,7 @@ model MoodCheckin {
 }
 
 model TriggerSelection {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   triggers  String[]
   notes     String?
@@ -202,7 +202,7 @@ model TriggerSelection {
 }
 
 model Summary {
-  id                String      @id @default(cuid())
+  id                String      @id @default(uuid())
   userId            String
   sessionId         String
   mainTopic         String
@@ -217,7 +217,7 @@ model Summary {
 }
 
 model JournalingToolConfig {
-  id                String  @id @default(cuid())
+  id                String  @id @default(uuid())
   schoolId          String  @unique
   enableWriting     Boolean @default(true)
   enableAudio       Boolean @default(true)
@@ -233,7 +233,7 @@ model JournalingToolConfig {
 }
 
 model WritingJournal {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   title     String?
   content   String
@@ -244,7 +244,7 @@ model WritingJournal {
 }
 
 model AudioJournal {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   title     String?
   audioUrl  String
@@ -256,7 +256,7 @@ model AudioJournal {
 }
 
 model ArtJournal {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   imageUrl  String
   createdAt DateTime @default(now())
@@ -266,7 +266,7 @@ model ArtJournal {
 }
 
 model JournalingPrompt {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   text      String
   moodIds   String[]
   createdAt DateTime @default(now())
@@ -277,7 +277,7 @@ model JournalingPrompt {
 }
 
 model MusicTherapy {
-  id             String         @id @default(cuid())
+  id             String         @id @default(uuid())
   title          String
   subtitle       String?
   thumbnailUrl   String?
@@ -293,7 +293,7 @@ model MusicTherapy {
 }
 
 model Meditation {
-  id           String                         @id @default(cuid())
+  id           String                         @id @default(uuid())
   title        String
   description  String
   thumbnailUrl String?
@@ -317,7 +317,7 @@ model Meditation {
 }
 
 model MeditationMood {
-  id           String     @id @default(cuid())
+  id           String     @id @default(uuid())
   meditationId String
   moodId       String
   meditation   Meditation @relation(fields: [meditationId], references: [id], onDelete: Cascade)
@@ -327,7 +327,7 @@ model MeditationMood {
 }
 
 model MusicInstruction {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   title       String
   description String
   steps       Json
@@ -346,7 +346,7 @@ model MusicInstruction {
 }
 
 model MeditationListeningInstruction {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   title       String
   description String
   steps       Json
@@ -366,7 +366,7 @@ model MeditationListeningInstruction {
 }
 
 model MeditationMeditationCategory {
-  id           String             @id @default(cuid())
+  id           String             @id @default(uuid())
   meditationId String
   categoryId   String
   createdAt    DateTime           @default(now())
@@ -378,7 +378,7 @@ model MeditationMeditationCategory {
 }
 
 model MeditationMeditationGoal {
-  id           String         @id @default(cuid())
+  id           String         @id @default(uuid())
   meditationId String
   goalId       String
   createdAt    DateTime       @default(now())
@@ -390,7 +390,7 @@ model MeditationMeditationGoal {
 }
 
 model MeditationCategory {
-  id          String                         @id @default(cuid())
+  id          String                         @id @default(uuid())
   name        String                         @unique
   description String?
   icon        String?
@@ -404,7 +404,7 @@ model MeditationCategory {
 }
 
 model MeditationGoal {
-  id          String                     @id @default(cuid())
+  id          String                     @id @default(uuid())
   name        String                     @unique
   description String?
   icon        String?
@@ -417,7 +417,7 @@ model MeditationGoal {
 }
 
 model Article {
-  id                 String              @id @default(cuid())
+  id                 String              @id @default(uuid())
   title              String
   subtitle           String?
   author             String
@@ -426,6 +426,7 @@ model Article {
   readTime           Int?
   status             ResourceStatus      @default(DRAFT)
   createdBy          String
+  schoolId           String?
   averageRating      Float?
   ratingCount        Int?
   createdAt          DateTime            @default(now())
@@ -437,6 +438,7 @@ model Article {
   goals              ArticleGoal[]
   moods              ArticleMood[]
   admin              User                @relation("UserArticles", fields: [createdBy], references: [id])
+  school             School?             @relation(fields: [schoolId], references: [id])
   bulletListBlocks   BulletListBlock[]
   imageBlocks        ImageBlock[]
   keyTakeawaysBlocks KeyTakeawaysBlock[]
@@ -450,7 +452,7 @@ model Article {
 }
 
 model Rating {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   articleId String
   score     Int
   studentId String?
@@ -463,7 +465,7 @@ model Rating {
 }
 
 model SavedArticle {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   articleId String
   studentId String?
   createdAt DateTime @default(now())
@@ -475,7 +477,7 @@ model SavedArticle {
 }
 
 model ArticleCompletion {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   articleId String
   studentId String?
   createdAt DateTime @default(now())
@@ -487,7 +489,7 @@ model ArticleCompletion {
 }
 
 model MeditationSave {
-  id           String   @id @default(cuid())
+  id           String   @id @default(uuid())
   meditationId String
   studentId    String?
   createdAt    DateTime @default(now())
@@ -497,7 +499,7 @@ model MeditationSave {
 }
 
 model MusicSave {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   musicId   String
   studentId String?
   createdAt DateTime @default(now())
@@ -507,7 +509,7 @@ model MusicSave {
 }
 
 model ArticleMood {
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid())
   articleId String
   moodId    String
   article   Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
@@ -517,7 +519,7 @@ model ArticleMood {
 }
 
 model ArticleGoal {
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid())
   articleId String
   goalId    String
   article   Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
@@ -527,7 +529,7 @@ model ArticleGoal {
 }
 
 model ArticleCategory {
-  id         String        @id @default(cuid())
+  id         String        @id @default(uuid())
   articleId  String
   categoryId String
   article    Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
@@ -537,7 +539,7 @@ model ArticleCategory {
 }
 
 model DailyLogin {
-  id     String   @id @default(cuid())
+  id     String   @id @default(uuid())
   userId String
   date   DateTime @default(now())
   user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -547,7 +549,7 @@ model DailyLogin {
 }
 
 model ResourceAccess {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   resource  String
   createdAt DateTime @default(now())
@@ -557,7 +559,7 @@ model ResourceAccess {
 }
 
 model Streak {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid())
   userId     String   @unique
   count      Int      @default(0)
   lastActive DateTime @default(now())
@@ -567,7 +569,7 @@ model Streak {
 }
 
 model HighRiskAlert {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String
   reason    String
   createdAt DateTime @default(now())
@@ -578,7 +580,7 @@ model HighRiskAlert {
 }
 
 model EscalationAlert {
-  id                      String              @id @default(cuid())
+  id                      String              @id @default(uuid())
   studentId               String
   studentName             String
   studentClass            String?
@@ -608,7 +610,7 @@ model EscalationAlert {
 }
 
 model AdminNotification {
-  id        String           @id @default(cuid())
+  id        String           @id @default(uuid())
   userId    String
   alertId   String?
   type      String
@@ -624,7 +626,7 @@ model AdminNotification {
 }
 
 model MoodLabel {
-  id         String           @id @default(cuid())
+  id         String           @id @default(uuid())
   name       String           @unique
   type       String           @default("GENERAL")
   articles   ArticleMood[]
@@ -632,7 +634,7 @@ model MoodLabel {
 }
 
 model GoalLabel {
-  id       String        @id @default(cuid())
+  id       String        @id @default(uuid())
   name     String        @unique
   status   String        @default("ACTIVE")
   articles ArticleGoal[]
@@ -641,7 +643,7 @@ model GoalLabel {
 }
 
 model CategoryLabel {
-  id       String            @id @default(cuid())
+  id       String            @id @default(uuid())
   name     String            @unique
   status   String            @default("ACTIVE")
   articles ArticleCategory[]
@@ -650,7 +652,7 @@ model CategoryLabel {
 }
 
 model ArticleBlock {
-  id        String  @id @default(cuid())
+  id        String  @id @default(uuid())
   articleId String
   type      String
   order     Int
@@ -661,7 +663,7 @@ model ArticleBlock {
 }
 
 model ImageBlock {
-  id        String  @id @default(cuid())
+  id        String  @id @default(uuid())
   articleId String
   order     Int
   src       String
@@ -673,7 +675,7 @@ model ImageBlock {
 }
 
 model KeyTakeawaysBlock {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   articleId String
   order     Int
   title     String?
@@ -684,7 +686,7 @@ model KeyTakeawaysBlock {
 }
 
 model ReflectionBlock {
-  id        String  @id @default(cuid())
+  id        String  @id @default(uuid())
   articleId String
   order     Int
   heading   String
@@ -696,7 +698,7 @@ model ReflectionBlock {
 }
 
 model LinkBlock {
-  id          String  @id @default(cuid())
+  id          String  @id @default(uuid())
   articleId   String
   order       Int
   title       String
@@ -708,7 +710,7 @@ model LinkBlock {
 }
 
 model SectionBlock {
-  id        String  @id @default(cuid())
+  id        String  @id @default(uuid())
   articleId String
   order     Int
   title     String
@@ -719,7 +721,7 @@ model SectionBlock {
 }
 
 model BulletListBlock {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   articleId String
   order     Int
   title     String
@@ -730,7 +732,7 @@ model BulletListBlock {
 }
 
 model Session {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   sessionId String   @unique
   userId    String
   roleId    String
@@ -740,7 +742,7 @@ model Session {
 }
 
 model MusicMood {
-  id             String              @id @default(cuid())
+  id             String              @id @default(uuid())
   name           String              @unique
   description    String?
   icon           String?
@@ -754,7 +756,7 @@ model MusicMood {
 }
 
 model MusicResourceMood {
-  id              String        @id @default(cuid())
+  id              String        @id @default(uuid())
   musicResourceId String
   moodId          String
   createdAt       DateTime      @default(now())
@@ -766,7 +768,7 @@ model MusicResourceMood {
 }
 
 model MusicResource {
-  id           String                  @id @default(cuid())
+  id           String                  @id @default(uuid())
   title        String
   description  String?
   url          String
@@ -791,7 +793,7 @@ model MusicResource {
 }
 
 model MusicCategory {
-  id             String                  @id @default(cuid())
+  id             String                  @id @default(uuid())
   name           String                  @unique
   description    String?
   icon           String?
@@ -806,7 +808,7 @@ model MusicCategory {
 }
 
 model MusicResourceCategory {
-  id              String        @id @default(cuid())
+  id              String        @id @default(uuid())
   musicResourceId String
   categoryId      String
   createdAt       DateTime      @default(now())
@@ -818,7 +820,7 @@ model MusicResourceCategory {
 }
 
 model MusicGoal {
-  id             String              @id @default(cuid())
+  id             String              @id @default(uuid())
   name           String              @unique
   description    String?
   icon           String?
@@ -832,7 +834,7 @@ model MusicGoal {
 }
 
 model MusicResourceGoal {
-  id              String        @id @default(cuid())
+  id              String        @id @default(uuid())
   musicResourceId String
   goalId          String
   createdAt       DateTime      @default(now())
@@ -844,7 +846,7 @@ model MusicResourceGoal {
 }
 
 model Badge {
-  id             String      @id @default(cuid())
+  id             String      @id @default(uuid())
   name           String
   icon           String
   description    String
@@ -862,7 +864,7 @@ model Badge {
 }
 
 model UserBadge {
-  id       String   @id @default(cuid())
+  id       String   @id @default(uuid())
   userId   String
   badgeId  String
   earnedAt DateTime @default(now())

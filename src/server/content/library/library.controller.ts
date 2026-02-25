@@ -5,13 +5,16 @@ import { handleError } from '@/src/utils/errors';
 import { CreateArticleSchema, UpdateArticleSchema } from './library.validators';
 
 export class LibraryController {
-  // GET /api/admin/content/library - Get all articles (Admin & SuperAdmin)
+  // GET /api/admin/content/library - Get articles (Admin & SuperAdmin)
   static getArticles = withPermission({ 
     module: 'PSYCHO_EDUCATION', 
     action: 'VIEW' 
-  })(async (req: NextRequest) => {
+  })(async (req: NextRequest, { user }: any) => {
     try {
-      const result = await LibraryService.getAllArticles();
+      // For regular admins, use their schoolId
+      // For super admins, no school filtering (can see all articles)
+      const userSchoolId = user.role?.name === 'SUPERADMIN' ? undefined : user.schoolId;
+      const result = await LibraryService.getAllArticles(userSchoolId);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Get articles error:', error);
