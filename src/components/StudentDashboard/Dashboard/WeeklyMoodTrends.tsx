@@ -10,6 +10,7 @@ import {
 import { Bar } from "react-chartjs-2";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useMemo, useState } from "react";
+import { Smile } from "lucide-react";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Legend);
 
@@ -65,11 +66,14 @@ const blueGradientPlugin = {
     const { ctx, chartArea } = chart;
     if (!chartArea) return;
 
-    // Cache gradient so it doesn’t recalc every render
     if (!chart._blueGradient) {
       const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-      gradient.addColorStop(0, "rgba(147,197,253,0.92)");
-      gradient.addColorStop(1, "rgba(219,234,254,0.20)");
+
+      // ⭐ 3-COLOR GRADIENT: #68A1FD → #A6C8FF → white
+      gradient.addColorStop(0, "rgba(104,161,253,1)");    // #68A1FD
+      gradient.addColorStop(0.5, "rgba(166,200,255,1)");  // #A6C8FF (middle)
+      gradient.addColorStop(1, "rgba(255,255,255,1)");    // white (bottom)
+
       chart._blueGradient = gradient;
     }
 
@@ -81,6 +85,10 @@ const blueGradientPlugin = {
     );
   },
 };
+
+
+
+
 
 /* -------------------------
    NO TEXT PLUGIN
@@ -166,10 +174,13 @@ export default function WeeklyMoodTrends() {
         {
           data: data?.weeklyData.map((d) => d.moodScore) || Array(7).fill(0),
           hasDataFlags: data?.weeklyData.map((d) => d.hasData) || Array(7).fill(false),
-          borderRadius: 12,
-          barThickness: 32,
-          borderSkipped: false,
-        },
+          borderRadius: 24,
+          borderWidth:2,
+          borderColor:"#ffffff",
+          
+          barThickness: 50,
+          borderSkipped: "bottom" as const,
+        } as any,
       ],
     }),
     [data]
@@ -183,6 +194,8 @@ export default function WeeklyMoodTrends() {
       responsive: true,
       maintainAspectRatio: false,
 
+      
+
       // parsing disabled - not needed for this chart
 
       animation: {
@@ -192,7 +205,7 @@ export default function WeeklyMoodTrends() {
       scales: {
         y: {
           beginAtZero: true,
-          max: 6,
+          max: 5,
           ticks: { display: false },
           grid: { display: false },
           border: { display: false },
@@ -202,8 +215,8 @@ export default function WeeklyMoodTrends() {
           offset: true, // prevents overlap with bars
           ticks: {
             padding: 12, // 🔥 FIX — Push labels DOWN
-            font: { size: 12, weight: "normal" as const },
-            color: "#9CA3AF",
+            font: { size: 14, weight: "normal" as const },
+            color: "#585858",
           },
           grid: { display: false },
           border: { display: false },
@@ -247,17 +260,20 @@ export default function WeeklyMoodTrends() {
      MAIN UI
   ------------------------- */
   return (
-    <div className="relative rounded-3xl p-6 bg-white shadow-sm border h-[280px] w-full overflow-hidden">
+    <div className="relative rounded-[15px] p-6 bg-white drop-shadow-sm drop-shadow-[#65656514] shadow-inner-xl border border-[#ffffff] h-auto w-auto overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">Weekly Mood Trends</h3>
-        <span className="text-xs text-gray-500">
-          {data.totalCheckins} check-ins • Avg: {data.averageMood.toFixed(1)}/5
-        </span>
+      <div className="flex mb-3">
+        {/* <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-md"> */}
+        <Smile className="h-[20px] w-[20px] mt-1.5 mr-1 text-[#1C76DC]" />
+        <span className="text-[20px] font-semibold text-[#2F3D43]">
+Weekly Mood Trends</span>
       </div>
+        <div className="text-xs text-right -mt-8 mb-6 text-gray-400">
+          {data.totalCheckins} check-ins • Avg: {data.averageMood.toFixed(1)}/5
+        </div>
 
       {/* Chart + emoji */}
-      <div className="relative h-[200px]">
+      <div className="relative h-[285px]">
         <Bar ref={chartRef} data={chartData} options={options} plugins={[blueGradientPlugin]} />
 
         {/* Emoji overlay */}
@@ -270,7 +286,7 @@ export default function WeeklyMoodTrends() {
               style={{
                 left: p.x,
                 top: p.y,
-                transform: "translate(-50%, -120%)",
+                transform: "translate(-50%, 30%)",
               }}
             />
           ))}

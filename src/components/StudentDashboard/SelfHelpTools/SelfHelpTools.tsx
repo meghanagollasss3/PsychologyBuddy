@@ -1,24 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { BookOpen, Music, Brain, ArrowLeft } from "lucide-react";
+import { BookOpen, Music, Brain } from "lucide-react";
 import BackToDashboard from "../Layout/BackToDashboard";
+import Image from "next/image";
 
 export default function SelfHelpCardsExact() {
   const router = useRouter();
-  
+
   const cards = [
     {
       id: "journaling",
       title: "Journaling",
-      description: "Express your thoughts and feelings in a safe, private space",
-      icon: BookOpen,
-      iconBg: "from-[#A855F7] to-[#9333EA]",
-      // ⬇ EXACT background from screenshot
-      gradient: "from-[#FFFFFF] via-[#F8F4FF] to-[#F3E9FF]",
-      glow: "from-[#F7E9FF] to-[#FFFFFF]",
-      bullets: "bg-[#9333EA]",
-      cta: "from-[#9333EA] to-[#A855F7]",
+      description:
+        "Express your thoughts and feelings in a safe, private space",
+      image: "/selfhelptools/journaling.svg",
+            gradient: "from-white via-[#F9F5FF] to-[#F3E8FF]",
+      glow: "from-[#F5D8FF] to-white",
+      bullets: "bg-[#893ACC]",
+      cta: "from-[#8D3AD4] to-[#A949FC]",
       benefits: ["Process emotions", "Track patterns", "Build self-awareness"],
       buttonText: "Build self-awareness",
     },
@@ -26,13 +26,11 @@ export default function SelfHelpCardsExact() {
       id: "music",
       title: "Music Therapy",
       description: "Curated playlists to support your emotional wellbeing",
-      icon: Music,
-      iconBg: "from-[#3B82F6] to-[#2563EB]",
-      // ⬇ Exact sky-blue gradient
-      gradient: "from-[#FFFFFF] via-[#F2F7FF] to-[#E6F0FF]",
-      glow: "from-[#DDEAFF] to-[#FFFFFF]",
-      bullets: "bg-[#3B82F6]",
-      cta: "from-[#3B82F6] to-[#60A5FA]",
+      image: "/selfhelptools/music.svg",
+      gradient: "from-white via-[#F3F7FF] to-[#E6F0FF]",
+      glow: "from-[#DDEAFF] to-white",
+      bullets: "bg-[#368AF0]",
+      cta: "from-[#2C7EDE] to-[#68A1FD]",
       benefits: ["Reduce stress", "Improve mood", "Enhance focus"],
       buttonText: "Start Music Therapy",
     },
@@ -40,127 +38,129 @@ export default function SelfHelpCardsExact() {
       id: "meditation",
       title: "Meditation",
       description: "Guided practices for mindfulness and inner peace",
-      icon: Brain,
-      iconBg: "from-[#10B981] to-[#059669]",
-      // ⬇ Exact mint-green gradient
-      gradient: "from-[#FFFFFF] via-[#EDFFF7] to-[#D9FCEA]",
-      glow: "from-[#C8FFE0] to-[#FFFFFF]",
-      bullets: "bg-[#10B981]",
-      cta: "from-[#10B981] to-[#34D399]",
+      image: "/selfhelptools/med.svg",
+      gradient: "from-white via-[#EDFFF7] to-[#D9FCEA]",
+      glow: "from-[#C8FFE0] to-white",
+      bullets: "bg-[#07A049]",
+      cta: "from-[#07B04D] to-[#01D066]",
       benefits: ["Calm your mind", "Reduce anxiety", "Improve sleep"],
       buttonText: "Start Meditation",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Navbar */}
-      
-
-      <main className="max-w-5xl mx-auto px-6 py-10">
-        {/* Back Link */}
-        <div className="max-w-7xl my-[2px] sm:my-[10px] mx-[-10px] pt-2 sm:pt-3 lg:pt-5 sm:px-3 lg:px-4">
-                      <BackToDashboard />
-                    </div>
+    <div className="min-h-screen bg-[#F6F8FB]">
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        {/* Back Button */}
+        <div className="max-w-7xl mb-4 mt-5">
+          <BackToDashboard />
+        </div>
 
         {/* Header */}
-        <div className="flex items-center gap-4 mb-10">
-          <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100">
-            <span className="text-2xl">📊</span>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 leading-tight">
-              Self-Help Tools
+        <div className="flex mb-[15px] sm:mb-15 items-start gap-3 sm:gap-4 w-auto ">
+          <Image
+            src="/Content/Library.svg"
+            alt="Psychology Buddy Logo"
+            width={63}
+            height={63}
+            className="w-[25px] h-[25px] sm:w-[40px] sm:h-[40px] md:w-[50px] md:h-[50px] lg:w-[63px] lg:h-[63px]"
+          />
+          <div className="ml-[3px] sm:ml-[5px] flex-1">
+            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-[32px] font-bold text-slate-900 mb-1 sm:mb-2">
+              Self-Help Tools{" "}
             </h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              Quick, effective tools to help you manage emotions, reduce stress.
+            <p className="text-[#686D70] text-sm sm:text-base md:text-[16px] font-light hidden xs:block sm:block">
+              Quick, effective tools to help you manage emotions, reduce
+              stress.{" "}
             </p>
           </div>
         </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-      {cards.map((card) => {
-        const Icon = card.icon;
+        {/* Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+          {cards.map((card) => {
+            const Icon = card.icon;
 
-        return (
-          <div
-            key={card.id}
-            className={`
-              w-[330px] rounded-3xl p-6 relative overflow-hidden
-              bg-gradient-to-br ${card.gradient}
-              border border-white/70
-              shadow-[0px_4px_18px_rgba(0,0,0,0.06)]
-            `}
-          >
-            {/* Soft glow blob */}
-            <div
-              className={`
-                absolute top-[-10px] right-[-10px]
-                w-44 h-44 rounded-full blur-3xl opacity-70
-                bg-gradient-to-br ${card.glow}
-              `}
-            />
-
-            {/* Content */}
-            <div className="relative z-10">
-              {/* Icon */}
+            return (
               <div
-                className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${card.iconBg} flex items-center justify-center shadow-md`}
-              >
-                <Icon className="w-6 h-6 text-white" />
-              </div>
-
-              {/* Title */}
-              <h2 className="text-lg font-semibold text-gray-900 mt-4">
-                {card.title}
-              </h2>
-
-              {/* Description */}
-              <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                {card.description}
-              </p>
-
-              {/* Benefits */}
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-800 mb-2">
-                  Benefits
-                </p>
-
-                <ul className="space-y-2 text-sm text-gray-700">
-                  {card.benefits.map((b) => (
-                    <li key={b} className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${card.bullets}`} />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* CTA Button */}
-              <button
-                onClick={() => {
-                  if (card.id === "journaling") {
-                    router.push("/students/selfhelptools/journaling");
-                  } else if (card.id === "music") {
-                    router.push("/students/selfhelptools/music");
-                  } else if (card.id === "meditation") {
-                    router.push("/students/selfhelptools/meditation");
-                  }
-                }}
+                key={card.id}
                 className={`
-                  mt-6 w-full py-3 text-sm font-semibold rounded-full text-white
-                  bg-gradient-to-r ${card.cta}
-                  shadow-md hover:shadow-lg transition-all cursor-pointer
+                  w-[379px] h-[431px]
+                  rounded-[15px] p-7 relative overflow-hidden
+                  bg-gradient-to-b ${card.gradient}
+                  border-2 border-white
+                  drop-shadow-xl shadow-[#2424241A] inset-shadow-xl inset-shadow-[#2424241A]-500/50 hover:shadow-md hover:scale-[1.02] transition-all 
                 `}
               >
-                {card.buttonText}
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-    </main>
+                {/* Glow Effect */}
+                <div
+                  className={`absolute inset-0 w-[164px] h-[164px] left-[290px] top-[-45px] rounded-full bg-gradient-to-l ${card.gradient} opacity-70`}
+                />
+
+                {/* Content */}
+                <div className="relative z-10">
+                  {/* Icon */}
+                  <div
+                    
+                  >
+                    <img
+                      src={card.image}
+                      alt={card.title}
+                      className="h-[71px] w-[73px] "
+                      onError={(e) => {
+                        // Fallback to a placeholder if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/placeholder.png";
+                      }}
+                    />
+                  </div>
+
+                  {/* Title */}
+                  <h2 className="text-[20px] font-semibold text-[#2F3D43] mt-5">
+                    {card.title}
+                  </h2>
+
+                  {/* Description */}
+                  <p className="text-[#767676] text-[16px] mt-2">
+                    {card.description}
+                  </p>
+
+                  {/* Benefits */}
+                  <div className="mt-4">
+                    <p className="text-[16px] font-semibold text-[#2F3D43] mb-2">
+                      Benefits
+                    </p>
+                    <ul className="space-y-2 text-[14px] text-[#767676]">
+                      {card.benefits.map((b) => (
+                        <li key={b} className="flex items-center gap-2">
+                          <span
+                            className={`w-2 h-2 rounded-full ${card.bullets}`}
+                          />
+                          {b}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* CTA Button */}
+                  <button
+                    onClick={() =>
+                      router.push(`/students/selfhelptools/${card.id}`)
+                    }
+                    className={`
+                      mt-8 w-full py-3 text-[16px] font-medium rounded-full text-white
+                      bg-gradient-to-r ${card.cta}
+                      shadow-md hover:shadow-lg transition-all cursor-pointer
+                    `}
+                  >
+                    {card.buttonText}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </main>
     </div>
   );
 }

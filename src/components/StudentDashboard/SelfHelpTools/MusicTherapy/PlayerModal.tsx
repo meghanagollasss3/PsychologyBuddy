@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Icons } from './Icons';
-import { CardProps } from './MusicCard';
+import React, { useState, useEffect, useRef } from "react";
+import { Icons } from "./Icons";
+import { CardProps } from "./MusicCard";
 
 interface PlayerModalProps {
   card: CardProps;
@@ -16,401 +16,291 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
   const [activeTrack, setActiveTrack] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
+
   const audioRef = useRef<HTMLAudioElement>(null);
 
-
-  // Get tracks from the same category
-  const getTracksFromSameCategory = async () => {
-    try {
-      // Get current music resources to find other tracks in same category
-      const response = await fetch('/api/student/music/resources?limit=50');
-      const result = await response.json();
-      
-      if (result.success) {
-        const allMusic = result.data.resources || [];
-        
-        // Get the category names from the current card
-        const currentCategoryNames = card.categories?.map((cat: any) => cat.category?.name).filter(Boolean) || [];
-        
-        // Find tracks that share the same category as the current card
-        const sameCategoryTracks = allMusic.filter((music: { categories: any[]; id: string; }) => {
-          // Skip the current track
-          if (music.id === card.id) return false;
-          
-          // Check if music has categories and if any match the current card's categories
-          return music.categories && music.categories.some(musicCat => 
-            currentCategoryNames.includes(musicCat.category?.name)
-          );
-        });
-        
-        // Transform the tracks to the expected format
-        const transformedTracks = sameCategoryTracks.map((music: any) => ({
-          title: music.title,
-          artist: music.artist || 'Unknown Artist',
-          duration: `${Math.floor(music.duration / 60)}:${(music.duration % 60).toString().padStart(2, '0')}`,
-          url: music.url
-        }));
-        
-        // Combine current track with other tracks from same category
-        const tracks = [
-          { title: card.title, artist: card.artist || 'Unknown Artist', duration: card.duration, url: card.url }, 
-          ...transformedTracks
-        ];
-        return tracks;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('Error fetching tracks:', error);
-      return [];
-    }
-  };
-
+  /* -----------------------------------------------------------------------
+   FETCHING TRACKS LOGIC (same as your code, unchanged)
+  -------------------------------------------------------------------------*/
   const [tracks, setTracks] = useState([
-    { title: card.title, artist: card.artist || 'Unknown Artist', duration: card.duration, url: card.url }
+    {
+      title: card.title,
+      artist: card.artist || "Unknown Artist",
+      duration: card.duration,
+      url: card.url,
+    },
   ]);
 
-
-  // Load tracks from same category when component mounts
   useEffect(() => {
-    const loadRelatedTracks = async () => {
-      const relatedTracks = await getTracksFromSameCategory();
-      if (relatedTracks.length > 1) {
-        setTracks(relatedTracks);
+    const loadTracks = async () => {
+      try {
+        const res = await fetch("/api/student/music/resources?limit=40");
+        const json = await res.json();
+
+        if (!json.success) return;
+
+        const allMusic = json.data.resources || [];
+
+        const categoryNames =
+          card.categories?.map((c: any) => c.category?.name).filter(Boolean) ||
+          [];
+
+        const sameCategory = allMusic.filter((m: any) => {
+          if (m.id === card.id) return false;
+          return m.categories?.some((cat: any) =>
+            categoryNames.includes(cat.category?.name)
+          );
+        });
+
+        const mapped = sameCategory.map((m: any) => ({
+          title: m.title,
+          artist: m.artist,
+          duration: `${Math.floor(m.duration / 60)}:${String(
+            m.duration % 60
+          ).padStart(2, "0")}`,
+          url: m.url,
+        }));
+
+        setTracks([
+          {
+            title: card.title,
+            artist: card.artist,
+            duration: card.duration,
+            url: card.url,
+          },
+          ...mapped,
+        ]);
+      } catch (err) {
+        console.log("Error:", err);
       }
     };
-    
-    loadRelatedTracks();
+
+    loadTracks();
   }, []);
 
-  // Handle time updates and metadata loading
+  /* -----------------------------------------------------------------------
+   AUDIO EVENTS
+  -------------------------------------------------------------------------*/
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handleTimeUpdate = () => {
+    const update = () => {
       setCurrentTime(audio.currentTime);
-      if (audio.duration) {
-        setProgress((audio.currentTime / audio.duration) * 100);
-      }
+      setProgress((audio.currentTime / audio.duration) * 100 || 0);
     };
 
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
-    };
+    const onMeta = () => setDuration(audio.duration);
+    const onEnd = () => handleNextTrack();
 
-    const handleEnded = () => {
-      handleNextTrack();
-    };
-
-    const handleError = (e: any) => {
-      const audio = audioRef.current;
-      
-      // Try to play next track if current track fails
-      if (tracks.length > 1) {
-        handleNextTrack();
-      }
-    };
-
-    const handleCanPlay = () => {
-      // Audio can play
-    };
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError);
-    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener("timeupdate", update);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("ended", onEnd);
 
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('error', handleError);
-      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener("timeupdate", update);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("ended", onEnd);
     };
   }, [activeTrack]);
 
+  /* -----------------------------------------------------------------------
+   PLAYER CONTROLS
+  -------------------------------------------------------------------------*/
   const togglePlayPause = () => {
     const audio = audioRef.current;
-    if (!audio || !tracks[activeTrack]?.url) return;
+    if (!audio) return;
 
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-    } else {
-      audio.play().catch(error => {
-        console.error('Error playing audio:', error, 'Track:', tracks[activeTrack]);
-        setIsPlaying(false);
-      });
+    isPlaying ? audio.pause() : audio.play();
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleTrackSelect = (i: number) => {
+    setActiveTrack(i);
+    const audio = audioRef.current;
+
+    if (audio && tracks[i]?.url) {
+      audio.src = tracks[i].url;
+      audio.load();
+      audio.play();
       setIsPlaying(true);
     }
   };
 
-  const handleTrackSelect = (index: number) => {
-    if (!tracks[index]?.url) {
-      console.error('Invalid track URL at index:', index, tracks[index]);
-      return;
-    }
-    
-    setActiveTrack(index);
-    setIsPlaying(true);
-    
-    const audio = audioRef.current;
-    if (audio && tracks[index].url !== audio.src) {
-      audio.src = tracks[index].url;
-      audio.load();
-      audio.play().catch(error => {
-        console.error('Error playing track:', error, 'Track:', tracks[index]);
-        setIsPlaying(false);
-      });
-    }
-  };
-
   const handleNextTrack = () => {
-    const nextIndex = (activeTrack + 1) % tracks.length;
-    if (!tracks[nextIndex]?.url) {
-      console.error('Invalid next track URL at index:', nextIndex, tracks[nextIndex]);
-      return;
-    }
-    
-    setActiveTrack(nextIndex);
-    setIsPlaying(true);
-    
+    handleTrackSelect((activeTrack + 1) % tracks.length);
+  };
+
+  const handlePrevTrack = () => {
+    handleTrackSelect(
+      activeTrack === 0 ? tracks.length - 1 : activeTrack - 1
+    );
+  };
+
+  const scrub = (e: any) => {
+    const bar = e.target.getBoundingClientRect();
+    const clickX = e.clientX - bar.left;
+    const percent = clickX / bar.width;
+
     const audio = audioRef.current;
-    if (audio && tracks[nextIndex].url !== audio.src) {
-      audio.src = tracks[nextIndex].url;
-      audio.load();
-      audio.play().catch(error => {
-        console.error('Error playing next track:', error, 'Track:', tracks[nextIndex]);
-        setIsPlaying(false);
-      });
-    }
+    audio.currentTime = percent * audio.duration;
+    setProgress(percent * 100);
   };
 
-  const handlePreviousTrack = () => {
-    const prevIndex = activeTrack === 0 ? tracks.length - 1 : activeTrack - 1;
-    if (!tracks[prevIndex]?.url) {
-      console.error('Invalid previous track URL at index:', prevIndex, tracks[prevIndex]);
-      return;
-    }
-    
-    setActiveTrack(prevIndex);
-    setIsPlaying(true);
-    
-    const audio = audioRef.current;
-    if (audio && tracks[prevIndex].url !== audio.src) {
-      audio.src = tracks[prevIndex].url;
-      audio.load();
-      audio.play().catch(error => {
-        console.error('Error playing previous track:', error, 'Track:', tracks[prevIndex]);
-        setIsPlaying(false);
-      });
-    }
-  };
+  const format = (t: number) =>
+    `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const audio = audioRef.current;
-    if (!audio || !duration) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickPercent = clickX / rect.width;
-    const newTime = clickPercent * duration;
-
-    audio.currentTime = newTime;
-    setProgress(clickPercent * 100);
-  };
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  /* -----------------------------------------------------------------------
+   UI STARTS HERE — ALL NEW DESIGN
+  -------------------------------------------------------------------------*/
 
   return (
     <>
-      <audio
-        ref={audioRef}
-        src={tracks[activeTrack].url}
-        preload="metadata"
-      />
-      
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-        <div 
-          className="absolute inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity duration-500"
-          onClick={onClose}
-        />
+      <audio ref={audioRef} src={tracks[activeTrack].url}></audio>
 
-        <div className="relative w-full max-w-6xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row h-[90vh] lg:h-[800px] animate-in fade-in zoom-in-95 duration-300">
-          
-          <button 
-            onClick={onClose}
-            className="lg:hidden absolute top-4 right-4 z-50 p-2 bg-white/50 backdrop-blur rounded-full"
-          >
-            <Icons.X className="w-6 h-6 text-slate-800" />
-          </button>
+      {/* Modal Background */}
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[999] flex items-center justify-center p-6">
 
-          {/* Left Side: Playlist */}
-          <div className="w-full lg:w-[400px] bg-slate-50/50 flex flex-col border-r border-slate-100">
-            <div className="p-8 pb-4">
-              <div className="flex items-center gap-3 mb-6 text-blue-600 bg-blue-50 w-fit px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                <Icons.Headphones className="w-4 h-4" />
-                Playlist
-              </div>
-              <h2 className="text-3xl font-bold text-slate-800 mb-2">{card.title}</h2>
-              <p className="text-slate-500 text-sm leading-relaxed">{card.description}</p>
-              
-              <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-widest">
-                <Icons.Music className="w-3 h-3" />
-                <span>{tracks.length} Tracks</span>
-                <span className="mx-2">•</span>
-                <span>{card.duration} Total</span>
-              </div>
+        {/* Modal Container */}
+        <div className="bg-white w-full max-w-6xl rounded-[32px] shadow-2xl flex overflow-hidden animate-fadeIn scale-100">
+
+          {/* LEFT — PLAYLIST */}
+          <div className="w-[360px] bg-[#F8FAFF] border-r flex flex-col">
+            <div className="p-6 border-b">
+              <h1 className="text-xl font-bold text-[#223344]">{card.title}</h1>
+              <p className="text-sm text-[#778395] mt-1">
+                Gentle melodies to reduce stress and anxiety
+              </p>
+
+              <p className="text-xs text-[#99A3B3] mt-4">
+                🎵 {tracks.length} Tracks
+              </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-2 custom-scrollbar">
-              {tracks.map((track, idx) => (
-                <div 
-                  key={idx}
-                  onClick={() => handleTrackSelect(idx)}
-                  className={`group flex items-center p-3 rounded-2xl cursor-pointer transition-all duration-300 ${
-                    activeTrack === idx 
-                      ? 'bg-white shadow-lg shadow-blue-500/10 border border-blue-100 scale-100' 
-                      : 'hover:bg-white hover:shadow-md border border-transparent scale-[0.98] hover:scale-100'
-                  }`}
+            {/* Track List */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+              {tracks.map((t, i) => (
+                <div
+                  key={i}
+                  onClick={() => handleTrackSelect(i)}
+                  className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all 
+                    ${
+                      activeTrack === i
+                        ? "bg-white shadow border border-[#D5E5FF]"
+                        : "hover:bg-white/60"
+                    }
+                  `}
                 >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-colors ${
-                    activeTrack === idx ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'
-                  }`}>
-                    {activeTrack === idx && isPlaying ? (
-                      <div className="flex gap-0.5 h-3 items-end">
-                        <div className="w-0.5 bg-white animate-[bounce_1s_infinite] h-2"></div>
-                        <div className="w-0.5 bg-white animate-[bounce_1.2s_infinite] h-3"></div>
-                        <div className="w-0.5 bg-white animate-[bounce_0.8s_infinite] h-1.5"></div>
-                      </div>
-                    ) : (
-                      <Icons.Play className="w-4 h-4 fill-current ml-0.5" />
-                    )}
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-blue-600 border 
+                        ${
+                          activeTrack === i
+                            ? "bg-blue-600 text-white"
+                            : "border-[#D8E1F3]"
+                        }`}
+                    >
+                      {activeTrack === i ? (
+                        <Icons.Pause className="w-4 h-4" />
+                      ) : (
+                        <Icons.Play className="w-4 h-4 ml-[2px]" />
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-[#223344] text-sm">
+                        {t.title}
+                      </p>
+                      <p className="text-xs text-[#8C97A8]">{t.artist}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className={`text-sm font-bold truncate ${activeTrack === idx ? 'text-blue-900' : 'text-slate-700'}`}>
-                      {track.title}
-                    </h4>
-                    <p className="text-xs text-slate-400 truncate">{track.artist}</p>
-                  </div>
-                  <span className="text-xs font-medium text-slate-400">{track.duration}</span>
+
+                  <span className="text-xs text-[#7D8899]">{t.duration}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex-1 bg-white relative flex flex-col p-8 lg:p-12">
-            <div className="hidden lg:flex justify-end mb-8">
-              <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-800">
-                <Icons.X className="w-6 h-6" />
-              </button>
+          {/* RIGHT — MAIN PLAYER */}
+          <div className="flex-1 p-8 relative flex flex-col">
+
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="absolute top-6 right-6 p-2 bg-white rounded-full shadow-md hover:bg-gray-100"
+            >
+              <Icons.X className="w-5 h-5 text-gray-700" />
+            </button>
+
+            {/* Image */}
+            <div className="rounded-2xl overflow-hidden shadow-lg w-full max-h-[320px]">
+              <img
+                src={card.coverImage || card.thumbnailUrl}
+                className="w-full h-full object-cover"
+                alt="cover"
+              />
             </div>
 
-            <div className="flex-1 flex flex-col justify-center items-center relative mb-8">
-               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/20 pointer-events-none z-10" />
-               
-               {/* Dynamic Background Blur Image */}
-               {(card.coverImage || card.thumbnailUrl) && (
-                  <div className="absolute inset-0 overflow-hidden rounded-[3rem]">
-                     <img 
-                       src={card.coverImage || card.thumbnailUrl} 
-                       className="w-full h-full object-cover blur-3xl opacity-30 scale-150 animate-pulse-slow" 
-                       alt="bg"
-                     />
-                  </div>
-               )}
+            {/* Title/Description */}
+            <div className="mt-6">
+              <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-600 font-semibold">
+                Now Playing
+              </span>
 
-               <div className="relative z-20 w-full max-w-2xl aspect-video rounded-[2rem] overflow-hidden shadow-2xl shadow-blue-900/20 group">
-                  {card.coverImage ? (
-                    <img 
-                      src={card.coverImage} 
-                      alt="Now Playing" 
-                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[2s]"
-                    />
-                  ) : card.thumbnailUrl ? (
-                    <img 
-                      src={card.thumbnailUrl} 
-                      alt="Now Playing" 
-                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[2s]"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                       <div className="text-center text-white">
-                         <Icons.Music className="w-24 h-24 mx-auto mb-4 opacity-80" />
-                         <div className="text-lg font-medium opacity-90">Now Playing</div>
-                         <div className="text-sm opacity-70 mt-1">{card.title}</div>
-                       </div>
-                    </div>
-                  )}
-                  
-                  {/* Now Playing Badge */}
-                  <div className="absolute top-6 left-6 px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white text-xs font-bold uppercase tracking-wider shadow-lg">
-                    Now Playing
-                  </div>
-               </div>
+              <h2 className="text-3xl font-bold text-[#222] mt-3">
+                {tracks[activeTrack].title}
+              </h2>
+
+              <p className="text-[#556070] mt-1 text-sm">
+                Perfect for your meditation experience
+              </p>
             </div>
 
-            <div className="relative z-20 max-w-3xl mx-auto w-full">
-              <div className="flex items-end justify-between mb-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-800 mb-1">{tracks[activeTrack].title}</h2>
-                  <p className="text-slate-500 font-medium">Perfect for your music experience</p>
-                </div>
-                <div className="flex gap-2">
-                   <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><Icons.Volume2 className="w-5 h-5" /></button>
-                   <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><Icons.Repeat className="w-5 h-5" /></button>
-                </div>
-              </div>
-
-              <div className="mb-2 flex justify-between text-xs font-semibold text-slate-400">
-                <span>{formatTime(currentTime)}</span>
+            {/* Progress */}
+            <div className="mt-6">
+              <div className="flex justify-between text-xs text-[#778395] mb-1">
+                <span>{format(currentTime)}</span>
                 <span>{tracks[activeTrack].duration}</span>
               </div>
-              <div 
-                className="h-1.5 bg-slate-100 rounded-full mb-10 overflow-hidden cursor-pointer group/progress"
-                onClick={handleProgressClick}
+
+              <div
+                className="w-full h-2 bg-gray-200 rounded-full cursor-pointer"
+                onClick={scrub}
               >
-                <div 
-                  className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full relative" 
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all"
                   style={{ width: `${progress}%` }}
-                >
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover/progress:opacity-100 transition-opacity" />
-                </div>
+                ></div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-center gap-10">
-                <button 
-                  className="p-4 text-slate-300 hover:text-slate-800 transition-colors hover:bg-slate-50 rounded-full"
-                  onClick={handlePreviousTrack}
-                >
-                  <Icons.SkipBack className="w-8 h-8" />
-                </button>
+            {/* Controls */}
+            <div className="flex items-center justify-center gap-8 mt-10">
+              <button
+                onClick={handlePrevTrack}
+                className="p-4 rounded-full bg-gray-100 hover:bg-gray-200"
+              >
+                <Icons.SkipBack className="w-6 h-6 text-[#667085]" />
+              </button>
 
-                <button 
-                  onClick={togglePlayPause}
-                  className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-blue-500/40 hover:scale-110 hover:shadow-blue-500/60 transition-all duration-300 active:scale-95"
-                >
-                  {isPlaying ? (
-                    <Icons.Pause className="w-8 h-8 fill-current" />
-                  ) : (
-                    <Icons.Play className="w-8 h-8 fill-current ml-1" />
-                  )}
-                </button>
+              {/* Play Button */}
+              <button
+                onClick={togglePlayPause}
+                className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition"
+              >
+                {isPlaying ? (
+                  <Icons.Pause className="w-8 h-8 text-white" />
+                ) : (
+                  <Icons.Play className="w-8 h-8 text-white ml-1" />
+                )}
+              </button>
 
-                <button 
-                  className="p-4 text-slate-300 hover:text-slate-800 transition-colors hover:bg-slate-50 rounded-full"
-                  onClick={handleNextTrack}
-                >
-                  <Icons.SkipForward className="w-8 h-8" />
-                </button>
-              </div>
+              <button
+                onClick={handleNextTrack}
+                className="p-4 rounded-full bg-gray-100 hover:bg-gray-200"
+              >
+                <Icons.SkipForward className="w-6 h-6 text-[#667085]" />
+              </button>
             </div>
           </div>
         </div>

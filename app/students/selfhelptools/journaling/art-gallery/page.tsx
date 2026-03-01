@@ -101,10 +101,10 @@ export default function ArtGalleryPage() {
             <div className="flex items-center gap-4">
               <Link 
                 href="/students/selfhelptools/journaling"
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors group"
+                className="flex items-center gap-2 text-[#73829A] hover:text-[#1a9bcc] transition-colors group"
               >
                 <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                <span className="font-medium">Back to Journaling</span>
+                <span className="text-[16px]">Back to Journaling</span>
               </Link>
             </div>
             
@@ -127,15 +127,26 @@ export default function ArtGalleryPage() {
           </div>
 
           {/* Page Title */}
-          <div className="text-center mb-10">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center text-white text-3xl mx-auto mb-4 shadow-lg">
-              🎨
-            </div>
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">My Art Gallery</h1>
-            <p className="text-gray-600 text-lg">Your personal collection of artistic expressions</p>
-            <div className="flex items-center justify-center gap-2 mt-4 text-sm text-gray-500">
-              <Calendar className="w-4 h-4" />
-              <span>{artJournals.length} {artJournals.length === 1 ? 'artwork' : 'artworks'} created</span>
+          <div className="mb-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/selfhelptools/journaling/paint.svg"
+                  alt="Editor"
+                  className="w-[45px] h-[45px] sm:w-[63px] sm:h-[63px]"
+                />
+
+                <div>
+                  <h1 className="text-3xl font-bold text-slate-900">
+                    Your Journals
+                  </h1>
+                  <p className="text-slate-500 text-sm">
+                    View and manage all your journal entries
+                  </p>
+                </div>
+              </div>
+
+            
             </div>
           </div>
 
@@ -158,11 +169,11 @@ export default function ArtGalleryPage() {
               </Link>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid h-[491px] grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+            <div className={viewMode === 'grid' ? 'grid h-[191px] grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
               {artJournals.map((journal) => (
                 <div 
                   key={journal.id} 
-                  className={`bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group ${
+                  className={`bg-white rounded-[24px] border border-[#1C76DC] shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group ${
                     viewMode === 'list' ? 'flex gap-4 p-4' : ''
                   }`}
                 >

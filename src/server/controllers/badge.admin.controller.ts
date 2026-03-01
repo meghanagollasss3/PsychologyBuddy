@@ -139,6 +139,11 @@ export class BadgeAdminController {
                 schoolId: true,
               },
             },
+            _count: {
+              select: {
+                userBadges: true,
+              },
+            },
           },
         }),
         prisma.badge.count({ where }),

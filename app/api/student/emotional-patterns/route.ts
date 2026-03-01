@@ -255,7 +255,7 @@ function getTriggerName(trigger: string): string {
     "family": "Family",
     "social": "Social pressure",
     "sleep": "Sleep",
-    "school": "School work",
+    "school": "School",
     "health": "Health",
     "others": "Others"
   };

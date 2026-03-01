@@ -48,7 +48,9 @@ export class BadgeService {
       writingJournalCount,
       audioJournalCount,
       artJournalCount,
-      allResourceAccess,
+      articleCompletions,
+      meditationSaves,
+      musicSaves,
       moodCheckinCount,
     ] = await Promise.all([
       // Current streak
@@ -60,28 +62,25 @@ export class BadgeService {
       prisma.writingJournal.count({ where: { userId } }),
       prisma.audioJournal.count({ where: { userId } }),
       prisma.artJournal.count({ where: { userId } }),
-      // All resource access (we'll filter by type)
-      prisma.resourceAccess.findMany({
-        where: { userId },
-        select: { resource: true },
-      }),
+      // Article completions
+      prisma.articleCompletion.count({ where: { studentId: userId } }),
+      // Meditation saves
+      prisma.meditationSave.count({ where: { studentId: userId } }),
+      // Music saves
+      prisma.musicSave.count({ where: { studentId: userId } }),
       // Mood check-ins
       prisma.moodCheckin.count({ where: { userId } }),
     ]);
 
-    // Count by resource type
-    const articleReadCount = allResourceAccess.filter(ra => ra.resource === 'ARTICLE').length;
-    const meditationCount = allResourceAccess.filter(ra => ra.resource === 'MEDITATION').length;
-    const musicCount = allResourceAccess.filter(ra => ra.resource === 'MUSIC').length;
-
     const totalJournalCount = writingJournalCount + audioJournalCount + artJournalCount;
+    const totalResourcesUsed = articleCompletions + meditationSaves + musicSaves;
 
     return {
       streakCount: streak?.count || 0,
       journalCount: totalJournalCount,
-      articleReadCount,
-      meditationCount,
-      musicCount,
+      articleReadCount: articleCompletions,
+      meditationCount: meditationSaves,
+      musicCount: musicSaves,
       moodCheckinCount,
     };
   }

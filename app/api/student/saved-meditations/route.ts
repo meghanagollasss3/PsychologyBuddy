@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/src/prisma';
+import { StreakService } from '@/src/server/services/streak.service';
+import { BadgeService } from '@/src/server/services/badge.service';
+import { revalidatePath } from 'next/cache';
+import { requirePermission } from '@/src/utils/session-helper';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const studentId = searchParams.get('studentId');
-
-    if (!studentId) {
-      return NextResponse.json(
-        { success: false, message: 'Student ID required' },
-        { status: 400 }
-      );
-    }
+    const session = await requirePermission(request, 'badges.view');
+    const userId = session.userId;
 
     // Use raw SQL to get saved meditations since Prisma model is not generating properly
     const savedMeditations = await prisma.$queryRaw<Array<any>>`
       SELECT ms.*, m.* 
       FROM "MeditationSaves" ms
       JOIN "Meditation" m ON ms."meditationId" = m.id
-      WHERE ms."studentId" = ${studentId}
+      WHERE ms."studentId" = ${userId}
       ORDER BY ms."createdAt" DESC
     `;
 
@@ -71,8 +68,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await requirePermission(request, 'badges.view');
     const body = await request.json();
-    const { meditationId, studentId } = body;
+    const { meditationId } = body;
+
+    // Use session userId instead of body studentId
+    const userId = session.userId;
 
     if (!meditationId) {
       return NextResponse.json(
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
     const existingSave = await prisma.$queryRaw<Array<any>>`
       SELECT * FROM "MeditationSaves" 
       WHERE "meditationId" = ${meditationId} 
-      AND "studentId" = ${studentId}
+      AND "studentId" = ${userId}
       LIMIT 1
     `;
 
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         DELETE FROM "MeditationSaves" 
         WHERE "meditationId" = ${meditationId} 
-        AND "studentId" = ${studentId}
+        AND "studentId" = ${userId}
       `;
 
       return NextResponse.json({
@@ -118,8 +119,25 @@ export async function POST(request: NextRequest) {
       // Save the meditation
       await prisma.$executeRaw`
         INSERT INTO "MeditationSaves" ("id", "meditationId", "studentId", "createdAt")
-        VALUES (gen_random_uuid(), ${meditationId}, ${studentId}, NOW())
+        VALUES (gen_random_uuid(), ${meditationId}, ${userId}, NOW())
       `;
+
+      // Update user's streak for meditation activity
+      try {
+        await StreakService.updateStreak(userId);
+      } catch (streakError) {
+        console.error('Failed to update streak after meditation save:', streakError);
+      }
+
+      // Evaluate badges for meditation activity
+      try {
+        await BadgeService.evaluateUserBadges(userId);
+      } catch (badgeError) {
+        console.error('Failed to evaluate badges after meditation save:', badgeError);
+      }
+
+      // Revalidate stats cache to update frontend immediately
+      revalidatePath('/api/student/stats');
 
       return NextResponse.json({
         success: true,

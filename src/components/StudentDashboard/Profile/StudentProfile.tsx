@@ -16,13 +16,17 @@ import {
   Award,
   X,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  GraduationCap,
+  CalendarDays,
+  MessageCircleWarning
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/src/contexts/AuthContext";
 import StudentLayout from "@/src/components/StudentDashboard/Layout/StudentLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import BackToDashboard from "../Layout/BackToDashboard";
 
 /* ----------------------------------------------------------------------
    API FETCHER
@@ -127,13 +131,7 @@ export default function StudentProfilePage() {
       <div className="w-full max-w-7xl mx-auto px-6 py-6 space-y-8">
 
         {/* Back Link */}
-        <Link
-          href="/students"
-          className="text-blue-600 hover:text-blue-800 flex items-center gap-2 text-sm font-medium"
-        >
-          ← Back to Dashboard
-        </Link>
-
+ <BackToDashboard />
         {/* HEADER CARD */}
         <HeaderCard 
           student={student} 
@@ -215,21 +213,21 @@ function HeaderCard({ student, selectedPhoto, setSelectedPhoto, isSaving, onSave
   };
 
   return (
-    <div className="rounded-2xl p-8 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 shadow-sm">
+    <div className="rounded-[32px] p-15 bg-gradient-to-r from-[#8AB1ED]/50 via-[#C3C5FF]/50 to-[#CBB5FF]/50 shadow-sm">
       <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
+          <div className="w-[140px] h-[140px] rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
             {photoPreview ? (
               <img 
                 src={photoPreview} 
                 alt="Profile" 
-                className="w-full h-full rounded-full object-cover"
+                className="w-full h-full  rounded-full object-cover"
               />
             ) : student.profileImage ? (
               <img 
                 src={student.profileImage} 
                 alt="Profile" 
-                className="w-full h-full rounded-full object-cover"
+                className="w-full h-full border-4 border-white rounded-full object-cover"
                 onError={(e) => {
                   // Fallback to initials if image fails to load
                   e.currentTarget.style.display = 'none';
@@ -240,31 +238,31 @@ function HeaderCard({ student, selectedPhoto, setSelectedPhoto, isSaving, onSave
               student.firstName[0]
             )}
           </div>
-          <label className="absolute bottom-0 right-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700">
+          <label className="absolute bottom-0 right-3 w-6 h-6 bg-white rounded-full flex items-center justify-center cursor-pointer ">
             <input
               type="file"
               accept="image/*"
               onChange={handlePhotoChange}
               className="hidden"
             />
-            <span className="text-white text-xs">+</span>
+            <span className="text-gray-500 text-[32px] mb-1">+</span>
           </label>
         </div>
 
-        <div className="flex-1 text-center sm:text-left space-y-1">
+        <div className="flex-1 text-center sm:text-left mt-4 space-y-1">
           <div className="flex flex-col sm:flex-row gap-3 items-center">
-            <h1 className="text-3xl font-semibold text-gray-800">{student.fullName}</h1>
+            <h1 className="text-[32px] font-semibold text-[#2F3D43]">{student.fullName}</h1>
 
-            <span className="px-3 py-1 rounded-full bg-green-100 text-green-600 text-xs font-medium">
+            <span className="px-3 py-1 rounded-full bg-[#B4E5C6] border border-[#02A63C] text-[#06772F] text-[12px] font-regular">
               {student.status}
             </span>
           </div>
 
-          <p className="text-gray-600">Member since {student.memberSince}</p>
+          <p className="text-[#8585A4] text-[14px]">Member since {student.memberSince}</p>
 
-          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-700 justify-center sm:justify-start">
+          <div className="flex flex-wrap gap-4 mt-2 text-[16px] text-[#5F5F75] justify-center sm:justify-start">
             <span>Student ID : {student.studentId || "N/A"}</span>
-            <span className="text-gray-400">•</span>
+            <span className="text-[#5F5F75] w-[8px] h-[8px] ">•</span>
             <span>{student.grade}</span>
           </div>
           
@@ -339,13 +337,13 @@ function ProfileInfo({ student }: any) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 space-y-4">
+    <div className="bg-white rounded-[17px] shadow-sm p-6  space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-800">Profile Information</h2>
         {!isEditing ? (
           <button
             onClick={handleEdit}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="text-[#1E86FD] hover:text-blue-800 text-sm font-medium"
           >
             Edit Profile
           </button>
@@ -371,7 +369,7 @@ function ProfileInfo({ student }: any) {
 
       <div className="grid sm:grid-cols-2 gap-4">
         <InfoItem 
-          icon={<User className="w-4 h-4 text-blue-500" />} 
+          icon={<GraduationCap className="w-4 h-4 text-[#1E86FD]" />} 
           label="Full Name" 
           value={isEditing ? (
             <input
@@ -385,7 +383,7 @@ function ProfileInfo({ student }: any) {
         />
 
         <InfoItem 
-          icon={<Phone className="w-4 h-4 text-indigo-500" />} 
+          icon={<Phone className="w-4 h-4 text-[#1E86FD]" />} 
           label="Phone" 
           value={isEditing ? (
             <input
@@ -399,7 +397,7 @@ function ProfileInfo({ student }: any) {
         />
 
         <InfoItem
-          icon={<Calendar className="w-4 h-4 text-purple-500" />}
+          icon={<CalendarDays className="w-4 h-4 text-[#1E86FD]" />}
           label="Date of Birth"
           value={isEditing ? (
             <input
@@ -412,7 +410,7 @@ function ProfileInfo({ student }: any) {
         />
 
         <InfoItem 
-          icon={<BookOpen className="w-4 h-4 text-green-600" />} 
+          icon={<GraduationCap className="w-4 h-4 text-[#1E86FD]" />} 
           label="Grade" 
           value={isEditing ? (
             <select
@@ -430,7 +428,7 @@ function ProfileInfo({ student }: any) {
         />
 
         <InfoItem
-          icon={<Users className="w-4 h-4 text-red-500" />}
+          icon={<MessageCircleWarning className="w-4 h-4 text-[#1E86FD]" />}
           label="Emergency Contact"
           value={isEditing ? (
             <input
@@ -455,16 +453,16 @@ function ProfileInfo({ student }: any) {
 function InfoItem({ icon, label, value, full }: any) {
   return (
     <div
-      className={`p-4 rounded-lg bg-gray-50 border border-gray-200 flex items-center gap-3 ${
+      className={`p-4 rounded-lg bg-[#F6F8FA]  flex items-center gap-3 ${
         full ? "sm:col-span-2" : ""
       }`}
     >
-      <div className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center">
+      <div className="w-9 h-9 rounded-full bg-[#E1ECFA] shadow flex items-center justify-center">
         {icon}
       </div>
       <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-sm font-medium text-gray-800">{value}</p>
+        <p className="text-[12px] text-[#979CA2]">{label}</p>
+        <p className="text-[12px] font-medium text-[#35334C]">{value}</p>
       </div>
     </div>
   );
@@ -523,10 +521,42 @@ function SessionCard({ session, setSelectedSession, setIsModalOpen }: any) {
     setIsModalOpen(true);
   };
 
+  // Determine styling based on session status
+  const getStatusStyling = (status: string) => {
+    switch (status) {
+      case 'Completed':
+        return {
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          badge: 'bg-green-100 text-green-700'
+        };
+      case 'In Progress':
+        return {
+          bg: 'bg-blue-50',
+          border: 'border-blue-200',
+          badge: 'bg-blue-100 text-blue-700'
+        };
+      case 'Scheduled':
+        return {
+          bg: 'bg-yellow-50',
+          border: 'border-yellow-200',
+          badge: 'bg-yellow-100 text-yellow-700'
+        };
+      default:
+        return {
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          badge: 'bg-gray-100 text-gray-700'
+        };
+    }
+  };
+
+  const styling = getStatusStyling(session.status);
+
   return (
-    <div className="p-4 rounded-lg border flex flex-col gap-2 bg-green-50 border-green-200 mt-3">
+    <div className={`p-4 rounded-lg border flex flex-col gap-2 ${styling.bg} ${styling.border} mt-3`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 w-fit font-medium">
+        <span className={`text-xs px-2 py-1 rounded-full ${styling.badge} w-fit font-medium`}>
           {session.status}
         </span>
         {session.hasHighAlerts && session.highAlertsResolved && (
@@ -564,17 +594,22 @@ function SessionCard({ session, setSelectedSession, setIsModalOpen }: any) {
 /* ---------------------- ACTIVITY ---------------------- */
 function ActivitySection({ activities }: any) {
   const [filter, setFilter] = useState("All");
+  const [showAll, setShowAll] = useState(false);
 
   const getIcon = (type: string) => {
     if (type === "journaling") return <FileText className="w-5 h-5 text-purple-500" />;
-    if (type === "exercise") return <Wind className="w-5 h-5 text-green-500" />;
+    if (type === "meditation") return <Wind className="w-5 h-5 text-green-500" />;
+    if (type === "checkin") return <Activity className="w-5 h-5 text-green-500" />;
+    if (type === "reading") return <BookOpen className="w-5 h-5 text-blue-500" />;
     return <Activity className="w-5 h-5 text-blue-500" />;
   };
 
   const filteredActivities = activities.filter((activity: any) => {
     if (filter === "All") return true;
     if (filter === "Journaling" && activity.type === "journaling") return true;
-    if (filter === "Exercise" && activity.type === "exercise") return true;
+    if (filter === "Meditation" && activity.type === "meditation") return true;
+    if (filter === "Mood Check-ins" && activity.type === "checkin") return true;
+    if (filter === "Articles" && activity.type === "reading") return true;
     if (filter === "Tools" && activity.type === "tool") return true;
     return false;
   });
@@ -584,23 +619,17 @@ function ActivitySection({ activities }: any) {
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
+  // Limit to 6 activities initially
+  const displayedActivities = showAll ? sortedActivities : sortedActivities.slice(0, 5);
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
-        <select 
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="text-sm px-3 py-1 rounded border text-gray-600"
-        >
-          <option>All</option>
-          <option>Journaling</option>
-          <option>Exercise</option>
-          <option>Tools</option>
-        </select>
+        
       </div>
 
-      {sortedActivities.length === 0 ? (
+      {displayedActivities.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <Activity className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p>No {filter === "All" ? "activities" : filter.toLowerCase()} yet</p>
@@ -612,8 +641,8 @@ function ActivitySection({ activities }: any) {
           </p>
         </div>
       ) : (
-        <div className="mt-4 space-y-4 border-l-2 border-gray-200 pl-4">
-          {sortedActivities.map((a: any) => (
+        <div className="mt-4 max-h-96 overflow-y-auto space-y-4 border-l-2 border-gray-200 pl-4">
+          {displayedActivities.map((a: any) => (
             <div key={a.id} className="flex items-start gap-3">
               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
                 {getIcon(a.type)}
@@ -628,6 +657,18 @@ function ActivitySection({ activities }: any) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* View More Button */}
+      {sortedActivities.length > 6 && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {showAll ? 'View Less' : `View More (${sortedActivities.length - 6} more)`}
+          </button>
         </div>
       )}
     </div>

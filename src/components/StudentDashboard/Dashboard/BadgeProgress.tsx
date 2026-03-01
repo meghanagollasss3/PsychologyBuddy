@@ -39,9 +39,9 @@ export default function BadgeProgress() {
 
   /* ANIMATION STATE (Ref-based for perfect stability) */
   const [displayValue, setDisplayValue] = useState(0);
-  const lastValueRef = useRef(0);         // Saves previous final progress value
+  const lastValueRef = useRef(0); // Saves previous final progress value
   const animationFrame = useRef<number | undefined>(undefined); // Tracks RAF
-  const isAnimating = useRef(false);       // Prevent overlapping animations
+  const isAnimating = useRef(false); // Prevent overlapping animations
 
   /* -----------------------------
      Animate Progress (Perfect!)
@@ -103,19 +103,22 @@ export default function BadgeProgress() {
         : data.nextBadge?.name ||
           (hasBadges ? "Badge Progress" : "No Badges Available");
 
-    const subtitle =
-      data.progress === 100
-        ? "You've earned all available badges!"
-        : !hasBadges
-        ? "Admins haven't created any badges yet."
-        : remaining <= 10
-        ? `${remaining} actions away from your next badge ✨`
-        : `${remaining} actions to your next badge. Keep going!`;
+    let subtitlePrimary = "";
+    let subtitleSecondary = "";
 
-    return { title, subtitle };
+    if (data.progress === 100) {
+      subtitlePrimary = "You've earned all available badges!";
+    } else if (!hasBadges) {
+      subtitlePrimary = "Admins haven't created any badges yet.";
+    } else {
+      subtitlePrimary = `${remaining} actions away`;
+      subtitleSecondary = "from earning your next badge! Keep going 🌟";
+    }
+
+    return { title, subtitlePrimary, subtitleSecondary };
   };
 
-  const { title, subtitle } = computeTexts();
+  const { title, subtitlePrimary, subtitleSecondary } = computeTexts();
 
   /* -----------------------------
      Skeleton UI
@@ -138,8 +141,12 @@ export default function BadgeProgress() {
   if (isError || !data) {
     return (
       <div className="rounded-2xl p-5 border bg-white shadow-sm w-full">
-        <p className="text-sm text-red-500 font-medium">Failed to load badge progress.</p>
-        <p className="text-xs text-gray-400 mt-1">Please check your connection.</p>
+        <p className="text-sm text-red-500 font-medium">
+          Failed to load badge progress.
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Please check your connection.
+        </p>
       </div>
     );
   }
@@ -148,35 +155,49 @@ export default function BadgeProgress() {
      MAIN UI
   ----------------------------- */
   return (
-    <div className="rounded-2xl p-5 border bg-white shadow-sm w-full">
-      <div className="flex items-center gap-4">
+    <div
+      className="rounded-[16px] p-5 border-2 border-white bg-gradient-to-br 
+                 from-[#b8dbf95c] via-[#e7f7ff85] to-[#b8dbf97a] drop-shadow-sm shadow-[#3F7AC90D] w-auto h-auto "
+    >
+      <div className="flex items-center ml-4 gap-4">
         {/* ICON BLOCK */}
-        <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-md">
-          <Star className="h-6 w-6 text-white" />
-        </div>
 
         {/* CONTENT */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold text-gray-800">Badge Progress</h3>
-            <span className="text-xs text-gray-500">
+            <div
+              className="w-[48px] h-[48px] bg-gradient-to-br 
+                 from-[#4193FF] to-[#4A8FE9] rounded-[9px] flex items-center justify-center shadow-md"
+            >
+              <Star className="h-6 w-6 text-white" />
+            </div>
+            <h3 className="text-[20px] -mt-5 font-semibold text-[#2F3D43]">
+              Badge Progress
+            </h3>
+            <div className="text-xs -mt-3.5 text-gray-500">
               ({data.earnedBadges}/{data.totalBadges})
-            </span>
+            </div>
           </div>
-
-          <p className="text-sm font-medium text-gray-700 mb-2">{title}</p>
+          <p className="text-[16px] text-[#767676] -mt-6 ml-14 mb-2">{title}</p>
 
           {/* PROGRESS BAR */}
-          <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden mb-2">
+          <div className="w-[485px] bg-[#C6DDFC] rounded-full h-[14px] overflow-hidden mt-8 mb-2">
             <div
               className={`h-full ${
-                displayValue === 100 ? "bg-green-500" : "bg-blue-600"
+                displayValue === 100 ? "bg-green-500" : "bg-[#4293FE]"
               }`}
               style={{ width: `${displayValue}%` }}
             />
           </div>
 
-          <p className="text-xs text-gray-500">{subtitle}</p>
+          <div className="text-[16px] mt-4 ml-1">
+            <span className="text-[#2F80ED] font-medium">
+              {subtitlePrimary}
+            </span>
+            {subtitleSecondary && (
+              <span className="text-[#7C7C7C]"> {subtitleSecondary}</span>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
       writingJournalCount,
       audioJournalCount,
       artJournalCount,
-      allResourceAccess,
+      articleCompletions,
+      meditationSaves,
+      musicSaves,
       moodCheckinCount,
       userBadges,
     ] = await Promise.all([
@@ -26,11 +28,12 @@ export async function GET(req: NextRequest) {
       prisma.writingJournal.count({ where: { userId: session.userId } }),
       prisma.audioJournal.count({ where: { userId: session.userId } }),
       prisma.artJournal.count({ where: { userId: session.userId } }),
-      // All resource access
-      prisma.resourceAccess.findMany({
-        where: { userId: session.userId },
-        select: { resource: true },
-      }),
+      // Article completions
+      prisma.articleCompletion.count({ where: { studentId: session.userId } }),
+      // Meditation saves
+      prisma.meditationSave.count({ where: { studentId: session.userId } }),
+      // Music saves
+      prisma.musicSave.count({ where: { studentId: session.userId } }),
       // Mood check-ins
       prisma.moodCheckin.count({ where: { userId: session.userId } }),
       // User badges
@@ -39,13 +42,8 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    // Count by resource type
-    const articleReadCount = allResourceAccess.filter(ra => ra.resource === 'ARTICLE').length;
-    const meditationCount = allResourceAccess.filter(ra => ra.resource === 'MEDITATION').length;
-    const musicCount = allResourceAccess.filter(ra => ra.resource === 'MUSIC').length;
-    const totalResourcesUsed = articleReadCount + meditationCount + musicCount;
-
     const totalJournalCount = writingJournalCount + audioJournalCount + artJournalCount;
+    const totalResourcesUsed = articleCompletions + meditationSaves + musicSaves;
 
     return NextResponse.json({
       success: true,
@@ -64,9 +62,9 @@ export async function GET(req: NextRequest) {
             total: totalJournalCount,
           },
           resources: {
-            articles: articleReadCount,
-            meditation: meditationCount,
-            music: musicCount,
+            articles: articleCompletions,
+            meditation: meditationSaves,
+            music: musicSaves,
             total: totalResourcesUsed,
           },
           moodCheckins: moodCheckinCount,

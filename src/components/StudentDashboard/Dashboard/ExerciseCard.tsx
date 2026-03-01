@@ -75,35 +75,35 @@ export default function ExerciseCard() {
   return (
     <div
       className="
-        w-full max-w-[380px] 
-        rounded-3xl p-7
-        bg-gradient-to-br from-[#f3efff] via-[#ece6ff] to-[#f5f2ff]
+        w-auto 
+        rounded-[16px] p-10
+        bg-gradient-to-br from-[#e1caff]/50 to-[#f6efff]/50
         shadow-[0_4px_24px_rgba(120,80,220,0.10)]
         flex flex-col items-center 
         select-none
         backdrop-blur-xl
-        border border-white/40
+        border-2 border-white/40
       "
     >
       {/* Header */}
       <div className="w-full flex items-center gap-2 mb-6">
-        <Wind className="w-5 h-5 text-violet-700" />
-        <span className="text-[15px] font-bold text-violet-800">
+        <Wind className="w-5 h-5 text-[#8038B1]" />
+        <span className="text-[15px] font-bold text-[#8038B1]">
           Today’s Exercise: Deep Breathing
         </span>
       </div>
 
       {/* Breathing Visual */}
-      <div className="relative w-[180px] h-[180px] flex items-center justify-center mb-6">
+      <div className="relative w-[239px] h-[239px] flex items-center justify-center mb-6">
         {/* Outer Glow Ring */}
         <div
           className="
-            absolute rounded-full bg-violet-400/20
+            absolute rounded-full bg-[#e2d6ffb8]
             transition-transform
           "
           style={{
-            width: 180,
-            height: 180,
+            width: 219,
+            height: 219,
             transform: `scale(${isBreathing ? scale * 1.08 : 1})`,
             transitionDuration:
               phase === "inhale" ? "4000ms" : phase === "exhale" ? "8000ms" : "400ms",
@@ -113,12 +113,25 @@ export default function ExerciseCard() {
         {/* Mid Ring */}
         <div
           className="
-            absolute rounded-full bg-violet-400/30
+            absolute rounded-full bg-[#DACDFF]
             transition-transform
           "
           style={{
-            width: 148,
-            height: 148,
+            width: 191,
+            height: 191,
+            transform: `scale(${isBreathing ? scale * 1.05 : 1})`,
+            transitionDuration:
+              phase === "inhale" ? "4000ms" : phase === "exhale" ? "8000ms" : "400ms",
+          }}
+        />
+        <div
+          className="
+            absolute rounded-full bg-gradient-to-br from-[#B475EB] to-[#7994F2]
+            transition-transform
+          "
+          style={{
+            width: 156,
+            height: 156,
             transform: `scale(${isBreathing ? scale * 1.05 : 1})`,
             transitionDuration:
               phase === "inhale" ? "4000ms" : phase === "exhale" ? "8000ms" : "400ms",
@@ -129,14 +142,14 @@ export default function ExerciseCard() {
         <div
           className="
             absolute rounded-full
-            flex items-center justify-center text-white font-bold text-[14px]
+            flex items-center justify-center text-white font-semibold text-[18px]
             shadow-[0_8px_32px_rgba(139,92,246,0.45)]
-            bg-gradient-to-br from-violet-500 via-indigo-400 to-sky-400
+            bg-gradient-to-br from-[#C97AFF] to-[#85B2FF]
             z-10 transition-transform
           "
           style={{
-            width: 118,
-            height: 118,
+            width: 135,
+            height: 135,
             transform: `scale(${isBreathing ? scale : 1})`,
             transitionDuration:
               phase === "inhale" ? "4000ms" : phase === "exhale" ? "8000ms" : "400ms",
@@ -147,12 +160,12 @@ export default function ExerciseCard() {
       </div>
 
       {/* Title */}
-      <h2 className="text-[20px] font-extrabold text-violet-800 tracking-wide mb-1">
+      <h2 className="text-[20px] font-semibold text-[#8038B1] tracking-wide mb-1">
         4-7-8 Breathing
       </h2>
 
       {/* Subtitle */}
-      <p className="text-[13px] text-violet-500 text-center mb-6">
+      <p className="text-[16px] text-[#7C7C7C] text-center mb-6">
         Follow the circle's rhythm. You're doing great.
       </p>
 
@@ -161,10 +174,10 @@ export default function ExerciseCard() {
         onClick={handleStart}
         className="
           flex items-center gap-2
-          bg-gradient-to-r from-violet-600 to-indigo-500
-          text-white font-bold 
-          rounded-xl px-10 py-3 text-[15px]
-          shadow-[0_4px_16px_rgba(124,58,237,0.35)]
+          bg-gradient-to-r from-[#BC6EFF] to-[#6A8FFC]
+          text-white font-medium 
+          rounded-[16px] px-10 py-3 text-[15px]
+          drop-shadow-[0_4px_16px_rgba(124,58,237,0.35)]
           transition active:scale-95 hover:opacity-90
         "
       >

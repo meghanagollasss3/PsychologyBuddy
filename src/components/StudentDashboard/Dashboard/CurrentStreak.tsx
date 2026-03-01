@@ -4,9 +4,7 @@ import { Flame, Trophy } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useRef } from "react";
 
-/* ------------------------------
-   Fetcher (Typed, Production-Safe)
---------------------------------- */
+/* ------------------------------ Fetcher ------------------------------ */
 async function fetchCurrentStreak(): Promise<{
   count: number;
   lastActive: string;
@@ -18,20 +16,16 @@ async function fetchCurrentStreak(): Promise<{
   return json.data;
 }
 
-/* ------------------------------
-   Component
---------------------------------- */
+/* ------------------------------ Component ------------------------------ */
 export default function CurrentStreak() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["currentStreak"],
     queryFn: fetchCurrentStreak,
-    refetchInterval: 60000, // 1 min refresh
+    refetchInterval: 60000,
     staleTime: 60000,
   });
 
-  /* ------------------------------
-     Number Animation (Smooth, Optimized)
-  --------------------------------- */
+  /* ---- Number Animation ---- */
   const [displayValue, setDisplayValue] = useState(0);
   const animationRef = useRef<number | null>(null);
 
@@ -40,15 +34,13 @@ export default function CurrentStreak() {
 
     const start = displayValue;
     const end = data.count;
-    const duration = 700;
+    const duration = 600;
     let startTime = 0;
 
     function animate(time: number) {
       if (!startTime) startTime = time;
-
       const progress = Math.min((time - startTime) / duration, 1);
       const eased = start + (end - start) * progress;
-
       setDisplayValue(Math.floor(eased));
 
       if (progress < 1) {
@@ -60,94 +52,77 @@ export default function CurrentStreak() {
     return () => cancelAnimationFrame(animationRef.current!);
   }, [data]);
 
-  /* ------------------------------
-     Memoized Derived Values
-  --------------------------------- */
+  /* ---- Best streak + last active ---- */
   const streakDetails = useMemo(() => {
-    if (!data)
-      return { best: 0, lastActive: "N/A" };
-
-    return {
-      best: data.bestStreak ?? 0,
-      lastActive: new Date(data.lastActive).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
-    };
+    if (!data) return { best: 0 };
+    return { best: data.bestStreak ?? 0 };
   }, [data]);
 
-  /* ------------------------------
-     Loading State (Glass Skeleton)
-  --------------------------------- */
+  /* ------------------------------ Loading State ------------------------------ */
   if (isLoading) {
     return (
-      <div className="rounded-2xl p-5 border border-white/20 bg-white/10 backdrop-blur-xl shadow-md animate-pulse">
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 bg-orange-200/40 rounded-md"></div>
-          <div className="h-4 w-28 bg-white/30 rounded"></div>
-        </div>
-        <div className="h-10 w-16 bg-white/30 rounded mt-4"></div>
-        <div className="h-3 w-40 bg-white/20 rounded mt-3"></div>
-      </div>
+      <div className="rounded-2xl p-5 bg-orange-50 animate-pulse h-[150px]" />
     );
   }
 
-  /* ------------------------------
-     Error State
-  --------------------------------- */
+  /* ------------------------------ Error State ------------------------------ */
   if (isError || !data) {
     return (
-      <div className="rounded-2xl p-5 border border-white/20 bg-white/10 backdrop-blur-xl shadow-md flex flex-col items-center justify-center h-[150px]">
-        <Flame className="h-8 w-8 text-orange-400 mb-2" />
-        <p className="text-sm text-gray-200">Failed to load streak</p>
+      <div className="rounded-2xl p-5 bg-orange-50 h-[150px] flex items-center justify-center">
+        <p className="text-sm text-gray-600">Failed to load streak</p>
       </div>
     );
   }
 
-  /* ------------------------------
-     MAIN UI — Glassmorphism Card
-  --------------------------------- */
+  /* ------------------------------ MAIN UI ------------------------------ */
   return (
     <div
       className="
-        rounded-2xl p-5
-        border border-white/20 
-        bg-gradient-to-br from-white/20 to-white/5
-        backdrop-blur-xl shadow-md
-        text-gray-900
-        dark:text-gray-200
+        rounded-2xl p-5 
+        bg-gradient-to-br 
+                 from-[#ffeada8f] via-[#FFFBF8] to-[#ffeada88] drop-shadow-sm
+        border-2 border-[#ffffff] 
+        shadow-sm w-auto
       "
     >
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <Flame className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-        <h3 className="text-sm font-semibold">Current Streak</h3>
+      {/* HEADER */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3 ml-5">
+          <div className="w-[48px] h-[48px] rounded-xl flex items-center justify-center 
+                         bg-gradient-to-br from-[#FFECDE] to-[#FBE1CF] drop-shadow-xl">
+            <Flame className="h-6 w-6 text-[#FB9A56]" />
+          </div>
+
+          <div>
+            <h3 className="text-[20px] font-semibold text-[#2F3D43]">
+              Current Streak
+            </h3>
+            <p className="text-[14px] text-[#767676]">Keep showing up!</p>
+          </div>
+        </div>
+
+        {/* Number (07 Days) */}
+        <div className="text-right mr-4">
+          <p className="text-[32px] font-semibold text-[#E57C30] leading-none">
+            {String(displayValue).padStart(2, "0")}
+          </p>
+          <p className="text-[16px] text-[#7C7C7C]">Days</p>
+        </div>
       </div>
 
-      {/* Animated Number */}
-      <div className="mt-4">
-        <h2
-          className="text-4xl font-bold text-orange-600 dark:text-orange-400"
-          aria-live="polite"
-        >
-          {displayValue}
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">Days</p>
-      </div>
+      {/* Divider */}
+      <div className="w-[480px] ml-6 mt-8 h-[1px] bg-[#D0D0D0] my-4" />
 
-      {/* Best Streak */}
-      <div className="mt-4 flex items-center gap-2">
-        <Trophy className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-        <p className="text-sm text-gray-700 dark:text-gray-300">
-          Best streak:{" "}
-          <span className="font-medium">{streakDetails.best}</span> days
+      {/* BEST STREAK */}
+      <div className="flex items-center gap-2 ml-5 mt-1">
+        <Trophy className="h-[20px] w-[20px] text-[#9770DB]" />
+        <p className="text-[14px] text-[#767676]">
+          Your best:{" "}
+          <span className="text-[16px] font-semibold text-[#3A3A3A]">
+            {streakDetails.best} days
+          </span>
         </p>
       </div>
-
-      {/* Encouragement */}
-      <p className="text-xs text-gray-600 dark:text-gray-400 mt-3">
-        Keep going — you're doing amazing! 🔥
-      </p>
     </div>
   );
 }

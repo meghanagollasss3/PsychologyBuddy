@@ -59,14 +59,26 @@ export async function GET(req: NextRequest) {
       weeklyData[dayOfWeek].hasData = true;
     });
 
+    // Rotate the data so current day is at the end
+    const today = new Date().getDay();
+    const rotatedData = [];
+    const rotatedLabels = [];
+    
+    // Start from tomorrow (today + 1) and go to today
+    for (let i = 1; i <= 7; i++) {
+      const dayIndex = (today + i) % 7;
+      rotatedData.push(weeklyData[dayIndex]);
+      rotatedLabels.push(dayNames[dayIndex]);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Weekly mood trends retrieved successfully',
       data: {
-        weeklyData,
+        weeklyData: rotatedData,
         totalCheckins: moodCheckins.length,
         averageMood: moodCheckins.length > 0 
-          ? weeklyData.reduce((sum, day) => sum + (day.hasData ? day.moodScore : 0), 0) / weeklyData.filter(day => day.hasData).length
+          ? rotatedData.reduce((sum, day) => sum + (day.hasData ? day.moodScore : 0), 0) / rotatedData.filter(day => day.hasData).length
           : 0,
       },
     });

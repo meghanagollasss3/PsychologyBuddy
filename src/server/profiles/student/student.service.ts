@@ -626,18 +626,65 @@ export class StudentService {
       // Note: Meditation model doesn't track user usage, only admin creation
       // For now, we'll only track journal and mood check-in activities
 
-      // Create sessions from chat sessions
-      const sessions = chatSessions.map(session => ({
-        id: session.id,
-        date: new Date(session.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        time: new Date(session.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-        type: 'Chat Session',
-        doctor: session.user ? `Dr. ${session.user.firstName} ${session.user.lastName}` : 'Dr. Unknown',
-        status: session.endedAt ? 'Completed' : 'In Progress'
-      }));
+      // Fetch meditation saves for activity tracking
+      const meditationSaves = await prisma.meditationSave.findMany({
+        where: { studentId: student.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      });
 
-      // Create activity list
+      // Fetch article completions for activity tracking
+      const articleCompletions = await prisma.articleCompletion.findMany({
+        where: { studentId: student.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      });
+
+      // Create sessions from chat sessions
+      const sessions = chatSessions.map(session => {
+        console.log('Processing session:', session.id, session.startedAt, session.endedAt, session.isActive);
+        
+        // Determine session status with multiple checks
+        let status = 'In Progress';
+        
+        // Primary check: if session has endedAt, it's completed
+        if (session.endedAt) {
+          status = 'Completed';
+        }
+        // Secondary check: if session is marked as inactive, it's completed
+        else if (!session.isActive) {
+          status = 'Completed';
+        }
+        // Fallback: if session is older than 1 hour, assume it's completed
+        else {
+          const sessionAge = Date.now() - new Date(session.startedAt).getTime();
+          const oneHour = 60 * 60 * 1000;
+          if (sessionAge > oneHour) {
+            status = 'Completed';
+          }
+        }
+        
+        return {
+          id: session.id,
+          date: new Date(session.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          time: new Date(session.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          type: 'Chat Session',
+          doctor: session.user ? `Dr. ${session.user.firstName} ${session.user.lastName}` : 'Dr. Unknown',
+          status: status
+        };
+      });
+
+      // Create activity list with all required activity types
       const activities = [
+        // Add mood check-ins
+        ...moodCheckins.slice(0, 5).map((checkin, index) => ({
+          id: `checkin-${index}`,
+          type: 'checkin',
+          title: 'Mood check-in completed',
+          details: checkin.mood ? `Mood: ${checkin.mood}` : 'Daily mood tracking',
+          time: this.getTimeAgo(new Date(checkin.date || new Date())),
+          date: checkin.date || new Date()
+        })),
         // Add journaling activities if they exist
         ...(writingJournals.length > 0 ? writingJournals.map(journal => ({
           id: `journal-${journal.id}`,
@@ -647,30 +694,42 @@ export class StudentService {
           time: this.getTimeAgo(new Date(journal.createdAt)),
           date: journal.createdAt
         })) : []),
-        // Add mood check-ins
-        ...moodCheckins.slice(0, 5).map((checkin, index) => ({
-          id: `checkin-${index}`,
+        // Add meditation activities if they exist
+        ...(meditationSaves.length > 0 ? meditationSaves.map(meditation => ({
+          id: `meditation-${meditation.id}`,
+          type: 'meditation',
+          title: 'Meditation session completed',
+          details: 'Meditation practice',
+          time: this.getTimeAgo(new Date(meditation.createdAt)),
+          date: meditation.createdAt
+        })) : []),
+        // Add article reading activities if they exist
+        ...(articleCompletions.length > 0 ? articleCompletions.map(completion => ({
+          id: `article-${completion.id}`,
+          type: 'reading',
+          title: 'Article completed',
+          details: 'Article reading',
+          time: this.getTimeAgo(new Date(completion.createdAt)),
+          date: completion.createdAt
+        })) : []),
+        // Add badges earned activities
+        ...userBadges.slice(0, 3).map(userBadge => ({
+          id: `badge-${userBadge.id}`,
           type: 'tool',
-          title: 'Mood check-in completed',
-          details: checkin.mood ? `Mood: ${checkin.mood}` : 'Daily mood tracking',
-          time: this.getTimeAgo(new Date(checkin.date || new Date())),
-          date: checkin.date || new Date()
-        })),
-        // Add chat session activities
-        ...chatSessions.slice(0, 3).map((session, index) => ({
-          id: `session-${session.id}`,
-          type: 'exercise',
-          title: 'Therapy session completed',
-          details: session.user ? `With Dr. ${session.user.firstName} ${session.user.lastName}` : 'With therapist',
-          time: this.getTimeAgo(new Date(session.startedAt)),
-          date: session.startedAt
+          title: 'Badge earned',
+          details: `Earned "${userBadge.badge.name}" badge`,
+          time: this.getTimeAgo(new Date(userBadge.earnedAt)),
+          date: userBadge.earnedAt
         }))
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
 
       console.log('Writing journals for activity:', writingJournals.length, writingJournals);
       console.log('Mood check-ins for activity:', moodCheckins.length, moodCheckins);
       console.log('Chat sessions for activity:', chatSessions.length, chatSessions);
+      console.log('Meditation saves for activity:', meditationSaves.length, meditationSaves);
+      console.log('Article completions for activity:', articleCompletions.length, articleCompletions);
       console.log('Final activities array:', activities.length, activities);
+      console.log('Sessions array:', sessions.length, sessions);
 
       // Return student profile data
       const profileData = {

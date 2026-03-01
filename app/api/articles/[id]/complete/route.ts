@@ -3,6 +3,8 @@ import { PrismaClient } from '@/src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { handleError } from '@/src/utils/errors';
 import { StreakService } from '@/src/server/services/streak.service';
+import { BadgeService } from '@/src/server/services/badge.service';
+import { revalidatePath } from 'next/cache';
 
 // Create Prisma client inline to avoid import issues
 const adapter = new PrismaPg({
@@ -100,6 +102,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     } catch (streakError) {
       console.error('Failed to update streak after article completion:', streakError);
     }
+
+    // Evaluate badges for article completion activity
+    try {
+      await BadgeService.evaluateUserBadges(student.id);
+    } catch (badgeError) {
+      console.error('Failed to evaluate badges after article completion:', badgeError);
+    }
+
+    // Revalidate stats cache to update frontend immediately
+    revalidatePath('/api/student/stats');
 
     // Get updated article with new view count
     const updatedArticle = await prisma.article.findUnique({

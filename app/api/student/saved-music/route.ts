@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/src/prisma';
+import { StreakService } from '@/src/server/services/streak.service';
+import { BadgeService } from '@/src/server/services/badge.service';
+import { revalidatePath } from 'next/cache';
+import { requirePermission } from '@/src/utils/session-helper';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const studentId = searchParams.get('studentId');
-
-    if (!studentId) {
-      return NextResponse.json(
-        { success: false, message: 'Student ID required' },
-        { status: 400 }
-      );
-    }
+    const session = await requirePermission(request, 'badges.view');
+    const userId = session.userId;
 
     // Use raw SQL to get saved music since Prisma model is not generating properly
     const savedMusic = await prisma.$queryRaw<Array<any>>`
       SELECT ms.*, mr.* 
       FROM "MusicSaves" ms
       JOIN "MusicResources" mr ON ms."musicId" = mr.id
-      WHERE ms."studentId" = ${studentId}
+      WHERE ms."studentId" = ${userId}
       ORDER BY ms."createdAt" DESC
     `;
 
@@ -72,8 +69,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await requirePermission(request, 'badges.view');
     const body = await request.json();
-    const { musicId, studentId } = body;
+    const { musicId } = body;
+
+    // Use session userId instead of body studentId
+    const userId = session.userId;
 
     if (!musicId) {
       return NextResponse.json(
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
     const existingSave = await prisma.$queryRaw<Array<any>>`
       SELECT * FROM "MusicSaves" 
       WHERE "musicId" = ${musicId} 
-      AND "studentId" = ${studentId}
+      AND "studentId" = ${userId}
       LIMIT 1
     `;
 
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         DELETE FROM "MusicSaves" 
         WHERE "musicId" = ${musicId} 
-        AND "studentId" = ${studentId}
+        AND "studentId" = ${userId}
       `;
 
       return NextResponse.json({
@@ -107,8 +108,25 @@ export async function POST(request: NextRequest) {
       // Save the music
       await prisma.$executeRaw`
         INSERT INTO "MusicSaves" ("id", "musicId", "studentId", "createdAt")
-        VALUES (gen_random_uuid(), ${musicId}, ${studentId}, NOW())
+        VALUES (gen_random_uuid(), ${musicId}, ${userId}, NOW())
       `;
+
+      // Update user's streak for music activity
+      try {
+        await StreakService.updateStreak(userId);
+      } catch (streakError) {
+        console.error('Failed to update streak after music save:', streakError);
+      }
+
+      // Evaluate badges for music activity
+      try {
+        await BadgeService.evaluateUserBadges(userId);
+      } catch (badgeError) {
+        console.error('Failed to evaluate badges after music save:', badgeError);
+      }
+
+      // Revalidate stats cache to update frontend immediately
+      revalidatePath('/api/student/stats');
 
       return NextResponse.json({
         success: true,

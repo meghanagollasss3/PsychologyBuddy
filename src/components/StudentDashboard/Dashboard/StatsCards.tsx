@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { Flame, Smile, BookOpen, Medal } from "lucide-react";
 import React from "react";
 
 /* ---------------------------------------------
@@ -17,28 +16,32 @@ const statsConfig = [
     key: "currentStreak",
     label: "Current Streaks",
     sublabel: "Days",
-    icon: <Flame className="h-5 w-5 text-orange-500" />,
+    image: "/Dashboard/StatCards/Streaks.svg",
+    className: "border-[2px] border-[#FFEAD0] bg-gradient-to-b from-[#ffffff] to-[#FFFAF3]",
     gradient: "from-orange-100/60 to-orange-50/20",
   },
   {
     key: "totalCheckins",
     label: "Check-ins",
     sublabel: "Total",
-    icon: <Smile className="h-5 w-5 text-purple-500" />,
+    image: "/Dashboard/StatCards/Checkin.svg",
+    className: "border-[2px] border-[#EFD9FF] bg-gradient-to-b from-[#ffffff] to-[#F7ECFF]",
     gradient: "from-purple-100/60 to-purple-50/20",
   },
   {
     key: "resourcesUsed",
     label: "Resources Used",
     sublabel: "Accessed",
-    icon: <BookOpen className="h-5 w-5 text-green-500" />,
+    image: "/Dashboard/StatCards/Resources.svg",
+    className: "border-[2px] border-[#D5FFE2] bg-gradient-to-b from-[#ffffff] to-[#E9FFF0]",
     gradient: "from-green-100/60 to-green-50/20",
   },
   {
     key: "badgesEarned",
     label: "Badges Earned",
     sublabel: "Unlocked",
-    icon: <Medal className="h-5 w-5 text-blue-500" />,
+    image: "/Dashboard/StatCards/Badges.svg",
+    className: "border-[2px] border-[#D1E2FF] bg-gradient-to-b from-[#ffffff] to-[#EDF4FF]",
     gradient: "from-blue-100/60 to-blue-50/20",
   },
 ];
@@ -66,15 +69,15 @@ const StatCard = React.memo(function StatCard({
   loading: boolean;
 }) {
   return (
-    <Card className="relative overflow-hidden rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] border border-gray-100">
+    <Card className={`relative w-[293px] h-auto overflow-hidden rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] ${config.className}`}>
       {/* Gradient BG */}
       <div
-        className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-70`}
+        className={`absolute inset-0 w-[150px] h-[150px] left-[186px] top-[-55px] rounded-full bg-gradient-to-br ${config.gradient} opacity-70`}
       />
 
       {/* Blob */}
       <svg
-        className="absolute -right-6 -top-6 w-32 h-32 opacity-20"
+        className="absolute left-[186px] top-[-55px] opacity-20"
         viewBox="0 0 200 200"
       >
         <path
@@ -86,24 +89,33 @@ const StatCard = React.memo(function StatCard({
       </svg>
 
       <CardContent className="relative p-6 flex flex-col gap-4">
-        {/* Icon */}
-        <div className="p-2 bg-white rounded-xl shadow-md w-fit z-10">
-          {config.icon}
+        {/* Image */}
+        <div>
+          <img 
+            src={config.image} 
+            alt={config.label}
+            className="h-[56px] w-[55px] "
+            onError={(e) => {
+              // Fallback to a placeholder if image fails to load
+              const target = e.target as HTMLImageElement;
+              target.src = "/images/placeholder.png";
+            }}
+          />
         </div>
 
         {/* Animated Number */}
         {loading ? (
           <Skeleton className="h-10 w-20 rounded-md" />
         ) : (
-          <h2 className="text-4xl font-bold text-gray-900 z-10">
+          <h2 className="text-[37px] -mt-4 font-bold text-[#2F3D43] z-10">
             {value.toString().padStart(2, "0")}
           </h2>
         )}
 
         {/* Labels */}
         <div className="z-10">
-          <p className="text-sm font-medium text-gray-700">{config.sublabel}</p>
-          <p className="text-xs text-gray-500 -mt-1">{config.label}</p>
+          <p className="text-[16px] -mt-6 font-medium text-[#686D70]">{config.sublabel}</p>
+          <p className="text-[14px] mt-2 text-[#767676] -mt-1">{config.label}</p>
         </div>
       </CardContent>
     </Card>
@@ -120,7 +132,7 @@ export default function StatsCards() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["studentStats"],
     queryFn: fetchStats,
-    staleTime: 1000 * 60 * 5, // cache 5 min
+    staleTime: 1000 * 60 * 2, // cache 2 minutes for balance
   });
 
   /* --- Animated numbers state --- */
