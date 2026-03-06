@@ -3,6 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { X, Edit, Loader } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface EditAdminModalProps {
   admin: any;
@@ -111,24 +120,16 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center space-x-3">
-            <Edit className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900">Edit Admin</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Admin</DialogTitle>
+          <DialogDescription>
+            Update administrator account information.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
@@ -137,13 +138,10 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   First Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.firstName ? 'border-red-500' : 'border-gray-300'
-                  }`}
                   placeholder="Enter first name"
                 />
                 {errors.firstName && (
@@ -155,13 +153,10 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Last Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.lastName ? 'border-red-500' : 'border-gray-300'
-                  }`}
                   placeholder="Enter last name"
                 />
                 {errors.lastName && (
@@ -173,13 +168,10 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email *
                 </label>
-                <input
+                <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
                   placeholder="admin@school.edu"
                 />
                 {errors.email && (
@@ -191,11 +183,10 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Phone Number
                 </label>
-                <input
+                <Input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="+1234567890"
                 />
               </div>
@@ -204,13 +195,15 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Department
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.department}
                   onChange={(e) => handleInputChange('department', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., Psychology, Administration"
                 />
+                {errors.department && (
+                  <p className="mt-1 text-sm text-red-600">{errors.department}</p>
+                )}
               </div>
 
               <div>
@@ -220,12 +213,15 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
                 <select
                   value={formData.status}
                   onChange={(e) => handleInputChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
                   <option value="SUSPENDED">Suspended</option>
                 </select>
+                {errors.status && (
+                  <p className="mt-1 text-sm text-red-600">{errors.status}</p>
+                )}
               </div>
             </div>
           </div>
@@ -265,33 +261,28 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
 
           {/* Actions */}
           <div className="flex items-center justify-end space-x-3 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {loading ? (
                 <>
-                  <Loader className="w-4 h-4 animate-spin" />
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
                   <span>Updating...</span>
                 </>
               ) : (
                 <>
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-4 h-4 mr-2" />
                   <span>Update Admin</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

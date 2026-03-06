@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useSchoolFilter } from '@/src/contexts/SchoolFilterContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Edit, Eye, Trash2, FileText, Upload, Clock, BookOpen, X, Check, ChevronDown, MoreVertical, Search, CheckCircle2, Edit2 } from 'lucide-react';
@@ -125,6 +126,7 @@ export function ArticleList() {
   const router = useRouter();
   const mountedRef = useRef(false);
   const { toast } = useToast();
+  const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } = useSchoolFilter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   // const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -165,7 +167,15 @@ export function ArticleList() {
     
     try {
       const headers = getAuthHeaders();
-      const response = await fetch('/api/articles', { headers });
+      const params = new URLSearchParams();
+      
+      // Add school filter if applicable
+      if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
+        params.append('schoolId', selectedSchoolId);
+      }
+      
+      const url = `/api/articles${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url, { headers });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -187,7 +197,7 @@ export function ArticleList() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [selectedSchoolId, isSuperAdmin]);
 
   const fetchLabels = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -471,6 +481,10 @@ export function ArticleList() {
         title="Psychoeducation Library" 
         subtitle="Manage educational content and resources"
         showTimeFilter={false}
+        showSchoolFilter={isSuperAdmin}
+        schoolFilterValue={selectedSchoolId}
+        schools={schools}
+        onSchoolFilterChange={setSelectedSchoolId}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" className="gap-2 hover:bg-gray-200" onClick={() => setIsCategoryOpen(true)}>
@@ -768,6 +782,7 @@ export function ArticleList() {
                     <Upload className="h-8 w-8 mx-auto text-gray-500" />
                     <p className="text-sm text-gray-500">Click to upload thumbnail</p>
                     <p className="text-xs text-gray-500 mt-[9px]">PNG, JPG up to 2MB</p>
+                    <p className="text-xs text-gray-500 mt-[9px]">[399 × 140]</p>
                   </div>
                 )}
                 <input 

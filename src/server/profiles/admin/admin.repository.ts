@@ -34,15 +34,22 @@ export const AdminRepository = {
   },
 
   // Get all admins (SuperAdmin only)
-  getAllAdmins: async () => {
-    return prisma.user.findMany({
-      where: {
-        role: {
-          name: {
-            in: ['ADMIN', 'SUPERADMIN'],
-          },
+  getAllAdmins: async (schoolId?: string) => {
+    const whereClause: any = {
+      role: {
+        name: {
+          in: ['ADMIN', 'SUPERADMIN'],
         },
       },
+    };
+
+    // Add school filter if provided
+    if (schoolId && schoolId !== 'all') {
+      whereClause.schoolId = schoolId;
+    }
+
+    return prisma.user.findMany({
+      where: whereClause,
       include: {
         role: {
           include: {

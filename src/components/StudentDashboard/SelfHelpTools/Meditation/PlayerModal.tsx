@@ -11,6 +11,8 @@ interface PlayerModalProps {
 
 export const PlayerModal = ({ card, onClose }: PlayerModalProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRef = card.type === 'video' ? videoRef : audioRef;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -18,48 +20,50 @@ export const PlayerModal = ({ card, onClose }: PlayerModalProps) => {
   const [duration, setDuration] = useState(0);
 
   /* --------------------------------------------
-    AUDIO EVENTS
+    MEDIA EVENTS (AUDIO/VIDEO)
   -------------------------------------------- */
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const media = mediaRef.current;
+    if (!media) return;
 
     const updateProgress = () => {
-      setCurrentTime(audio.currentTime);
-      if (audio.duration) {
-        setProgress((audio.currentTime / audio.duration) * 100);
+      setCurrentTime(media.currentTime);
+      if (media.duration) {
+        setProgress((media.currentTime / media.duration) * 100);
       }
     };
-    const loadMeta = () => setDuration(audio.duration);
+    const loadMeta = () => setDuration(media.duration);
 
-    audio.addEventListener("timeupdate", updateProgress);
-    audio.addEventListener("loadedmetadata", loadMeta);
+    media.addEventListener("timeupdate", updateProgress);
+    media.addEventListener("loadedmetadata", loadMeta);
 
     return () => {
-      audio.removeEventListener("timeupdate", updateProgress);
-      audio.removeEventListener("loadedmetadata", loadMeta);
+      media.removeEventListener("timeupdate", updateProgress);
+      media.removeEventListener("loadedmetadata", loadMeta);
     };
-  }, []);
+  }, [card.type]);
 
   const togglePlayPause = () => {
-    if (!audioRef.current) return;
+    const media = mediaRef.current;
+    if (!media) return;
 
     if (isPlaying) {
-      audioRef.current.pause();
+      media.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      media.play();
       setIsPlaying(true);
     }
   };
 
   const handleSeek = (e: any) => {
-    if (!audioRef.current || !duration) return;
+    const media = mediaRef.current;
+    if (!media || !duration) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
 
-    audioRef.current.currentTime = percent * duration;
+    media.currentTime = percent * duration;
     setProgress(percent * 100);
   };
 
@@ -72,7 +76,16 @@ export const PlayerModal = ({ card, onClose }: PlayerModalProps) => {
 
   return (
     <>
-      <audio src={card.url} ref={audioRef} preload="metadata" />
+      {card.type === 'video' ? (
+        <video 
+          src={card.url} 
+          ref={videoRef} 
+          preload="metadata"
+          className="hidden"
+        />
+      ) : (
+        <audio src={card.url} ref={audioRef} preload="metadata" />
+      )}
 
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 sm:p-6">
         
@@ -87,13 +100,37 @@ export const PlayerModal = ({ card, onClose }: PlayerModalProps) => {
             <Icons.X className="w-5 h-5 text-gray-700" />
           </button>
 
-          {/* IMAGE */}
-          <div className="w-full rounded-[2rem] overflow-hidden shadow-lg">
-            <img
-              src={card.image}
-              alt={card.title}
-              className="w-full h-[320px] sm:h-[360px] object-cover rounded-[2rem]"
-            />
+          {/* IMAGE OR VIDEO */}
+          <div className="w-full rounded-[2rem] overflow-hidden shadow-lg relative">
+            {card.type === 'video' ? (
+              <>
+                <video
+                  src={card.url}
+                  ref={videoRef}
+                  controls={false}
+                  preload="metadata"
+                  className="w-full h-[320px] sm:h-[360px] object-cover rounded-[2rem]"
+                  onClick={togglePlayPause}
+                />
+                {/* Video Play Button Overlay */}
+                {!isPlaying && (
+                  <div 
+                    className="absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer rounded-[2rem]"
+                    onClick={togglePlayPause}
+                  >
+                    <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors">
+                      <Icons.Play className="w-8 h-8 text-blue-600 ml-1" />
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <img
+                src={card.image}
+                alt={card.title}
+                className="w-full h-[320px] sm:h-[360px] object-cover rounded-[2rem]"
+              />
+            )}
           </div>
 
           {/* NOW PLAYING */}
@@ -108,8 +145,8 @@ export const PlayerModal = ({ card, onClose }: PlayerModalProps) => {
             <h2 className="text-2xl font-bold text-gray-900">
               {card.title}
             </h2>
-            <p className="text-gray-500 mt-1">
-              Perfect for your first meditation experience
+            <p className="text-gray-500 mt-1 flex items-center gap-2">
+              {card.type === 'video' ? 'Video meditation' : 'Perfect for your first meditation experience'}
             </p>
           </div>
 

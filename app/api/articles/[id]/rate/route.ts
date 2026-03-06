@@ -25,11 +25,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
+    // Process studentId - convert 'anonymous' and invalid UUIDs to null
+    let processedStudentId = (studentId && studentId !== 'anonymous') ? studentId : null;
+
+    // Validate that processedStudentId is either null or a valid UUID
+    if (processedStudentId !== null) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(processedStudentId)) {
+        // If it's not a valid UUID, set it to null
+        processedStudentId = null;
+      }
+    }
+
     // Check if user already rated this article
     const existingRating = await prisma.rating.findFirst({
       where: {
         articleId: id,
-        studentId: studentId || null
+        studentId: processedStudentId
       }
     });
 
@@ -45,7 +57,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: {
           articleId: id,
           score: rating,
-          studentId: studentId || null
+          studentId: processedStudentId
         }
       });
     }
@@ -100,11 +112,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       );
     }
 
+    // Process studentId - convert 'anonymous' and invalid UUIDs to null
+    let processedStudentId = (studentId && studentId !== 'anonymous') ? studentId : null;
+
+    // Validate that processedStudentId is either null or a valid UUID
+    if (processedStudentId !== null) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(processedStudentId)) {
+        // If it's not a valid UUID, set it to null
+        processedStudentId = null;
+      }
+    }
+
     // Find and delete the user's rating
     const existingRating = await prisma.rating.findFirst({
       where: {
         articleId: id,
-        studentId: studentId || null
+        studentId: processedStudentId
       }
     });
 

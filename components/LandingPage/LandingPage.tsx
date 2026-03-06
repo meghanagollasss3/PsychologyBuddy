@@ -3,25 +3,45 @@ import Navigation from "./components/Navigation";
 import Hero from "./sections/Hero";
 import Features from "./sections/Features";
 import HowItWorks from "./sections/HowItWorks";
+import WellnessSection from "./sections/Wellness";
+import TrustSection from "./sections/Privacy";
+import FAQSection from "./sections/FAQ";
+import Footer from "./sections/Footer";
 
 const LandingPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-r from-[#F5F5F9] via-[#F1F1F6] to-[#f8f7f8] relative">
+    <div className="min-h-screen bg-[#F5F5F9] relative overflow-x-hidden">
       <Navigation />
+      
+      {/* WRAPPER FOR IMAGE + CONTENT */}
       <div 
-        className="relative"
+        className="relative flex flex-col -mt-20 items-center"
         style={{
-          backgroundImage: 'url("/LP.png")',
-          backgroundSize: "100% auto",
-          backgroundPosition: "center",
+          backgroundImage: 'url("/LandingPage/LP.svg")',
+          backgroundSize: "100% auto", // Matches image width to screen width
+          backgroundPosition: "top center",
           backgroundRepeat: "no-repeat",
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#9ecbfd]/10 to-[#92c4fc]/0"></div>
+        {/* Section 1: Hero */}
         <Hero />
-        <Features />
+
+        {/* Section 2: Features 
+            The negative margin (mt-[-120px]) pulls the features 
+            up onto the reflection area of the SVG image.
+        */}
+        <div id="features" className="relative z-20 w-full mt-[-80px] md:mt-[-150px] pb-20"> 
+          <Features />
+        </div>
       </div>
-      <HowItWorks />
+
+      <div id="how-it-works">
+        <HowItWorks />
+      </div>
+      <WellnessSection/>
+      <TrustSection/>
+      <FAQSection/>
+      <Footer/>
     </div>
   );
 };

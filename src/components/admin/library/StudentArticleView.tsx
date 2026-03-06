@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, Clock, User, Bookmark, BookmarkCheck, ArrowLeft, CheckCircle2, Edit2 } from 'lucide-react';
+import { Star, Clock, User, Bookmark, BookmarkCheck, ArrowLeft, CheckCircle2, Edit2, BookOpen, Brain } from 'lucide-react';
 
 interface ContentSection {
   id: string;
@@ -51,6 +51,8 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
       checkIfArticleIsSaved(articleId);
       // Check completion status
       checkCompletionStatus(articleId);
+      // Fetch user's existing rating
+      fetchUserRating(articleId);
     }
   }, [articleId]);
 
@@ -184,15 +186,16 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
 
   const checkIfArticleIsSaved = async (articleId: string) => {
     try {
-      const studentId = localStorage.getItem('studentId') || null;
+      const studentId = localStorage.getItem('studentId');
       console.log('🔍 Checking if article is saved:', { articleId, studentId });
       
-      const response = await fetch(`/api/articles/${articleId}/save/check?studentId=${studentId}`);
+      // Call the API even if studentId is null or invalid - the API will handle it
+      const response = await fetch(`/api/articles/${articleId}/save/check?studentId=${studentId || ''}`);
       console.log('📡 Save check response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('� Save check response data:', data);
+        console.log('💾 Save check response data:', data);
         setIsSaved(data.isSaved || false);
       } else {
         console.error('❌ Save check failed:', response.status, response.statusText);
@@ -246,7 +249,7 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
 
   const checkCompletionStatus = async (articleId: string) => {
     try {
-      const studentId = localStorage.getItem('studentId') || null;
+      const studentId = localStorage.getItem('studentId');
       if (!studentId) return;
 
       const response = await fetch(`/api/articles/${articleId}/complete/check?studentId=${studentId}`);
@@ -256,6 +259,23 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
       }
     } catch (error) {
       console.error('Failed to check completion status:', error);
+    }
+  };
+
+  const fetchUserRating = async (articleId: string) => {
+    try {
+      const studentId = localStorage.getItem('studentId');
+      // Call the API even if studentId is null or invalid - the API will handle it
+      const response = await fetch(`/api/articles/${articleId}/rating/check?studentId=${studentId || ''}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.rating) {
+          setUserRating(data.data.rating);
+          setHasRated(true);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch user rating:', error);
     }
   };
 
@@ -484,7 +504,7 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-14">
         <button
                     onClick={() => router.push('/students/content/library')}
                     className="flex cursor-pointer items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 sm:mb-6 lg:mb-9 transition-colors"
@@ -493,64 +513,53 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
                     <span className="text-[12px] sm:text-[14px] lg:text-[16px]">Back to Library</span>
                   </button>
         {/* Article Header */}
-        <div className="bg-linear-to-r from-[#EC2C92] to-[#FF64B7] h-auto rounded-[12px] sm:rounded-[14px] lg:rounded-[16px] shadow-sm p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8">
+        <div className="bg-linear-to-r from-[#EC2C92] to-[#FF64B7] h-auto rounded-[12px] sm:rounded-[14px] lg:rounded-[16px] shadow-sm p-4 sm:p-6 lg:p-6 mb-6 sm:mb-8">
           <div className="flex flex-row sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <Badge variant="secondary" className="bg-white/20 text-[8px] sm:text-[9px] lg:text-[10px] text-white border-white/50 font-base w-fit">
+            <Badge variant="secondary" className="bg-white/20 py-1 text-[8px] sm:text-[9px] lg:text-[12px] text-white border-white/50 font-medium w-fit">
               {categoryName}
             </Badge>
             
             <div className="flex items-center gap-1 sm:gap-2">
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-              <span className='text-white text-[10px] sm:text-[11px] lg:text-[12px]'>{article?.readTime || readTime || 5} min read</span>
+              <BookOpen className="h-3 w-3 sm:h-[16px] sm:w-[17px] text-white" />
+              <span className='text-white text-[10px] sm:text-[11px] lg:text-[16px]'>{article?.readTime || readTime || 5} min read</span>
             </div>
-            <div className="flex items-center gap-2 text-white text-xs sm:text-sm ml-2">
-                  <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="truncate">{article?.author || 'Unknown Author'}</span>
-                </div>
+            
             {/* <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"> */}
                 
 
           </div>
+          <div className='flex flex-row sm:flex-row sm:items-center'>
+            <div className='bg-white rounded-[12px] px-2 py-2'>
+
+          <Brain className="w-8 h-8 text-[#EC2C92] "></Brain>
+            </div>
           
-          <h1 className="text-[20px] sm:text-[26px] lg:text-[32px] font-bold text-white mb-2 leading-tight">
+          <h1 className="text-[20px] sm:text-[26px] lg:text-[32px] ml-2 font-bold text-white mb-2 leading-tight">
             {article?.title || 'Untitled Article'}
           </h1>
+          </div>
           
-          <p className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#F5F5F5] mb-4 sm:mb-6 leading-relaxed">
+          <p className="text-[12px] sm:text-[13px] lg:text-[15px] text-[#F5F5F5] mb-4 mt-2 sm:mb-6 leading-relaxed">
             {article?.description || introText || 'No description available.'}
           </p>
           
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                {/* <div className="flex items-center gap-2 text-white text-xs sm:text-sm">
+          <div className="flex flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 text-white text-xs sm:text-sm">
                   <User className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="truncate">{article?.author || 'Unknown Author'}</span>
-                </div> */}
+                </div>
                 
                 <div className="flex items-center gap-2 sm:justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSaveArticle}
-                    className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${
-                      isSaved 
-                        ? 'text-green-600 hover:bg-green-50' 
-                        : 'text-black hover:text-gray-800'
-                    }`}
-                  >
-                    {isSaved ? (
-                      <>
-                        <BookmarkCheck className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden xs:block sm:block">Saved</span>
-                        <span className="block xs:hidden sm:hidden">Save</span>
-                      </>
-                    ) : (
-                      <>
-                        <Bookmark className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden xs:block sm:block">Save</span>
-                        <span className="block xs:hidden sm:hidden">Save</span>
-                      </>
-                    )}
-                  </Button>
+                  <div
+  onClick={handleSaveArticle}
+  className="rounded-full w-[50px] h-[50px] shadow-md bg-white drop-shadow-xl flex items-center justify-center"
+>
+  {isSaved ? (
+    <CheckCircle2 size={27} className="text-black" />
+  ) : (
+    <Bookmark size={27} className="text-black" />
+  )}
+</div>
                 </div>
               </div>
         </div>
@@ -564,70 +573,47 @@ export const StudentArticleView = ({ articleId }: { articleId: string }) => {
 
         {/* Rating Section */}
         <div className="bg-background px-3 sm:px-4 lg:px-6 pb-6 m-3 sm:pb-8">
-          <div className="max-w-2xl sm:max-w-3xl mx-auto">
-            <Card className="border-border">
-              <CardContent className="p-4 sm:p-6 text-center">
-                <h3 className="font-semibold text-foreground text-sm sm:text-base mb-2">How helpful was this article?</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">Your feedback helps us improve</p>
-                <div className="flex justify-center gap-1 sm:gap-2 mb-3 sm:mb-4">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star 
-                      key={star} 
-                      className={`h-6 w-6 sm:h-8 sm:w-8 cursor-pointer transition-colors ${
-                        star <= (userRating || 0) 
-                          ? 'text-yellow-400 fill-yellow-400' 
-                          : 'text-gray-300 hover:text-yellow-200'
-                      }`}
-                      onClick={() => !hasRated && handleRating(star)}
-                    />
-                  ))}
-                </div>
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4">
-                  <Badge variant="outline" className="text-xs">
-                    {hasRated ? 'Thank you for your feedback!' : 'Click to rate this article'}
-                  </Badge>
-                  {hasRated && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={handleUndoRating}
-                      className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-                    >
-                      Undo Rating
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          <div className="max-w-2xl sm:max-w-7xl mx-auto">
+            {/* White Card for Rating */}
+            <div className="bg-white rounded-[32px] shadow-sm p-6 mb-6">
+              <h3 className="text-center text-[20px] font-regular text-[#3A3A3A] mb-4">How would you rate this article ?</h3>
+              <div className="flex justify-center gap-2 mb-4">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star 
+                    key={star} 
+                    className={`h-8 w-8 cursor-pointer transition-colors ${
+                      star <= (userRating || 0) 
+                        ? 'text-[#F69D04] fill-[#F69D04]' 
+                        : 'text-gray-300 hover:text-[#F69D04]'
+                    }`}
+                    onClick={() => !hasRated && handleRating(star)}
+                  />
+                ))}
+              </div>
+              <div className="text-center">
+                <button 
+                  className="text-sm text-gray-500 underline hover:text-gray-600 transition-colors"
+                  onClick={handleUndoRating}
+                  
+                >
+                  May be next time
+                </button>
+              </div>
+            </div>
             
-            {/* Complete Button */}
-            <div className="mt-4 sm:mt-6 text-center">
-              <Button
+            {/* Complete Lesson Button */}
+            <div className="text-center">
+              <button
                 onClick={handleComplete}
                 disabled={isCompleted}
-                className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                className={`w-full max-w-7xl py-4 px-8 rounded-full font-medium text-[20px] transition-all ${
                   isCompleted 
-                    ? 'bg-green-100 text-green-700 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-linear-to-r from-[#EC2C92] to-[#FF64B7] text-white hover:bg-pink-900 shadow-md hover:shadow-lg'
                 }`}
               >
-                {isCompleted ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Article Completed
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Mark as Complete
-                  </>
-                )}
-              </Button>
-              {!isCompleted && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Mark this article as complete to track your progress
-                </p>
-              )}
+                {isCompleted ? 'Lesson Completed' : 'Complete Lesson'}
+              </button>
             </div>
           </div>
         </div>

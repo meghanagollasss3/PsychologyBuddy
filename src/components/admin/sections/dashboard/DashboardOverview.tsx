@@ -50,7 +50,9 @@ export function DashboardOverview() {
                     />
                 )}
 
-      <ClassHeatmap classData={classData || []} />
+      {selectedSchoolId && classData && classData.length > 0 && (
+        <ClassHeatmap classData={classData} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Mood Distribution Chart */}

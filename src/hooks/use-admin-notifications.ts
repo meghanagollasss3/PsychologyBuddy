@@ -38,7 +38,7 @@ export function useAdminNotifications() {
       const response = await fetch('/api/admin/notifications/read', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notificationId })
+        body: JSON.stringify({ notificationIds: [notificationId] })
       })
 
       if (response.ok) {
@@ -55,7 +55,7 @@ export function useAdminNotifications() {
   // Clear all notifications
   const clearAll = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/notifications/clear', {
+      const response = await fetch('/api/admin/notifications/clear?clearAll=true', {
         method: 'DELETE'
       })
 
@@ -83,6 +83,12 @@ export function useAdminNotifications() {
     eventSource.onmessage = (event) => {
       try {
         const newNotification = JSON.parse(event.data)
+        
+        // Skip heartbeat and connection messages
+        if (newNotification.type === 'heartbeat' || newNotification.type === 'connected') {
+          console.log('[AdminNotifications] Received system message:', newNotification.type)
+          return
+        }
         
         // Only show toast for critical/high priority escalations
         if (newNotification.type === 'escalation' && 

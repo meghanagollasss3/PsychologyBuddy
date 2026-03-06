@@ -3,6 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { X, UserPlus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface AddStudentModalProps {
   onClose: () => void;
@@ -229,24 +238,16 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center space-x-3">
-            <UserPlus className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900">Add New Student</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+            <DialogTitle>Add New Student</DialogTitle>
+            <DialogDescription>
+              Register a new student to the platform.
+            </DialogDescription>
+          </DialogHeader>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Error Message */}
           {submitError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -256,7 +257,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
           
           {/* Student Information */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Student Information</h3>
+            {/* <h3 className="text-lg font-medium text-gray-900 mb-4">Student Information</h3> */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* School Selection - Only show for super admins */}
               {user?.role?.name === 'SUPERADMIN' && (
@@ -264,7 +265,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     School ID *
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.schoolId}
                     onChange={(e) => handleInputChange('schoolId', e.target.value)}
@@ -283,7 +284,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Student ID *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.studentId}
                   onChange={(e) => handleInputChange('studentId', e.target.value)}
@@ -301,7 +302,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   First Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
@@ -319,7 +320,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Last Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
@@ -337,7 +338,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Password *
                 </label>
-                <input
+                <Input
                   type="password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
@@ -356,7 +357,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email
                 </label>
-                <input
+                <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
@@ -374,7 +375,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Phone Number
                 </label>
-                <input
+                <Input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
@@ -387,7 +388,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Grade *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.grade}
                   onChange={(e) => handleInputChange('grade', e.target.value)}
@@ -404,7 +405,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Section *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.section}
                   onChange={(e) => handleInputChange('section', e.target.value)}
@@ -422,17 +423,12 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
 
           {/* Actions */}
           <div className="flex items-center justify-end space-x-3 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {loading ? (
                 <>
@@ -440,14 +436,14 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 </>
               ) : (
                 <>
-                  <UserPlus className="w-4 h-4" />
+                  <UserPlus className="w-4 h-4 mr-2" />
                   <span>Add Student</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

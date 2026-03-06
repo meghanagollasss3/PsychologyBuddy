@@ -143,8 +143,10 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
     const percent = clickX / bar.width;
 
     const audio = audioRef.current;
-    audio.currentTime = percent * audio.duration;
-    setProgress(percent * 100);
+    if (audio && audio.duration) {
+      audio.currentTime = percent * audio.duration;
+      setProgress(percent * 100);
+    }
   };
 
   const format = (t: number) =>

@@ -3,6 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { X, Edit, Loader } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface EditStudentModalProps {
   student: any;
@@ -59,42 +67,71 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
     // Pre-fill form with student data
     if (student && typeof student === 'object' && student.id) {
       try {
+        const dateOfBirthValue = student.studentProfile?.dateOfBirth || student.dateOfBirth || student.date_of_birth;
+
+        let processedDateOfBirth = '';
+        if (dateOfBirthValue) {
+          if (typeof dateOfBirthValue === 'string') {
+            // If it's already a string, check if it's in YYYY-MM-DD format
+            if (dateOfBirthValue.includes('T')) {
+              processedDateOfBirth = dateOfBirthValue.split('T')[0];
+            } else {
+              processedDateOfBirth = dateOfBirthValue;
+            }
+          } else if (dateOfBirthValue instanceof Date) {
+            processedDateOfBirth = dateOfBirthValue.toISOString().split('T')[0];
+          } else {
+            // Try to create a date from it
+            try {
+              const date = new Date(dateOfBirthValue);
+              if (!isNaN(date.getTime())) {
+                processedDateOfBirth = date.toISOString().split('T')[0];
+              }
+            } catch (dateError) {
+              console.error('Error processing date:', dateError);
+            }
+          }
+        }
+
         setFormData({
-          firstName: student.firstName || '',
-          lastName: student.lastName || '',
+          firstName: student.firstName || student.first_name || '',
+          lastName: student.lastName || student.last_name || '',
           email: student.email || '',
           phone: student.phone || '',
-          dateOfBirth: student.dateOfBirth ? 
-          (typeof student.dateOfBirth === 'string' ? student.dateOfBirth : 
-           new Date(student.dateOfBirth).toISOString().split('T')[0]) : '',
-          classId: student.classRef?.id || student.classId || '',
-          schoolId: student.school?.id || student.schoolId || '',
+          dateOfBirth: processedDateOfBirth,
+          classId: student.classRef?.name || student.className || student.class_name || '',
+          schoolId: student.school?.id || student.schoolId || student.school_id || '',
           emergencyContact: {
-            name: student.emergencyContact?.name || '',
-            phone: student.emergencyContact?.phone || '',
-            relationship: student.emergencyContact?.relationship || ''
+            name: student.studentProfile?.emergencyContact?.name || student.emergencyContact?.name || student.emergency_contact?.name || '',
+            phone: student.studentProfile?.emergencyContact?.phone || student.emergencyContact?.phone || student.emergency_contact?.phone || '',
+            relationship: student.studentProfile?.emergencyContact?.relationship || student.emergencyContact?.relationship || student.emergency_contact?.relationship || ''
           },
-          status: student.status || 'ACTIVE'
+          status: student.studentProfile?.status || student.status || 'ACTIVE'
         });
       } catch (error) {
         console.error('Error setting form data from student:', error, student);
       }
+    } else {
+      console.warn('Invalid student data for form initialization:', student);
     }
   }, [student]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Handle nested emergency contact fields
+    if (field.startsWith('emergencyContact.')) {
+      const nestedField = field.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        emergencyContact: { ...prev.emergencyContact, [nestedField]: value }
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+    
     // Clear error for this field
     if (errors[field as keyof FormData]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
-  };
-
-  const handleEmergencyContactChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      emergencyContact: { ...prev.emergencyContact, [field]: value }
-    }));
   };
 
   const validateForm = () => {
@@ -129,38 +166,39 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
       const data = await response.json();
       
       if (data.success) {
-        alert('Student updated successfully!');
+        toast({
+          title: "Student Updated Successfully",
+          description: "The student's profile has been updated and will reflect in their student dashboard."
+        });
         onSuccess();
       } else {
-        alert(data.error?.message || 'Failed to update student');
+        toast({
+          title: "Update Failed",
+          description: data.error?.message || "Failed to update student",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Error updating student:', error);
-      alert('Failed to update student');
+      toast({
+        title: "Update Failed",
+        description: "Failed to update student. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center space-x-3">
-            <Edit className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900">Edit Student</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogTitle className="flex items-center space-x-3">
+          <Edit className="w-5 h-5 text-blue-600" />
+          <span>Edit Student</span>
+        </DialogTitle>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
@@ -169,7 +207,7 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   First Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
@@ -187,7 +225,7 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Last Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
@@ -203,16 +241,16 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Email *
                 </label>
-                <input
+                <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.email ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="student@school.edu"
+                  placeholder="Enter email address"
                 />
                 {errors.email && (
                   <p className="mt-1 text-sm text-red-600">{errors.email}</p>
@@ -221,22 +259,33 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
+                  Phone
                 </label>
-                <input
+                <Input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="+1234567890"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="Enter phone number"
                 />
+                {errors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                )}
               </div>
+            </div>
+          </div>
 
+          {/* Personal Information */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date of Birth *
+                  Date of Birth
                 </label>
-                <input
+                <Input
                   type="date"
                   value={formData.dateOfBirth}
                   onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
@@ -251,76 +300,49 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="SUSPENDED">Suspended</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* School and Class Assignment */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">School & Class Assignment</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  School *
-                </label>
-                <select
-                  value={formData.schoolId}
-                  onChange={(e) => handleInputChange('schoolId', e.target.value)}
-                  disabled={user?.role?.name !== 'SUPERADMIN'}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.schoolId ? 'border-red-500' : 'border-gray-300'
-                  } ${user?.role?.name !== 'SUPERADMIN' ? 'bg-gray-100' : ''}`}
-                >
-                  <option value="">Select School</option>
-                  {schools.map((school) => (
-                    <option key={school.id} value={school.id}>
-                      {school.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.schoolId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.schoolId}</p>
-                )}
-                {user?.role?.name !== 'SUPERADMIN' && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    You can only assign students to your school
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Class *
                 </label>
-                <select
+                <Input
+                  type="text"
                   value={formData.classId}
                   onChange={(e) => handleInputChange('classId', e.target.value)}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.classId ? 'border-red-500' : 'border-gray-300'
                   }`}
-                >
-                  <option value="">Select Class</option>
-                  {classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Enter class name"
+                />
                 {errors.classId && (
                   <p className="mt-1 text-sm text-red-600">{errors.classId}</p>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* School */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">School</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                School *
+              </label>
+              <Input
+                type="text"
+                value={formData.schoolId}
+                onChange={(e) => handleInputChange('schoolId', e.target.value)}
+                disabled={user?.role?.name !== 'SUPERADMIN'}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.schoolId ? 'border-red-500' : 'border-gray-300'
+                } ${user?.role?.name !== 'SUPERADMIN' ? 'bg-gray-100' : ''}`}
+                placeholder="Enter school name"
+              />
+              {errors.schoolId && (
+                <p className="mt-1 text-sm text-red-600">{errors.schoolId}</p>
+              )}
+              {user?.role?.name !== 'SUPERADMIN' && (
+                <p className="mt-1 text-xs text-gray-500">
+                  You can only assign students to your school
+                </p>
+              )}
             </div>
           </div>
 
@@ -330,12 +352,12 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contact Name
+                  Name
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.emergencyContact.name}
-                  onChange={(e) => handleEmergencyContactChange('name', e.target.value)}
+                  onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Parent/Guardian name"
                 />
@@ -345,10 +367,10 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Contact Phone
                 </label>
-                <input
+                <Input
                   type="tel"
                   value={formData.emergencyContact.phone}
-                  onChange={(e) => handleEmergencyContactChange('phone', e.target.value)}
+                  onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="+1234567890"
                 />
@@ -358,10 +380,10 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Relationship
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.emergencyContact.relationship}
-                  onChange={(e) => handleEmergencyContactChange('relationship', e.target.value)}
+                  onChange={(e) => handleInputChange('emergencyContact.relationship', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Parent, Guardian, etc."
                 />
@@ -369,35 +391,24 @@ export function EditStudentModal({ student, onClose, onSuccess, schools, classes
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end space-x-3 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+          {/* Footer */}
+          <div className="flex justify-end space-x-3 pt-6 border-t">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
+            </Button>
+            <Button type="submit" disabled={loading}>
               {loading ? (
                 <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  <span>Updating...</span>
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
                 </>
               ) : (
-                <>
-                  <Edit className="w-4 h-4" />
-                  <span>Update Student</span>
-                </>
+                'Update Student'
               )}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

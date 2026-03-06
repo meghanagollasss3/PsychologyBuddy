@@ -78,8 +78,8 @@ export const GET = withPermission({
     const schoolsWithMetrics = await Promise.all(
       schools.map(async (school) => {
         const [alertCount, checkInsToday] = await Promise.all([
-          // Count unresolved alerts for students in this school
-          prisma.highRiskAlert.count({
+          // Count unresolved escalation alerts for students in this school
+          prisma.escalationAlert.count({
             where: {
               user: {
                 schoolId: school.id,
@@ -87,7 +87,7 @@ export const GET = withPermission({
                   name: 'STUDENT'
                 }
               },
-              resolved: false
+              status: 'open'
             }
           }),
           // Count check-ins today for students in this school
@@ -107,6 +107,8 @@ export const GET = withPermission({
           })
         ]);
 
+        console.log(`School ${school.name} - Alert count: ${alertCount}, Check-ins today: ${checkInsToday}`);
+
         return {
           id: school.id,
           name: school.name,
@@ -122,7 +124,7 @@ export const GET = withPermission({
     );
 
     // Get global metrics
-    const [totalStudents, activeAlerts, checkinsToday] = await Promise.all([
+    const [totalStudents, activeAlerts, checkinsToday, totalCheckins] = await Promise.all([
       prisma.user.count({
         where: {
           role: {
@@ -130,9 +132,9 @@ export const GET = withPermission({
           }
         }
       }),
-      prisma.highRiskAlert.count({
+      prisma.escalationAlert.count({
         where: {
-          resolved: false
+          status: 'open'
         }
       }),
       prisma.moodCheckin.count({
@@ -142,8 +144,13 @@ export const GET = withPermission({
             lt: tomorrow
           }
         }
-      })
+      }),
+      // Check for any check-ins in the system (for debugging)
+      prisma.moodCheckin.count()
     ]);
+
+    console.log(`Global metrics - Total students: ${totalStudents}, Active alerts: ${activeAlerts}, Check-ins today: ${checkinsToday}, Total check-ins ever: ${totalCheckins}`);
+    console.log(`Date range: ${today.toISOString()} to ${tomorrow.toISOString()}`);
 
     const totalPages = Math.ceil(totalSchools / limit);
 

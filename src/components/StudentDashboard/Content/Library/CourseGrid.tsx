@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import CourseCard from './CourseCard';
+import Pagination from './Pagination';
 
 interface Article {
   id: string;
@@ -24,6 +25,15 @@ interface Article {
   createdAt: string;
 }
 
+interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  limit: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 interface CourseGridProps {
   selectedCategory?: string;
   showSaves?: boolean;
@@ -33,9 +43,11 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    const fetchArticles = async () => {
+    const fetchArticles = async (page: number = 1) => {
       try {
         setLoading(true);
         let response;
@@ -43,9 +55,9 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
         // Fetch saved articles if showSaves is true
         if (showSaves) {
           const studentId = localStorage.getItem('studentId') || null;
-          response = await fetch(`/api/student/saved-articles?studentId=${studentId}`);
+          response = await fetch(`/api/student/saved-articles?studentId=${studentId}&page=${page}&limit=9`);
         } else {
-          response = await fetch('/api/student/library');
+          response = await fetch(`/api/student/library?page=${page}&limit=9`);
         }
         
         if (!response.ok) {
@@ -81,6 +93,9 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
           }
           
           setArticles(filteredArticles);
+          if (result.pagination) {
+            setPagination(result.pagination);
+          }
         } else {
           setError(result.message || 'Failed to load articles');
         }
@@ -100,12 +115,16 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
       }
     };
 
-    fetchArticles();
-  }, [selectedCategory, showSaves]);
+    fetchArticles(currentPage);
+  }, [selectedCategory, showSaves, currentPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   // Transform article data to match CourseCard props
   const transformArticleToCourse = (article: Article, index: number) => {
-    // Get the first category name or use a default
+    // Get first category name or use a default
     const category = article.categories.length > 0 
       ? article.categories[0].category.name 
       : 'General';
@@ -188,13 +207,26 @@ export default function CourseGrid({ selectedCategory = 'all', showSaves = false
   }
 
   return (
-    <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-      {articles.map((article, index) => (
-        <CourseCard 
-          key={article.id} 
-          {...transformArticleToCourse(article, index)} 
+    <>
+      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+        {articles.map((article, index) => (
+          <CourseCard 
+            key={article.id} 
+            {...transformArticleToCourse(article, index)} 
+          />
+        ))}
+      </div>
+      
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          onPageChange={handlePageChange}
+          hasNextPage={pagination.hasNextPage}
+          hasPreviousPage={pagination.hasPreviousPage}
         />
-      ))}
-    </div>
+      )}
+    </>
   );
 }

@@ -17,17 +17,30 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Get user details to determine schoolId
+    // Get user details to determine role and permissions
     const userResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/me`, {
       headers: { cookie: req.headers.get('cookie') || '' }
     });
     const userData = await userResponse.json();
+    const user = userData.data?.user;
     
-    // For regular admins, use their schoolId
-    // For super admins, no school filtering (can see all articles)
-    const userSchoolId = userData.data?.user?.role?.name === 'SUPERADMIN' ? undefined : userData.data?.user?.schoolId;
+    let schoolId = undefined;
     
-    const result = await LibraryService.getAllArticles(userSchoolId);
+    if (user?.role?.name === 'SUPERADMIN') {
+      // For super admins, check if a specific school is selected
+      const { searchParams } = new URL(req.url);
+      const schoolFilter = searchParams.get('schoolId');
+      
+      if (schoolFilter && schoolFilter !== 'all') {
+        schoolId = schoolFilter;
+      }
+      // If no school filter or 'all', schoolId remains undefined (show all articles)
+    } else {
+      // For regular admins, use their assigned school
+      schoolId = user?.schoolId;
+    }
+    
+    const result = await LibraryService.getAllArticles(schoolId);
     
     return NextResponse.json(result);
   } catch (error) {

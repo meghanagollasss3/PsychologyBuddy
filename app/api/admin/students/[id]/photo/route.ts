@@ -3,9 +3,11 @@ import prisma from "@/src/prisma";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params for Next.js 15+
+    const { id } = await params;
     // Get session from cookie or header
     const sessionId = request.cookies.get('sessionId')?.value || 
                       request.headers.get('authorization')?.replace('Bearer ', '');
@@ -39,7 +41,7 @@ export async function POST(
       );
     }
 
-    const studentId = params.id;
+    const studentId = id;
     
     if (!studentId) {
       return NextResponse.json(

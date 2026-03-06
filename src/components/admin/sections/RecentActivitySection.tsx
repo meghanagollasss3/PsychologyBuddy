@@ -162,16 +162,16 @@ async function fetchActivitiesServer({
 // --------------------------
 const ActivityRow = React.memo(function ActivityRow({
   activity,
-  onClick,
+  // onClick,
 }: {
   activity: Activity;
-  onClick: (a: Activity) => void;
+  // onClick: (a: Activity) => void;
 }) {
   const Icon = iconMap[activity.type] ?? FileText;
 
   return (
     <div
-      onClick={() => onClick(activity)}
+      // onClick={() => onClick(activity)}
       className="flex items-start gap-4 p-4 hover:bg-[#E2E8F0]/40 cursor-pointer"
     >
       <div
@@ -378,7 +378,7 @@ export default function ActivitiesPage() {
                 {/* Activities for this date */}
                 <div className="">
                   {dateActivities.map((act) => (
-                    <ActivityRow key={act.id} activity={act} onClick={handleClick} />
+                    <ActivityRow key={act.id} activity={act}  />
                   ))}
                 </div>
               </div>

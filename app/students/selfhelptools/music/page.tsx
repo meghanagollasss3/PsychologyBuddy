@@ -25,6 +25,7 @@ import { useDebounce } from "@/src/hooks/useDebounce";
 import { getStudentId } from "@/src/utils/auth";
 import StudentLayout from "@/src/components/StudentDashboard/Layout/StudentLayout";
 import BackToDashboard from "@/src/components/StudentDashboard/Layout/BackToDashboard";
+import Pagination from "@/src/components/StudentDashboard/Content/Library/Pagination";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -38,6 +39,7 @@ export default function OptimizedMusicPage() {
   const [selectedCard, setSelectedCard] = useState<any | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
   const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
 
   // ⭐ NEW STATE FOR TOGGLE
   const [showSavedOnly, setShowSavedOnly] = useState(false);
@@ -48,7 +50,7 @@ export default function OptimizedMusicPage() {
 
   const { data: savedRes, mutate: mutateSavedItems } = useSWR(
     "/api/student/saved-music?studentId=" + getStudentId(),
-    fetcher
+    fetcher,
   );
 
   const initialSavedItems: Set<string> = useMemo(() => {
@@ -57,7 +59,7 @@ export default function OptimizedMusicPage() {
   }, [savedRes]);
 
   useEffect(() => {
-    if (initialSavedItems.size >= 0) {
+    if (initialSavedItems) {
       setSavedItems(initialSavedItems);
     }
   }, [initialSavedItems]);
@@ -81,16 +83,16 @@ export default function OptimizedMusicPage() {
 
     if (debouncedSearch) {
       params.append("query", debouncedSearch);
-      return `/api/student/music/search?${params.toString()}`;
+      return `/api/student/music/search?page=${currentPage}&limit=9&${params.toString()}`;
     }
 
     if (activeTab !== "Recommended") {
       params.append("category", activeTab);
-      return `/api/student/music/category?${params.toString()}`;
+      return `/api/student/music/category?page=${currentPage}&limit=9&${params.toString()}`;
     }
 
-    return `/api/student/music/resources?limit=20`;
-  }, [debouncedSearch, activeTab]);
+    return `/api/student/music/resources?page=${currentPage}&limit=9`;
+  }, [debouncedSearch, activeTab, currentPage]);
 
   const { data: musicRes, isLoading } = useSWR(endpoint, fetcher, {
     keepPreviousData: true,
@@ -142,20 +144,20 @@ export default function OptimizedMusicPage() {
     <div className="min-h-screen bg-gray-50">
       <StudentLayout>
         <div className="container mx-auto px-3 sm:px-2 md:px-6 lg:px-8 py-4 sm:py-5 max-w-7xl">
-
           <div className="max-w-7xl my-[2px] mb-4 mx-[-10px] pt-2 sm:pt-3 lg:pt-5 sm:px-3 lg:px-4">
             <button
               onClick={() => router.push("/students/selfhelptools")}
               className="flex items-center gap-2 text-[#73829A] hover:text-[#1a9bcc] transition-colors p-2"
             >
               <ArrowLeft className="w-4 h-5" />
-              <span className="text-[13px] sm:text-[16px]">Back to SelfHelpTools</span>
+              <span className="text-[13px] sm:text-[16px]">
+                Back to SelfHelpTools
+              </span>
             </button>
           </div>
 
           {/* HEADER ROW */}
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 lg:gap-6">
-
             {/* TITLE */}
             <div className="flex items-start gap-3 w-full sm:w-[510px] mb-[15px] sm:mb-[20px]">
               <Image
@@ -170,7 +172,8 @@ export default function OptimizedMusicPage() {
                   Music Therapy
                 </h1>
                 <p className="text-[#686D70] text-sm sm:text-base">
-                  Curated playlists designed to support your emotional wellbeing.
+                  Curated playlists designed to support your emotional
+                  wellbeing.
                 </p>
               </div>
             </div>
@@ -187,13 +190,16 @@ export default function OptimizedMusicPage() {
                 <button
                   onClick={() => setShowSavedOnly(!showSavedOnly)}
                   className={`h-10 sm:h-[47px] px-4 sm:px-6 rounded-full border transition-colors flex items-center gap-2 whitespace-nowrap text-sm sm:text-base 
-                    ${showSavedOnly 
-                      ? "border-red-400 bg-red-50 text-red-500" 
-                      : "border-[#A5C3FF] bg-[#A5C3FF]/10 text-[#5982D4] hover:bg-blue-100"
+                    ${
+                      showSavedOnly
+                        ? "border-red-400 bg-red-50 text-red-500"
+                        : "border-[#A5C3FF] bg-[#A5C3FF]/10 text-[#5982D4] hover:bg-blue-100"
                     }`}
                 >
                   <Heart className="w-3 h-3 sm:w-4 sm:h-4" />
-                  {showSavedOnly ? "Show All" : `Saved Items (${savedItems.size})`}
+                  {showSavedOnly
+                    ? "Show All"
+                    : `Saved Items (${savedItems.size})`}
                 </button>
               </div>
             </div>
@@ -202,41 +208,61 @@ export default function OptimizedMusicPage() {
 
         {/* MAIN PAGE CONTENT */}
         <main className="max-w-7xl mx-auto px-4 py-8">
-
           {/* TABS */}
-          <div className="mb-8 sm:-mt-6">
-            <FilterTabs
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              categories={categories.map((c: any) => c.name)}
-            />
-          </div>
+          {!showSavedOnly && (
+            <div className="mb-8 sm:-mt-6">
+              <FilterTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                categories={categories.map((c: any) => c.name)}
+              />
+            </div>
+          )}
 
           {/* GRID */}
           {isLoading ? (
             <div className="flex flex-col items-center py-20">
               <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-              <p className="text-gray-500">Tuning the instruments...</p>
+              <p className="text-gray-500">Tuning instruments...</p>
             </div>
           ) : filteredMusicResources.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMusicResources.map((music: any) => (
-                <MusicCard
-                  key={music.id}
-                  music={music}
-                  isSaved={savedItems.has(music.id)}
-                  onSave={(e: React.MouseEvent) => handleToggleSave(music.id, e)}
-                  onPlay={() => {
-                    setSelectedCard({ ...music, url: music.url });
-                    setShowPlayer(true);
-                  }}
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredMusicResources.map((music: any) => (
+                  <MusicCard
+                    key={music.id}
+                    music={music}
+                    isSaved={savedItems.has(music.id)}
+                    onSave={(e: React.MouseEvent) =>
+                      handleToggleSave(music.id, e)
+                    }
+                    onPlay={() => {
+                      setSelectedCard({ ...music, url: music.url });
+                      setShowPlayer(true);
+                    }}
+                  />
+                ))}
+              </div>
+              
+              {/* Pagination */}
+              {musicRes?.pagination && musicRes.pagination.totalPages > 1 && (
+                <Pagination
+                  currentPage={musicRes.pagination.currentPage}
+                  totalPages={musicRes.pagination.totalPages}
+                  onPageChange={setCurrentPage}
+                  hasNextPage={musicRes.pagination.hasNextPage}
+                  hasPreviousPage={musicRes.pagination.hasPreviousPage}
                 />
-              ))}
-            </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-20 bg-white rounded-3xl border border-dashed">
               <Music className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No tracks found.</p>
+              <p className="text-gray-500">
+                {showSavedOnly
+                  ? "You haven't saved any tracks yet."
+                  : "No tracks found."}
+              </p>
             </div>
           )}
 
@@ -290,14 +316,18 @@ function MusicCard({ music, isSaved, onSave, onPlay }: any) {
 
       <div className="p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="font-bold text-gray-900 text-[20px] truncate flex-1">{music.title}</h3>
+          <h3 className="font-bold text-gray-900 text-[20px] truncate flex-1">
+            {music.title}
+          </h3>
           <button
             onClick={onSave}
             className={`p-2 rounded-full w-[36px] h-[35px] border border-[#D4D4D4] ${
               isSaved ? "bg-red-50 text-red-500" : "bg-gray-50 text-[#666666]"
             }`}
           >
-            <Heart className={`w-[18px] h-[18px] ${isSaved ? "fill-current" : ""}`} />
+            <Heart
+              className={`w-[18px] h-[18px] ${isSaved ? "fill-current" : ""}`}
+            />
           </button>
         </div>
 
@@ -308,7 +338,16 @@ function MusicCard({ music, isSaved, onSave, onPlay }: any) {
         <div className="flex items-center gap-2 mb-3">
           <Clock className="w-[14px] h-[14px] text-[#686D70]" />
           <span className="text-[13px] text-[#686D70]">
-            {Math.floor(music.duration / 60)} mins
+            {Math.max(
+              1,
+              Math.floor(
+                (music.durationSec ||
+                  music.duration_seconds ||
+                  music.duration ||
+                  0) / 60,
+              ),
+            )}{" "}
+            mins
           </span>
         </div>
 

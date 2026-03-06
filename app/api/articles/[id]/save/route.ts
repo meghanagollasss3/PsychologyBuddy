@@ -20,18 +20,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
+    // Process studentId - convert 'anonymous' and invalid UUIDs to null
+    let processedStudentId = (studentId && studentId !== 'anonymous') ? studentId : null;
+
+    // Validate that processedStudentId is either null or a valid UUID
+    if (processedStudentId !== null) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(processedStudentId)) {
+        // If it's not a valid UUID, set it to null
+        processedStudentId = null;
+      }
+    }
+
     // Check if article is already saved
     const existingSave = await prisma.savedArticle.findFirst({
       where: {
         articleId: id,
-        studentId: studentId || null
+        studentId: processedStudentId
       }
     });
 
     console.log('🔍 Existing save check result:', { 
       existingSave: !!existingSave, 
       articleId: id, 
-      studentId: studentId || null,
+      studentId: processedStudentId,
       existingSaveId: existingSave?.id 
     });
 
@@ -48,14 +60,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const newSave = await prisma.savedArticle.create({
       data: {
         articleId: id,
-        studentId: studentId || null
+        studentId: processedStudentId
       }
     });
 
     console.log('✅ Article saved to database:', { 
       saveId: newSave.id, 
       articleId: id, 
-      studentId: studentId || null 
+      studentId: processedStudentId 
     });
 
     return NextResponse.json({
@@ -79,11 +91,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     console.log('🗑️ Delete save API called:', { id, studentId });
 
+    // Process studentId - convert 'anonymous' and invalid UUIDs to null
+    let processedStudentId = (studentId && studentId !== 'anonymous') ? studentId : null;
+
+    // Validate that processedStudentId is either null or a valid UUID
+    if (processedStudentId !== null) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(processedStudentId)) {
+        // If it's not a valid UUID, set it to null
+        processedStudentId = null;
+      }
+    }
+
     // Find and delete the saved article
     const existingSave = await prisma.savedArticle.findFirst({
       where: {
         articleId: id,
-        studentId: studentId || null
+        studentId: processedStudentId
       }
     });
 
@@ -94,7 +118,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         where: { id: existingSave.id }
       });
 
-      console.log('✅ Article unsaved:', { saveId: existingSave.id, articleId: id, studentId: studentId || null });
+      console.log('✅ Article unsaved:', { saveId: existingSave.id, articleId: id, studentId: processedStudentId });
 
       return NextResponse.json({
         success: true,

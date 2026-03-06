@@ -47,6 +47,7 @@ import {
 import { cn } from "@/src/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
+import { usePermissions } from "@/src/hooks/usePermissions";
 
 interface EscalationAlert {
   id: string
@@ -490,48 +491,47 @@ export function EscalationDashboardNew() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [userProfile, setUserProfile] = useState<any>(null)
   const [schools, setSchools] = useState<Array<{ id: string; name: string }>>([])
   const [selectedSchool, setSelectedSchool] = useState('all')
   const [isMonitoring, setIsMonitoring] = useState(false)
+  
+  const { isSuperAdmin, userSchoolId } = usePermissions()
 
-  // Fetch user profile and schools
+  // Set initial school based on permissions
   useEffect(() => {
-    fetchUserProfile()
-  }, [])
-
-  const fetchUserProfile = async () => {
-    try {
-      const profileResponse = await fetch('/api/admin/profile')
-      const profileResult = await profileResponse.json()
-      
-      if (profileResult.success) {
-        setUserProfile(profileResult.data)
-        
-        // If not super admin, set school filter to their school
-        if (profileResult.data.role?.name !== 'SUPERADMIN' && profileResult.data.schoolId) {
-          setSelectedSchool(profileResult.data.schoolId)
-        } else {
-          setSelectedSchool('all')
-        }
-        
-        // Fetch schools if super admin
-        if (profileResult.data.role?.name === 'SUPERADMIN') {
-          fetchSchools()
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error)
+    if (!isSuperAdmin && userSchoolId) {
+      setSelectedSchool(userSchoolId)
     }
-  }
+  }, [isSuperAdmin, userSchoolId])
+
+  // Fetch schools if super admin
+  useEffect(() => {
+    console.log('useEffect triggered - isSuperAdmin:', isSuperAdmin)
+    if (isSuperAdmin) {
+      console.log('User is super admin, fetching schools...')
+      fetchSchools()
+    }
+  }, [isSuperAdmin])
+
+  // Fetch alerts and schools
+  useEffect(() => {
+    fetchAlerts()
+  }, [selectedSchool, statusFilter])
 
   const fetchSchools = async () => {
     try {
+      console.log('Fetching schools for super admin...')
       const schoolsResponse = await fetch('/api/admin/schools')
       const schoolsResult = await schoolsResponse.json()
       
-      if (schoolsResult.success) {
-        setSchools(schoolsResult.data)
+      console.log('Schools API response:', schoolsResult)
+      
+      // API returns schools directly, not wrapped in success/data structure
+      if (Array.isArray(schoolsResult)) {
+        console.log('Schools fetched successfully:', schoolsResult)
+        setSchools(schoolsResult)
+      } else {
+        console.error('Unexpected schools API response format:', schoolsResult)
       }
     } catch (error) {
       console.error('Failed to fetch schools:', error)
@@ -721,6 +721,9 @@ export function EscalationDashboardNew() {
     )
   }
 
+  // Debug logging
+  console.log('School Filter Show:', isSuperAdmin, 'Is Super Admin:', isSuperAdmin)
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Admin Header */}
@@ -728,7 +731,7 @@ export function EscalationDashboardNew() {
         title="Escalation & Alerts"
         subtitle={`${openCount} open alerts, ${highCount + criticalCount} high priority`}
         showTimeFilter={false}
-        showSchoolFilter={userProfile?.role === 'SUPER_ADMIN'}
+        showSchoolFilter={isSuperAdmin}
         schoolFilterValue={selectedSchool}
         onSchoolFilterChange={setSelectedSchool}
         schools={schools}

@@ -85,11 +85,15 @@ async function fetchSchools({
     params.append("schoolId", schoolFilter);
   }
 
+  console.log('OrganizationsSection - Fetching schools with params:', params.toString());
+
   const res = await fetch(`/api/schools?${params.toString()}`, {
     credentials: "include",
   });
 
   const json = await res.json();
+  console.log('OrganizationsSection - Schools API response:', json);
+  
   if (!json.success) throw new Error("Failed to load organizations");
 
   return json;
@@ -143,6 +147,9 @@ export default function OrganizationsPage() {
   const organizations = data?.data ?? [];
   const pagination = data?.pagination;
   const metrics = data?.metrics;
+
+  console.log('OrganizationsSection - Organizations data:', organizations);
+  console.log('OrganizationsSection - Sample organization alertCount:', organizations[0]?.alertCount);
 
   const handleViewSchool = (schoolId: string) => {
     router.push(`/admin?school=${schoolId}`);

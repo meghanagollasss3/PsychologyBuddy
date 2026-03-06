@@ -21,7 +21,14 @@ export const UpdateStudentSchema = z.object({
   email: z.string().email('Valid email required').optional(),
   phone: z.string().optional(),
   classId: z.string().optional(),
+  schoolId: z.string().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
+  dateOfBirth: z.string().optional(),
+  emergencyContact: z.object({
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    relationship: z.string().optional(),
+  }).optional(),
 });
 
 // Student self-update validator (Student only - limited fields)

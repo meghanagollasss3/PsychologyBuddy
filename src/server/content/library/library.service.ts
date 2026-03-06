@@ -66,6 +66,59 @@ export class LibraryService {
         },
       });
 
+      // Only create notification for published articles (not drafts)
+      console.log(`[LibraryService] Article created with status: ${article.status}, title: "${article.title}"`);
+      
+      if (article.status === 'PUBLISHED') {
+        console.log(`[LibraryService] Checking for existing notification for article: ${article.id}`);
+        
+        // Check if notification already exists for this article
+        const existingNotification = await prisma.adminNotification.findFirst({
+          where: {
+            type: 'system',
+            message: {
+              contains: `New article "${article.title}"`
+            }
+          }
+        });
+
+        console.log(`[LibraryService] Existing notification found: ${!!existingNotification}`);
+
+        if (!existingNotification) {
+          console.log(`[LibraryService] Creating new notification for published article: ${article.id} by user: ${userId}`);
+          
+          // Create notification for new article
+          await prisma.adminNotification.create({
+            data: {
+              userId: userId,
+              type: 'system',
+              message: `New article "${article.title}" has been added by ${article.admin?.firstName || 'Admin'}`,
+              severity: 'low',
+              read: false
+            }
+          });
+
+          console.log(`[LibraryService] Successfully created notification for article: ${article.id}`);
+
+          // Also trigger real-time notification for the stream
+          const notificationData = {
+            id: article.id,
+            type: 'system',
+            message: `New article "${article.title}" has been added by ${article.admin?.firstName || 'Admin'}`,
+            severity: 'low',
+            timestamp: new Date().toISOString(),
+            read: false,
+            actionUrl: `/admin/library/articles/${article.id}`
+          };
+
+          console.log(`[LibraryService] Real-time notification data:`, notificationData);
+        } else {
+          console.log(`[LibraryService] Notification already exists for article: ${article.id}, skipping...`);
+        }
+      } else {
+        console.log(`[LibraryService] Article is not published (status: ${article.status}), skipping notification creation`);
+      }
+
       return {
         success: true,
         message: 'Article created successfully',
@@ -77,9 +130,11 @@ export class LibraryService {
     }
   }
 
-  // Get all articles
-  static async getAllArticles(userSchoolId?: string) {
+  // Get all articles with pagination
+  static async getAllArticles(userSchoolId?: string, page: number = 1, limit: number = 9) {
     try {
+      const skip = (page - 1) * limit;
+      
       let whereClause: any = {};
       
       // For regular admins: show articles from their school + superadmin articles (null schoolId)
@@ -93,42 +148,59 @@ export class LibraryService {
         };
       }
       
-      const articles = await prisma.article.findMany({
-        where: whereClause,
-        include: {
-          categories: {
-            include: {
-              category: true,
+      const [articles, totalCount] = await Promise.all([
+        prisma.article.findMany({
+          where: whereClause,
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+            },
+            moods: {
+              include: {
+                mood: true,
+              },
+            },
+            goals: {
+              include: {
+                goal: true,
+              },
+            },
+            admin: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
             },
           },
-          moods: {
-            include: {
-              mood: true,
-            },
+          orderBy: {
+            createdAt: 'desc',
           },
-          goals: {
-            include: {
-              goal: true,
-            },
-          },
-          admin: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      });
+          skip,
+          take: limit,
+        }),
+        prisma.article.count({
+          where: whereClause,
+        }),
+      ]);
+
+      const totalPages = Math.ceil(totalCount / limit);
 
       return {
         success: true,
         message: 'Articles retrieved successfully',
         data: articles,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          limit,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+        },
       };
     } catch (error) {
       console.error('Get articles error:', error);
@@ -319,6 +391,40 @@ export class LibraryService {
           },
         },
       });
+
+      // Check if status changed to PUBLISHED and create notification if needed
+      if (data.status === 'PUBLISHED' && existingArticle && existingArticle.status !== 'PUBLISHED') {
+        console.log(`[LibraryService] Article status changed to PUBLISHED: ${id}, checking for notification...`);
+        
+        // Check if notification already exists for this article
+        const existingNotification = await prisma.adminNotification.findFirst({
+          where: {
+            type: 'system',
+            message: {
+              contains: `New article "${updatedArticle?.title || existingArticle?.title || 'Unknown'}"`
+            }
+          }
+        });
+
+        if (!existingNotification && updatedArticle) {
+          console.log(`[LibraryService] Creating notification for newly published article: ${id}`);
+          
+          // Create notification for newly published article
+          await prisma.adminNotification.create({
+            data: {
+              userId: updatedArticle?.createdBy || 'unknown',
+              type: 'system',
+              message: `New article "${updatedArticle?.title || 'Unknown'}" has been added by ${updatedArticle?.admin?.firstName || 'Admin'}`,
+              severity: 'low',
+              read: false
+            }
+          });
+
+          console.log(`[LibraryService] Successfully created notification for newly published article: ${id}`);
+        } else {
+          console.log(`[LibraryService] Notification already exists or article not found, skipping...`);
+        }
+      }
 
       return {
         success: true,

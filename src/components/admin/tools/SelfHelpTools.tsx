@@ -188,6 +188,7 @@ export default function SelfHelpTools() {
               schoolFilterValue={selectedSchool}
               onSchoolFilterChange={setSelectedSchool}
               schools={schools}
+              actions={renderActions()}
             />
       <div className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

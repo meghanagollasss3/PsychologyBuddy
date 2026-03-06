@@ -3,22 +3,23 @@ import { PasswordUtil } from '@/src/utils/password.util';
 import { ApiResponse } from '@/src/utils/api-response';
 import { AuthError } from '@/src/utils/errors';
 import { CreateStudentData, UpdateStudentData, StudentSelfUpdateData, ResetStudentPasswordData, UpdateStudentStatusData } from './student.validators';
+import { ExtendedUpdateStudentData } from './student.repository';
 import prisma from '@/src/prisma';
 
 export class StudentService {
   static studentSelfUpdate(id: any, validatedData: { profileImage?: string | undefined; }) {
     throw new Error('Method not implemented.');
   }
-  static updateStudent(id: any, validatedData: { firstName?: string | undefined; lastName?: string | undefined; email?: string | undefined; phone?: string | undefined; classId?: string | undefined; status?: "ACTIVE" | "INACTIVE" | "SUSPENDED" | undefined; }) {
+  static async updateStudent(id: any, validatedData: ExtendedUpdateStudentData) {
     try {
       // Check if student exists
-      const existingStudent = StudentRepository.getStudentById(id);
+      const existingStudent = await StudentRepository.getStudentById(id);
       if (!existingStudent) {
         throw AuthError.notFound('Student not found');
       }
 
-      // Update student data
-      const updatedStudent = StudentRepository.updateStudent(id, validatedData);
+      // Update student data in User table and StudentProfile
+      const updatedStudent = await StudentRepository.updateStudent(id, validatedData);
 
       return ApiResponse.success(updatedStudent, 'Student updated successfully');
     } catch (error) {
@@ -332,10 +333,10 @@ export class StudentService {
           streakDays: 0, // Default since not in schema
           joinDate: student.createdAt?.toISOString().split('T')[0],
         },
-        emergencyContact: {
-          name: "Mrs. Jane Doe",
-          phone: "+91 98765 12345",
-          relationship: "Parent / Guardian",
+        emergencyContact: student.studentProfile?.emergencyContact || {
+          name: "Not provided",
+          phone: "Not provided",
+          relationship: "Not specified"
         },
         _count: {
           sessions: completedSessions.length,
@@ -485,44 +486,6 @@ export class StudentService {
         });
       }
 
-      // Update grade if provided
-      if (data.grade) {
-        // Extract the grade number from the string (e.g., "10th Grade" -> 10)
-        const gradeNumber = parseInt(data.grade.replace(/\D/g, ''));
-        console.log('Updating grade:', data.grade, '-> gradeNumber:', gradeNumber);
-        
-        // Find a class with this grade for the student's school
-        const student = await prisma.user.findUnique({
-          where: { id: studentId },
-          select: { schoolId: true }
-        });
-
-        console.log('Student schoolId:', student?.schoolId);
-
-        if (student?.schoolId) {
-          const targetClass = await prisma.class.findFirst({
-            where: {
-              grade: gradeNumber,
-              schoolId: student.schoolId
-            }
-          });
-
-          console.log('Found target class:', targetClass);
-
-          if (targetClass) {
-            await prisma.user.update({
-              where: { id: studentId },
-              data: {
-                classId: targetClass.id
-              }
-            });
-            console.log('Updated student class to:', targetClass.id);
-          } else {
-            console.log('No class found for grade:', gradeNumber, 'in school:', student.schoolId);
-          }
-        }
-      }
-
       // Handle photo upload if provided
       if (photo) {
         try {
@@ -595,7 +558,6 @@ export class StudentService {
       const chatSessions = await prisma.chatSession.findMany({
         where: { userId: student.id },
         orderBy: { startedAt: 'desc' },
-        take: 5,
         include: {
           user: {
             select: {
@@ -605,6 +567,16 @@ export class StudentService {
           }
         }
       });
+
+      // Fetch escalation alerts to get resolved sessions
+      const escalationAlerts = await prisma.escalationAlert.findMany({
+        where: { studentId: student.id },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      console.log('Found chat sessions:', chatSessions.length);
+      console.log('Found escalation alerts:', escalationAlerts.length);
+      console.log('Resolved alerts:', escalationAlerts.filter(alert => alert.status === 'resolved').length);
 
       // Fetch user badges
       const userBadges = await prisma.userBadge.findMany({
@@ -640,39 +612,81 @@ export class StudentService {
         take: 5
       });
 
-      // Create sessions from chat sessions
-      const sessions = chatSessions.map(session => {
-        console.log('Processing session:', session.id, session.startedAt, session.endedAt, session.isActive);
-        
-        // Determine session status with multiple checks
-        let status = 'In Progress';
-        
-        // Primary check: if session has endedAt, it's completed
-        if (session.endedAt) {
-          status = 'Completed';
-        }
-        // Secondary check: if session is marked as inactive, it's completed
-        else if (!session.isActive) {
-          status = 'Completed';
-        }
-        // Fallback: if session is older than 1 hour, assume it's completed
-        else {
-          const sessionAge = Date.now() - new Date(session.startedAt).getTime();
-          const oneHour = 60 * 60 * 1000;
-          if (sessionAge > oneHour) {
-            status = 'Completed';
-          }
-        }
-        
-        return {
-          id: session.id,
-          date: new Date(session.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          time: new Date(session.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-          type: 'Chat Session',
-          doctor: session.user ? `Dr. ${session.user.firstName} ${session.user.lastName}` : 'Dr. Unknown',
-          status: status
-        };
-      });
+      // Create sessions from resolved escalation alerts only
+      const resolvedAlertSessions = await Promise.all(
+        escalationAlerts
+          .filter(alert => alert.status === 'resolved')
+          .map(async (alert) => {
+            console.log('Processing resolved alert as completed session:', {
+              id: alert.id,
+              category: alert.category,
+              status: alert.status,
+              createdAt: alert.createdAt
+            });
+            
+            // Get the admin who resolved the alert via AdminNotification
+            let adminName = "Dr. Support Team"; // Default fallback
+            
+            try {
+              const adminNotification = await prisma.adminNotification.findFirst({
+                where: { 
+                  alertId: alert.id
+                },
+                include: {
+                  user: {
+                    select: { firstName: true, lastName: true }
+                  }
+                },
+                orderBy: { createdAt: 'desc' }
+              });
+              
+              if (adminNotification?.user) {
+                adminName = `Dr. ${adminNotification.user.firstName} ${adminNotification.user.lastName}`;
+              }
+            } catch (error) {
+              console.log('Could not fetch admin info for alert:', alert.id, error);
+            }
+
+            return {
+              id: `alert-${alert.id}`,
+              date: new Date(alert.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              time: new Date(alert.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+              type: `Support Session - ${alert.category}`,
+              doctor: adminName,
+              status: 'Completed'
+            };
+          })
+      );
+
+      // Create sessions from active escalation alerts (in progress)
+      const activeAlertSessions = escalationAlerts
+        .filter(alert => alert.status === 'open')
+        .map(alert => {
+          console.log('Processing active alert as in-progress session:', {
+            id: alert.id,
+            category: alert.category,
+            status: alert.status,
+            createdAt: alert.createdAt
+          });
+
+          return {
+            id: `alert-${alert.id}`,
+            date: new Date(alert.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            time: new Date(alert.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+            type: `Support Session - ${alert.category}`,
+            doctor: 'Support Team',
+            status: 'In Progress'
+          };
+        });
+
+      // Combine both active and resolved alert sessions
+      const allSessions = [...activeAlertSessions, ...resolvedAlertSessions].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      console.log('Total sessions created:', allSessions.length);
+      console.log('Active alert sessions:', activeAlertSessions.length);
+      console.log('Resolved alert sessions:', resolvedAlertSessions.length);
 
       // Create activity list with all required activity types
       const activities = [
@@ -725,11 +739,10 @@ export class StudentService {
 
       console.log('Writing journals for activity:', writingJournals.length, writingJournals);
       console.log('Mood check-ins for activity:', moodCheckins.length, moodCheckins);
-      console.log('Chat sessions for activity:', chatSessions.length, chatSessions);
       console.log('Meditation saves for activity:', meditationSaves.length, meditationSaves);
       console.log('Article completions for activity:', articleCompletions.length, articleCompletions);
       console.log('Final activities array:', activities.length, activities);
-      console.log('Sessions array:', sessions.length, sessions);
+      console.log('All sessions array (active + resolved alerts):', allSessions.length, allSessions);
 
       // Return student profile data
       const profileData = {
@@ -751,7 +764,7 @@ export class StudentService {
             phone: student.phone || '+91 0000000000'
           }
         },
-        sessions,
+        allSessions, // Use allSessions instead of sessions
         activities,
         badges: userBadges.map(ub => ({
           id: ub.badge.id,
@@ -761,7 +774,7 @@ export class StudentService {
           earnedAt: ub.earnedAt
         })),
         stats: {
-          totalSessions: chatSessions.length,
+          totalSessions: allSessions.length, // Only resolved escalation alerts
           totalJournals: writingJournals.length,
           totalMeditations: 0, // Meditation usage not tracked in current schema
           totalBadges: userBadges.length,

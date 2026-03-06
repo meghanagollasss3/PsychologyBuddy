@@ -138,6 +138,7 @@ export const ROLE_PERMISSIONS = {
     "badges.assign",
 
     "settings.view",
+    "settings.update",
   ],
 
   STUDENT: [

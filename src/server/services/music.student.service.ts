@@ -22,13 +22,16 @@ export class MusicStudentService {
   async getMusicResources(data: StudentGetMusicResourcesInput & { schoolId?: string }) {
     try {
       console.log('Student service getMusicResources - input data:', data);
-      const result = await this.musicRepository.getPublishedMusicResources(data);
+      const result = await this.musicRepository.getMusicResources(data);
       console.log('Student service getMusicResources - repository result:', result);
       
       return {
         success: true,
         message: "Music resources retrieved successfully",
-        data: result,
+        data: {
+          resources: result.resources,
+          pagination: result.pagination
+        },
       };
     } catch (error) {
       console.error("Error getting music resources:", error);

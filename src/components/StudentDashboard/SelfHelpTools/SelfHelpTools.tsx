@@ -15,6 +15,7 @@ export default function SelfHelpCardsExact() {
       description:
         "Express your thoughts and feelings in a safe, private space",
       image: "/selfhelptools/journaling.svg",
+      icon: BookOpen,
             gradient: "from-white via-[#F9F5FF] to-[#F3E8FF]",
       glow: "from-[#F5D8FF] to-white",
       bullets: "bg-[#893ACC]",
@@ -27,6 +28,7 @@ export default function SelfHelpCardsExact() {
       title: "Music Therapy",
       description: "Curated playlists to support your emotional wellbeing",
       image: "/selfhelptools/music.svg",
+      icon: Music,
       gradient: "from-white via-[#F3F7FF] to-[#E6F0FF]",
       glow: "from-[#DDEAFF] to-white",
       bullets: "bg-[#368AF0]",

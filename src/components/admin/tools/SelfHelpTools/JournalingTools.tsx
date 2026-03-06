@@ -238,6 +238,9 @@ export default function JournalingTools({
         //   newArtConfig.colorPaletteEnabled = data.data.enableColorPalette;
         // }
         
+        // Preserve the colorPaletteEnabled setting from localStorage
+        newArtConfig.colorPaletteEnabled = loadColorPaletteFromStorage();
+        
         console.log('Final state before setting:', {
           journaling: newJournalingConfig,
           audio: newAudioConfig,

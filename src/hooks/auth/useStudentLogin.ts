@@ -85,14 +85,63 @@ export function useStudentLogin() {
         
         // Login user in context with required adminProfile (empty for students)
         const userWithProfile = {
-          ...data.data.user,
+          ...data.data?.user,
           adminProfile: {} // Students don't have adminProfile but it's required by User interface
         };
         login(userWithProfile);
         
-        // Redirect to student dashboard
-        setTimeout(() => {
-          router.push('/students/mood-checkin');
+        // Check if mood checkin is already done today
+        setTimeout(async () => {
+          try {
+            console.log('Checking mood checkin status after login...');
+            
+            // Store studentId in localStorage first
+            const studentId = data.data?.user?.studentId;
+            if (studentId) {
+              localStorage.setItem('studentId', studentId);
+              console.log('Stored studentId in localStorage:', studentId);
+            }
+            
+            // Use the studentId directly from the login response
+            const headers: Record<string, string> = {
+              'Content-Type': 'application/json'
+            };
+            
+            if (studentId) {
+              headers['Authorization'] = studentId;
+              console.log('Making API call with studentId:', studentId);
+            }
+
+            const response = await fetch('/api/students/mood/checkin/today', {
+              method: 'GET',
+              headers,
+            });
+
+            console.log('API response status:', response.status);
+
+            if (response.ok) {
+              const moodData = await response.json();
+              console.log('Mood checkin data:', moodData);
+              
+              if (moodData.data?.hasCheckin) {
+                // Mood checkin already done, redirect to dashboard
+                console.log('Mood checkin already done, redirecting to dashboard');
+                router.push('/students');
+              } else {
+                // Mood checkin not done, redirect to mood checkin
+                console.log('Mood checkin not done, redirecting to mood checkin');
+                router.push('/students/mood-checkin');
+              }
+            } else {
+              // If there's an error checking mood status, default to mood checkin
+              console.log('API call failed, defaulting to mood checkin');
+              router.push('/students/mood-checkin');
+            }
+          } catch (error) {
+            // If there's an error checking mood status, default to mood checkin
+            console.error('Error checking mood checkin status:', error);
+            router.push('/students/mood-checkin');
+          }
         }, 1500);
       } else {
         setError(data.message || 'Login failed. Please check your credentials and try again.');

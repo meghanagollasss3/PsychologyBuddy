@@ -2,6 +2,16 @@ import prisma from '@/src/prisma';
 import { PasswordUtil } from '@/src/utils/password.util';
 import { CreateStudentData, UpdateStudentData } from './student.validators';
 
+export type ExtendedUpdateStudentData = UpdateStudentData & {
+  schoolId?: string;
+  dateOfBirth?: string;
+  emergencyContact?: {
+    name?: string;
+    phone?: string;
+    relationship?: string;
+  };
+};
+
 export const StudentRepository = {
   // Create student with profile
   createStudent: async (data: CreateStudentData & { roleId: string; schoolId: string; studentId: string }) => {
@@ -165,7 +175,37 @@ export const StudentRepository = {
   },
 
   // Update student
-  updateStudent: async (id: string, data: UpdateStudentData) => {
+  updateStudent: async (id: string, data: ExtendedUpdateStudentData) => {
+    // Handle schoolId - if it's a name, find the corresponding school ID
+    let schoolIdToUpdate = data.schoolId;
+    if (data.schoolId && !data.schoolId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      // If schoolId is not a UUID, treat it as a name and find the school
+      const school = await prisma.school.findFirst({
+        where: { name: data.schoolId },
+        select: { id: true }
+      });
+      if (school) {
+        schoolIdToUpdate = school.id;
+      } else {
+        throw new Error(`School with name "${data.schoolId}" not found`);
+      }
+    }
+
+    // Handle classId - if it's a name, find the corresponding class ID
+    let classIdToUpdate = data.classId;
+    if (data.classId && !data.classId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      // If classId is not a UUID, treat it as a name and find the class
+      const classRecord = await prisma.class.findFirst({
+        where: { name: data.classId },
+        select: { id: true }
+      });
+      if (classRecord) {
+        classIdToUpdate = classRecord.id;
+      } else {
+        throw new Error(`Class with name "${data.classId}" not found`);
+      }
+    }
+
     return prisma.user.update({
       where: { id },
       data: {
@@ -173,10 +213,13 @@ export const StudentRepository = {
         ...(data.lastName && { lastName: data.lastName }),
         ...(data.email && { email: data.email }),
         ...(data.phone && { phone: data.phone }),
-        ...(data.classId && { classId: data.classId }),
+        ...(classIdToUpdate && { classId: classIdToUpdate }),
+        ...(schoolIdToUpdate && { schoolId: schoolIdToUpdate }),
         studentProfile: {
           update: {
             ...(data.status && { status: data.status }),
+            ...(data.dateOfBirth && { dateOfBirth: new Date(data.dateOfBirth) }),
+            ...(data.emergencyContact && { emergencyContact: data.emergencyContact }),
           },
         },
       },

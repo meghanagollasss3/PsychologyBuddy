@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useSchoolFilter } from '@/src/contexts/SchoolFilterContext';
 
 import {
   Plus, Search, MoreVertical, Edit, Trash2, Shield, Eye, Users
@@ -109,6 +110,7 @@ const extractAdminPermissionKeys = (admin: Admin): Record<string, boolean> => {
 export function AdminManagementSection() {
   const { toast } = useToast();
   const { user, refreshUser } = useAuth();
+  const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } = useSchoolFilter();
 
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,8 +125,6 @@ export function AdminManagementSection() {
 
   const [editedPermissions, setEditedPermissions] = useState<Record<string, boolean>>({});
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
-
-  const [schools, setSchools] = useState<any[]>([]);
 
   const { hasPermission } = usePermissions();
 
@@ -141,7 +141,15 @@ export function AdminManagementSection() {
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/admins`, { credentials: 'include' });
+      const params = new URLSearchParams();
+      
+      // Add school filter if applicable
+      if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
+        params.append('schoolId', selectedSchoolId);
+      }
+      
+      const url = `/api/admins${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) return;
 
       const data = await response.json();
@@ -152,24 +160,7 @@ export function AdminManagementSection() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  ///////////////////////////////////////////////////////////////////////////
-  // FETCH SCHOOLS
-  ///////////////////////////////////////////////////////////////////////////
-
-  const fetchSchools = useCallback(async () => {
-    try {
-      const response = await fetch('/api/schools', { credentials: 'include' });
-      if (!response.ok) return;
-
-      const data = await response.json();
-      if (data.success) setSchools(data.data);
-
-    } catch (err) {
-      console.error("Error fetching schools:", err);
-    }
-  }, []);
+  }, [selectedSchoolId, isSuperAdmin]);
 
   ///////////////////////////////////////////////////////////////////////////
   // INITIAL LOAD
@@ -178,9 +169,8 @@ export function AdminManagementSection() {
   useEffect(() => {
     if (canViewAdmins) {
       fetchAdmins();
-      if (user?.role?.name === 'SUPERADMIN') fetchSchools();
     }
-  }, [canViewAdmins, fetchAdmins, fetchSchools]);
+  }, [canViewAdmins, fetchAdmins]);
 
   ///////////////////////////////////////////////////////////////////////////
   // FILTER ADMINS (MEMOIZED)
@@ -333,7 +323,12 @@ export function AdminManagementSection() {
       <AdminHeader
         title="Admin Management"
         subtitle="Manage administrators and their permissions"
+        
         showTimeFilter={false}
+        showSchoolFilter={isSuperAdmin}
+        schoolFilterValue={selectedSchoolId}
+        schools={schools}
+        onSchoolFilterChange={setSelectedSchoolId}
         actions={
           canCreateAdmins && (
             <Button onClick={() => setShowAddModal(true)} className="gap-2">

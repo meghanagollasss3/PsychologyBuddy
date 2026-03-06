@@ -250,14 +250,14 @@ function getMoodColor(mood: string): string {
 
 function getTriggerName(trigger: string): string {
   const triggerNames: Record<string, string> = {
-    "friends": "Friends",
-    "exams": "Exams",
-    "family": "Family",
-    "social": "Social pressure",
-    "sleep": "Sleep",
-    "school": "School",
-    "health": "Health",
-    "others": "Others"
+    "Friends": "Friends",
+    "Exams": "Exams",
+    "Family": "Family",
+    "Social Pressure": "Social pressure",
+    "Sleep": "Sleep",
+    "School": "School",
+    "Health": "Health",
+    "Others": "Others"
   };
   return triggerNames[trigger] || trigger;
 }

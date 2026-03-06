@@ -29,7 +29,10 @@ export class AdminController {
     action: 'VIEW' 
   })(async (req: NextRequest) => {
     try {
-      const result = await AdminService.getAllAdmins();
+      const { searchParams } = new URL(req.url);
+      const schoolId = searchParams.get('schoolId');
+      
+      const result = await AdminService.getAllAdmins(schoolId || undefined);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Get admins error:', error);

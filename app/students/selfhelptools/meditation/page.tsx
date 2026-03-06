@@ -4,10 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import {
-  ChevronLeft,
   Heart,
-  Play,
-  Search,
   Loader2,
   Music,
   Clock,
@@ -17,15 +14,14 @@ import {
 import { useToast } from "@/src/hooks/use-toast";
 import Image from "next/image";
 
-// Components
 import { PlayerModal } from "@/src/components/StudentDashboard/SelfHelpTools/Meditation/PlayerModal";
 import InstructionsDisplay from "@/src/components/StudentDashboard/SelfHelpTools/Meditation/InstructionsDisplay";
 import { useDebounce } from "@/src/hooks/useDebounce";
 import { getStudentId } from "@/src/utils/auth";
-import BackToDashboard from "@/src/components/StudentDashboard/Layout/BackToDashboard";
 import SearchHeader from "@/src/components/StudentDashboard/SelfHelpTools/MusicTherapy/SearchHeader";
 import FilterTabs from "@/src/components/StudentDashboard/SelfHelpTools/MusicTherapy/FilterTabs";
 import StudentLayout from "@/src/components/StudentDashboard/Layout/StudentLayout";
+import Pagination from "@/src/components/StudentDashboard/Content/Library/Pagination";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -33,82 +29,45 @@ export default function MeditationPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // --- UI & Player State ---
   const [activeTab, setActiveTab] = useState("Recommended");
   const [searchTerm, setSearchTerm] = useState("");
   const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
 
-  // Instructions state
-  const [meditationInstructions, setMeditationInstructions] =
-    useState<any>(null);
-
-  // Modal State
   const [selectedCard, setSelectedCard] = useState<any | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // --- Search Optimization ---
   const debouncedSearch = useDebounce(searchTerm, 400);
 
-  // --- Data Fetching: Saved Items (load on mount) ---
+  // -----------------------------
+  // Saved Items
+  // -----------------------------
   const { data: savedRes, mutate: mutateSavedItems } = useSWR(
     "/api/student/saved-meditations?studentId=" + getStudentId(),
     fetcher,
   );
+
   const initialSavedItems: Set<string> = useMemo(() => {
     const ids = (savedRes?.data || []).map((item: any) => item.id as string);
     return new Set(ids);
   }, [savedRes]);
 
-  // Sync saved items state with API response
   useEffect(() => {
     if (initialSavedItems.size > 0) {
       setSavedItems(initialSavedItems);
     }
   }, [initialSavedItems]);
 
-  // --- Data Fetching: Categories ---
+  // -----------------------------
+  // Categories
+  // -----------------------------
   const { data: catRes } = useSWR(
     "/api/student/meditation/categories",
     fetcher,
   );
   const categories = useMemo(() => catRes?.data || [], [catRes]);
 
-  // --- Data Fetching: Instructions ---
-  const { data: instructionsRes, error: instructionsError } = useSWR(
-    "/api/admin/meditation/instructions",
-    fetcher,
-  );
-  const instructions = useMemo(() => {
-    console.log("Instructions API response:", instructionsRes);
-    console.log("Instructions API error:", instructionsError);
-
-    if (instructionsRes?.success && instructionsRes?.data) {
-      const instruction = Array.isArray(instructionsRes.data)
-        ? instructionsRes.data[0]
-        : instructionsRes.data;
-      if (instruction) {
-        const processedData = {
-          title: instruction.title,
-          points: instruction.steps?.map((step: any) => step.description) || [],
-          proTip: instruction.proTip || undefined,
-          difficulty: instruction.difficulty || undefined,
-        };
-        console.log("Processed instructions data:", processedData);
-        return processedData;
-      }
-    }
-    console.log("No instructions data found");
-    return {
-      title: undefined,
-      points: [],
-      proTip: undefined,
-      difficulty: undefined,
-    };
-  }, [instructionsRes, instructionsError]);
-
-  console.log("Final meditationInstructions state:", instructions);
-
-  // FIX: deduplicate tabs
   const tabList = useMemo(() => {
     const names = categories.map((cat: any) => cat.name);
     return Array.from(new Set(["Recommended", ...names]));
@@ -119,9 +78,38 @@ export default function MeditationPage() {
     return categories.find((c: any) => c.name === activeTab)?.id;
   }, [activeTab, categories]);
 
-  // --- Data Fetching: Resources ---
+  // -----------------------------
+  // Instructions
+  // -----------------------------
+  const { data: instructionsRes } = useSWR(
+    "/api/admin/meditation/instructions",
+    fetcher,
+  );
+
+  const instructions = useMemo(() => {
+    if (instructionsRes?.success && instructionsRes?.data) {
+      const instruction = Array.isArray(instructionsRes.data)
+        ? instructionsRes.data[0]
+        : instructionsRes.data;
+
+      if (instruction) {
+        return {
+          title: instruction.title,
+          points: instruction.steps?.map((s: any) => s.description) || [],
+          proTip: instruction.proTip,
+        };
+      }
+    }
+
+    return { title: undefined, points: [], proTip: undefined };
+  }, [instructionsRes]);
+
+  // -----------------------------
+  // Meditation API
+  // -----------------------------
   const queryParams = new URLSearchParams({
-    limit: "20",
+    limit: "9",
+    page: currentPage.toString(),
     ...(debouncedSearch && { search: debouncedSearch }),
     ...(activeCategoryId && { categoryId: activeCategoryId }),
   }).toString();
@@ -133,8 +121,21 @@ export default function MeditationPage() {
   });
 
   const meditationResources = resData?.data || [];
+  const pagination = resData?.pagination || null;
 
-  // --- Player Initialization ---
+  // -----------------------------
+  // Saved Filter
+  // -----------------------------
+  const filteredMeditations = useMemo(() => {
+    if (showSavedOnly) {
+      return meditationResources.filter((med: any) => savedItems.has(med.id));
+    }
+    return meditationResources;
+  }, [showSavedOnly, meditationResources, savedItems]);
+
+  // -----------------------------
+  // Player
+  // -----------------------------
   const handleCardClick = (meditation: any) => {
     const mediaUrl = meditation.audioUrl || meditation.videoUrl || null;
 
@@ -156,15 +157,24 @@ export default function MeditationPage() {
       image:
         meditation.thumbnailUrl ||
         "https://picsum.photos/seed/meditation/400/400",
-      instructor: meditation.instructor,
-      categories: meditation.categories || [],
     });
+
     setShowPlayer(true);
   };
 
-  // --- Save Logic (Optimistic UI) ---
+  // -----------------------------
+  // Page Change Handler
+  // -----------------------------
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // -----------------------------
+  // Save Logic
+  // -----------------------------
   const toggleSave = async (id: string) => {
     const wasSaved = savedItems.has(id);
+
     setSavedItems((prev) => {
       const next = new Set(prev);
       wasSaved ? next.delete(id) : next.add(id);
@@ -177,19 +187,15 @@ export default function MeditationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ meditationId: id, studentId: getStudentId() }),
       });
+
       if (!res.ok) throw new Error();
+
       toast({
         title: wasSaved ? "Removed from favorites" : "Saved to favorites",
       });
-      // Revalidate cache to update other components
+
       mutateSavedItems();
-    } catch (error) {
-      // Revert if failed
-      setSavedItems((prev) => {
-        const next = new Set(prev);
-        wasSaved ? next.add(id) : next.delete(id);
-        return next;
-      });
+    } catch {
       toast({
         title: "Failed to sync favorites",
         variant: "destructive",
@@ -199,195 +205,201 @@ export default function MeditationPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-       <StudentLayout>
-
-      <div className="container mx-auto px-3 sm:px-2 md:px-6 lg:px-8 py-4 sm:py-5 lg:py-3 max-w-7xl">
-        <div className="max-w-7xl my-[2px] sm:my-[10px] mx-[-10px] pt-2 sm:pt-3 lg:pt-5 sm:px-3 lg:px-4">
-<button
-            onClick={()=>{router.push('/students/selfhelptools')}}
-            className={`flex items-center gap-2 text-[#73829A] hover:text-[#1a9bcc] transition-colors p-2`}
+      <StudentLayout>
+        <div className="max-w-7xl mx-auto px-6 py-14">
+          {/* Back Button */}
+          <button
+            onClick={() => router.push("/students/selfhelptools")}
+            className="flex items-center gap-2 text-[#73829A] hover:text-[#1a9bcc]"
           >
             <ArrowLeft className="w-4 h-5" />
-            <span className="text-[13px] sm:text-[16px]">Back to SelfHelpTools</span>
-          </button>         </div>
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 lg:gap-6">
-          <div className="flex mb-[15px] sm:mb-[20px] items-start gap-3 sm:gap-4 w-full sm:w-[510px]">
-            <Image 
-                                                  src="/Content/Library.svg" 
-                                                  alt="Psychology Buddy Logo" 
-                                                  width={63}
-                                                  height={63}
-                                                  className="w-[25px] h-[25px] sm:w-[40px] sm:h-[40px] md:w-[50px] md:h-[50px] lg:w-[63px] lg:h-[63px]"
-                                                />
-            <div className="ml-[3px] sm:ml-[5px] flex-1">
-              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-[32px] font-bold text-slate-900 mb-1 sm:mb-2">
-                Meditation
-              </h1>
-              <p className="text-[#686D70] text-sm sm:text-base md:text-[16px] font-light hidden xs:block sm:block">
-                Find the perfect practice for your needs
-              </p>
-              <p className="text-[#686D70] text-xs sm:text-sm font-light block xs:hidden sm:hidden">
-                Find the perfect practice for your needs
-              </p>
+            Back to SelfHelpTools
+          </button>
+
+          {/* Header */}
+          <div className="flex justify-between mt-6 flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <Image
+                src="/Content/Library.svg"
+                alt="Meditation"
+                width={60}
+                height={60}
+              />
+              <div>
+                <h1 className="text-3xl font-bold">Meditation</h1>
+                <p className="text-gray-500">
+                  Find the perfect practice for your needs
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col gap-3 w-full lg:w-auto mb-[30px] sm:mb-[55px]">
-            <div className="flex flex-col sm:flex-row gap-3 w-full">
+
+            <div className="flex gap-3 flex-wrap">
               <SearchHeader
                 searchQuery={searchTerm}
                 onSearchChange={setSearchTerm}
               />
+
               <button
-                onClick={() =>
-                  router.push("/students/selfhelptools/meditation/saved")
-                }
-                className="h-10 sm:h-[47px] px-4 sm:px-6 rounded-full border font-base transition-colors flex items-center gap-2 whitespace-nowrap text-sm sm:text-base border-[#A5C3FF] bg-[#A5C3FF]/10 text-[#5982D4] hover:bg-blue-100"
+                onClick={() => setShowSavedOnly((prev) => !prev)}
+                className={`h-[47px] px-6 rounded-full border flex items-center gap-2
+                ${
+                  showSavedOnly
+                    ? "bg-red-100 text-red-600 border-red-300"
+                    : "border-[#A5C3FF] bg-[#A5C3FF]/10 text-[#5982D4]"
+                }`}
               >
-                <Heart className="w-3 h-3 sm:w-4 sm:h-4" />
-                Saved Items ({savedItems.size})
+                <Heart className="w-4 h-4" />
+                {showSavedOnly
+                  ? "Showing Saved"
+                  : `Saved Items (${savedItems.size})`}
               </button>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Categories Tabs */}
-        <div className="mb-6 sm:mb-8 sm:-mt-6">
-          <FilterTabs
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            categories={categories.map((c: any) => c.name)}
-          />
-        </div>
-
-        {/* Results Grid */}
-        {isLoading && !meditationResources.length ? (
-          <div className="flex flex-col items-center py-24">
-            <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-            <p className="text-gray-500">Preparing your peace...</p>
-          </div>
-        ) : meditationResources.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {meditationResources.map((med: any) => (
-              <MeditationCardItem
-                key={med.id}
-                meditation={med}
-                isSaved={savedItems.has(med.id)}
-                onSave={() => toggleSave(med.id)}
-                onClick={() => handleCardClick(med)}
+          {/* Category Tabs */}
+          {!showSavedOnly && (
+            <div className="mt-8">
+              <FilterTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                categories={categories.map((c: any) => c.name)}
               />
-            ))}
+            </div>
+          )}
+
+          {/* Meditation Grid */}
+          <div className="mt-8">
+            {isLoading && !filteredMeditations.length ? (
+              <div className="flex flex-col items-center py-24">
+                <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
+                Preparing your peace...
+              </div>
+            ) : filteredMeditations.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredMeditations.map((med: any) => (
+                    <MeditationCardItem
+                      key={med.id}
+                      meditation={med}
+                      isSaved={savedItems.has(med.id)}
+                      onSave={() => toggleSave(med.id)}
+                      onClick={() => handleCardClick(med)}
+                    />
+                  ))}
+                </div>
+                
+                {/* Pagination */}
+                {pagination && pagination.totalPages > 1 && (
+                  <Pagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    onPageChange={handlePageChange}
+                    hasNextPage={pagination.hasNextPage}
+                    hasPreviousPage={pagination.hasPreviousPage}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
+                <Music className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                {showSavedOnly
+                  ? "You haven't saved any meditations yet."
+                  : "No results found for your search."}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
-            <Music className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">
-              No results found for your search.
-            </p>
-          </div>
-        )}
-      {/* Meditation Instructions Section */}
-      {(() => {
-        console.log("Checking instructions:", instructions);
-        if (instructions && instructions.title) {
-          return (
-            <div className="mb-10 mt-5">
+
+          {/* Instructions */}
+          {instructions?.title && (
+            <div className="mt-12">
               <InstructionsDisplay
                 title={instructions.title}
                 points={instructions.points}
                 proTip={instructions.proTip}
-                // difficulty={instructions.difficulty}
               />
             </div>
-          );
-        }
-        return null;
-      })()}
-      </div>
+          )}
+        </div>
 
-
-      {/* Modal - Passing allResources allows the modal to build the playlist */}
-      {showPlayer && selectedCard && (
-        <PlayerModal card={selectedCard} onClose={() => setShowPlayer(false)} />
-      )}
+        {showPlayer && selectedCard && (
+          <PlayerModal
+            card={selectedCard}
+            onClose={() => setShowPlayer(false)}
+          />
+        )}
       </StudentLayout>
     </div>
   );
 }
 
-// Sub-component for individual card logic
+// -------------------------------------
+// Meditation Card
+// -------------------------------------
 function MeditationCardItem({ meditation, isSaved, onSave, onClick }: any) {
-  const durationMin = Math.floor((meditation.durationSec || 0) / 60);
+  const durationMin = Math.max(
+    1,
+    Math.floor(
+      (meditation.durationSec ||
+        meditation.duration_seconds ||
+        meditation.duration ||
+        meditation.length ||
+        0) / 60
+    )
+  );
 
   return (
     <div
       onClick={onClick}
-      className="group w-auto sm:w-[399px] bg-white rounded-[14px] hover:shadow-xl hover:shadow-[#15A0EA33]/20 transition-all duration-300 flex flex-col h-full cursor-pointer"
+      className="group bg-white rounded-[14px] hover:shadow-xl transition-all cursor-pointer"
     >
-      <div className="relative aspect-square h-[149px]">
+      <div className="relative h-[149px]">
         <img
-          src={
-            meditation.thumbnailUrl || "https://picsum.photos/seed/med/400/300"
-          }
+          src={meditation.thumbnailUrl || "https://picsum.photos/400"}
           alt={meditation.title}
-          className="w-full h-full object-cover opacity-90 rounded-tl-[13px] rounded-tr-[14px]"
+          className="w-full h-full object-cover rounded-t-[14px]"
         />
-        {/* <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-          <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center scale-90 group-hover:scale-100 transition-all shadow-lg">
-            <Play className="w-5 h-5 text-blue-600 fill-current ml-1" />
-          </div>
-        </div> */}
       </div>
 
       <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-bold text-gray-900 text-[20px] truncate flex-1">
+        <div className="flex justify-between">
+          <h3 className="font-bold text-[20px] truncate">
             {meditation.title}
           </h3>
+
           <button
             onClick={(e) => {
               e.stopPropagation();
               onSave();
             }}
-            className={`p-2 rounded-full w-[36px] h-[35px] border border-[#D4D4D4] ${isSaved ? "bg-red-50 text-red-500" : "bg-gray-50 text-[#666666]"}`}
+            className={`p-3 rounded-full border-[1.5px] ${
+              isSaved ? "bg-red-50 text-red-500" : "bg-white text-[#D4D4D4]"
+            }`}
           >
-            <Heart
-              className={`w-[18px] h-[18px] ${isSaved ? "fill-current" : ""}`}
-            />
+            <Heart className={`w-[21px] h-[20px] ${isSaved ? "fill-current" : "text-[#666666]"}`} />
           </button>
-        </div>
-        <p className="text-sm text-gray-600 mb-2">
-          {meditation.description || "Therapeutic Artist"}
-        </p>
-        <div className="flex items-center gap-2 mb-2">
-          <Clock className="w-[14px] h-[14px] -mr-1 text-[#686D70]"></Clock>
-          <span className="text-[13px] text-[#686D70] -mb-0.5 -ml-0.5 rounded">
-            {durationMin} mins
-          </span>
-          {meditation.category && (
-            <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded">
-              {meditation.category}
-            </span>
-          )}
         </div>
 
-        <div className="flex mt-10 items-center justify-between">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick();
-            }}
-            className="group w-[348px] h-[52px] border-2 border-[#1C76DC] bg-white 
-                       group-hover:bg-[#1C76DC] rounded-full ml-2 flex items-center 
-                       justify-center transition-colors"
-          >
-            <PlayIcon className="w-[16px] h-[17px] text-[#1C76DC] group-hover:text-white transition-colors" />
-            <span className="text-[#1C76DC] group-hover:text-white ml-2 transition-colors font-medium text-[16px]">
-              Play
-            </span>
-          </button>
+        <p className="text-[16px] text-[#686D70] mb-2">
+          {meditation.description || "Meditation Session"}
+        </p>
+
+        <div className="flex items-center gap-2 text-gray-500 text-sm mb-4">
+          <Clock className="w-4 h-4" />
+          {durationMin} mins
         </div>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="w-full h-[52px] border-2 border-[#1C76DC] rounded-full flex text-[#1C76DC] items-center justify-center gap-2 hover:bg-[#1C76DC] hover:text-white transition"
+        >
+          <PlayIcon className="w-4 h-4" />
+          <span className="text-[#1C76DC] group-hover:text-white ml-2 font-medium text-[16px]">
+            Play
+          </span>
+        </button>
       </div>
     </div>
   );

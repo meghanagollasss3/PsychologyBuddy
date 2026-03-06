@@ -41,7 +41,12 @@ export async function GET(req: Request) {
     const formattedNotifications = notifications.map((notification: any) => ({
       id: notification.id,
       type: notification.type,
+      title: notification.type === 'system' ? 'System Notification' : 
+             notification.type === 'escalation' ? 'Escalation Alert' : 'Message',
       message: notification.message,
+      priority: notification.severity === 'critical' ? 'critical' :
+                notification.severity === 'high' ? 'high' :
+                notification.severity === 'medium' ? 'medium' : 'low',
       severity: notification.severity,
       timestamp: notification.createdAt.toISOString(),
       read: notification.read,
@@ -75,10 +80,18 @@ export async function GET(req: Request) {
 // POST /api/admin/notifications - Create new notification
 export async function POST(req: Request) {
   try {
-    const { type, message, severity, alertId } = await req.json();
+    const { type, message, severity, alertId, userId } = await req.json();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "userId is required" },
+        { status: 400 }
+      );
+    }
 
     const notification = await prisma.adminNotification.create({
       data: {
+        userId,
         type,
         message,
         severity: severity || 'medium',
@@ -93,7 +106,12 @@ export async function POST(req: Request) {
     const eventSourceData = JSON.stringify({
       id: notification.id,
       type,
+      title: type === 'system' ? 'System Notification' : 
+             type === 'escalation' ? 'Escalation Alert' : 'Message',
       message,
+      priority: severity === 'critical' ? 'critical' :
+                severity === 'high' ? 'high' :
+                severity === 'medium' ? 'medium' : 'low',
       severity: severity || 'medium',
       timestamp: notification.createdAt.toISOString(),
       read: false,
@@ -110,47 +128,6 @@ export async function POST(req: Request) {
     console.error('[NotificationsAPI] Error creating notification:', error);
     return NextResponse.json(
       { error: "Failed to create notification" },
-      { status: 500 }
-    );
-  }
-}
-
-// PATCH /api/admin/notifications/read - Mark notifications as read
-export async function PATCH(req: Request) {
-  try {
-    const { notificationIds } = await req.json();
-
-    if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
-      return NextResponse.json(
-        { error: "notificationIds array is required" },
-        { status: 400 }
-      );
-    }
-
-    // Mark notifications as read
-    const result = await prisma.adminNotification.updateMany({
-      where: {
-        id: {
-          in: notificationIds
-        },
-        read: false // Only update unread notifications
-      },
-      data: {
-        read: true
-      }
-    });
-
-    console.log(`[NotificationsAPI] Marked ${result.count} notifications as read`);
-
-    return NextResponse.json({
-      success: true,
-      updatedCount: result.count
-    });
-
-  } catch (error) {
-    console.error('[NotificationsAPI] Error marking notifications as read:', error);
-    return NextResponse.json(
-      { error: "Failed to mark notifications as read" },
       { status: 500 }
     );
   }

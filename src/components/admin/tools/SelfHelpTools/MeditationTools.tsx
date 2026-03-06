@@ -1315,6 +1315,7 @@ export default function MeditationTools({
                     <div className="space-y-1">
                       <Upload className="h-6 w-6 mx-auto text-[#64748B]" />
                       <p className="text-xs text-[#64748B]">Upload thumbnail</p>
+                      <p className="text-xs text-[#64748B]">(399 × 140)</p>
                     </div>
                   )}
                   <input
@@ -1340,7 +1341,6 @@ export default function MeditationTools({
                   <SelectContent>
                     <SelectItem value="AUDIO">Audio</SelectItem>
                     <SelectItem value="VIDEO">Video</SelectItem>
-                    <SelectItem value="TEXT">Text</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

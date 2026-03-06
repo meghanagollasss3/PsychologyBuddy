@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building2, Bell, Shield, Palette, Database, Key } from "lucide-react";
 import { AdminHeader } from '../layout/AdminHeader';
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,130 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/src/contexts/AuthContext";
+import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
+
+interface OrganizationData {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  timezone: string;
+}
 
 export default function SettingsSection() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { schools, isSuperAdmin } = useSchoolFilter();
+  
+  const [organizationData, setOrganizationData] = useState<OrganizationData>({
+    id: '',
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    timezone: 'est',
+  });
+  
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Initialize organization data based on user role
+  useEffect(() => {
+    if (user?.school) {
+      setSelectedSchoolId(user.school.id);
+      setOrganizationData({
+        id: user.school.id,
+        name: user.school.name || '',
+        address: '',
+        phone: '',
+        email: '',
+        timezone: 'est',
+      });
+      // Fetch full school details if needed
+      fetchSchoolDetails(user.school.id);
+    }
+  }, [user]);
+
+  // Fetch school details from API
+  const fetchSchoolDetails = async (schoolId: string) => {
+    if (!schoolId) return;
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/schools/${schoolId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setOrganizationData({
+          id: data.data.id,
+          name: data.data.name,
+          address: data.data.address || '',
+          phone: data.data.phone || '',
+          email: data.data.email || '',
+          timezone: 'est', // Default, can be extended
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch school details:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle school selection change (for super admin)
+  const handleSchoolChange = (schoolId: string) => {
+    setSelectedSchoolId(schoolId);
+    if (schoolId && schoolId !== 'select') {
+      fetchSchoolDetails(schoolId);
+    }
+  };
+
+  // Handle form input changes
+  const handleInputChange = (field: keyof OrganizationData, value: string) => {
+    setOrganizationData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Save organization changes
+  const handleSaveOrganization = async () => {
+    if (!organizationData.id || !organizationData.name.trim()) {
+      toast({ title: "Error", description: "School name is required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/schools/${organizationData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: organizationData.name,
+          address: organizationData.address,
+          phone: organizationData.phone,
+          email: organizationData.email,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({ title: "Success", description: "Organization settings saved successfully" });
+      } else {
+        toast({ title: "Error", description: data.error?.message || "Failed to save organization settings", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to save organization settings", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+  
   return (
     <div className="flex flex-col min-h-screen">
       <AdminHeader 
@@ -29,12 +151,14 @@ export default function SettingsSection() {
       />
       
       <div className="flex-1 overflow-auto p-6 animate-fade-in">
-        <Tabs defaultValue="organization" className="space-y-6">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full lg:w-auto bg-[#edf0f3]">
-            <TabsTrigger value="organization" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
-              <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Organization</span>
-            </TabsTrigger>
+        <Tabs defaultValue="notifications" className="space-y-6">
+          <TabsList className={`grid ${isSuperAdmin ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'} w-full lg:w-auto bg-[#edf0f3]`}>
+            {!isSuperAdmin && (
+              <TabsTrigger value="organization" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
+                <Building2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Organization</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="notifications" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Notifications</span>
@@ -57,52 +181,89 @@ export default function SettingsSection() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="organization">
-            <Card>
-              <CardHeader>
-                <CardTitle>Organization Profile</CardTitle>
-                <CardDescription>Manage your school's information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="schoolName">School Name</Label>
-                    <Input id="schoolName" defaultValue="Greenfield High School" />
+          {!isSuperAdmin && (
+            <TabsContent value="organization">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Organization Profile</CardTitle>
+                  <CardDescription>Manage your school's information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="schoolName">School Name</Label>
+                      <Input 
+                        id="schoolName" 
+                        value={organizationData.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        placeholder="Enter school name"
+                        disabled={loading || saving}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="adminEmail">Admin Email</Label>
+                      <Input 
+                        id="adminEmail" 
+                        type="email" 
+                        value={organizationData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        placeholder="admin@school.edu"
+                        disabled={loading || saving}
+                      />
+                    </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="adminEmail">Admin Email</Label>
-                    <Input id="adminEmail" type="email" defaultValue="admin@greenfield.edu" />
+                    <Label htmlFor="address">Address</Label>
+                    <Textarea 
+                      id="address" 
+                      value={organizationData.address}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
+                      placeholder="School address"
+                      rows={2} 
+                      disabled={loading || saving}
+                    />
                   </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Textarea id="address" defaultValue="123 Education Lane, Learning City, LC 12345" rows={2} />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" defaultValue="+1 (555) 123-4567" />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input 
+                        id="phone" 
+                        value={organizationData.phone}
+                        onChange={(e) => handleInputChange('phone', e.target.value)}
+                        placeholder="+1 (555) 123-4567"
+                        disabled={loading || saving}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="timezone">Timezone</Label>
+                      <Select 
+                        value={organizationData.timezone} 
+                        onValueChange={(value) => handleInputChange('timezone', value)}
+                        disabled={loading || saving}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pst">Pacific Time (PST)</SelectItem>
+                          <SelectItem value="mst">Mountain Time (MST)</SelectItem>
+                          <SelectItem value="cst">Central Time (CST)</SelectItem>
+                          <SelectItem value="est">Eastern Time (EST)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Select defaultValue="est">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pst">Pacific Time (PST)</SelectItem>
-                        <SelectItem value="mst">Mountain Time (MST)</SelectItem>
-                        <SelectItem value="cst">Central Time (CST)</SelectItem>
-                        <SelectItem value="est">Eastern Time (EST)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Separator />
-                <Button>Save Changes</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  <Separator />
+                  <Button 
+                    onClick={handleSaveOrganization} 
+                    disabled={loading || saving || !organizationData.id}
+                  >
+                    {saving ? "Saving..." : "Save Changes"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           <TabsContent value="notifications">
             <Card>

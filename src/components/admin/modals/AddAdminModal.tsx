@@ -3,6 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { X, UserPlus, Loader } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface AddAdminModalProps {
   onClose: () => void;
@@ -120,46 +129,35 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center space-x-3">
-            <UserPlus className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900">Add New Admin</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add New Admin</DialogTitle>
+          <DialogDescription>
+            Create a new administrator account for the platform.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Error Message */}
-        {submitError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{submitError}</p>
-          </div>
-        )}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Error Message */}
+          {submitError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="text-red-800">{submitError}</div>
+            </div>
+          )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Basic Information */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+            {/* <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3> */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   First Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.firstName ? 'border-red-500' : 'border-gray-300'
-                  }`}
                   placeholder="Enter first name"
                 />
                 {errors.firstName && (
@@ -171,13 +169,10 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Last Name *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.lastName ? 'border-red-500' : 'border-gray-300'
-                  }`}
                   placeholder="Enter last name"
                 />
                 {errors.lastName && (
@@ -189,13 +184,10 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email *
                 </label>
-                <input
+                <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
                   placeholder="admin@school.edu"
                 />
                 {errors.email && (
@@ -207,14 +199,11 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Password *
                 </label>
-                <input
+                <Input
                   type="password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter password"
+                  placeholder="Auto-generated secure password"
                 />
                 {errors.password && (
                   <p className="mt-1 text-sm text-red-600">{errors.password}</p>
@@ -247,13 +236,10 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     School ID *
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={formData.schoolId}
                     onChange={(e) => handleInputChange('schoolId', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.schoolId ? 'border-red-500' : 'border-gray-300'
-                    }`}
                     placeholder="Enter school ID"
                   />
                   {errors.schoolId && (
@@ -269,33 +255,28 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
 
           {/* Actions */}
           <div className="flex items-center justify-end space-x-3 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {loading ? (
                 <>
-                  <Loader className="w-4 h-4 animate-spin" />
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
                   <span>Creating...</span>
                 </>
               ) : (
                 <>
-                  <UserPlus className="w-4 h-4" />
+                  <UserPlus className="w-4 h-4 mr-2" />
                   <span>Add Admin</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

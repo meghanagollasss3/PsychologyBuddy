@@ -19,14 +19,17 @@ import {
   AlertTriangle,
   GraduationCap,
   CalendarDays,
-  MessageCircleWarning
+  MessageCircleWarning,
+  MessageCircle
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/src/contexts/AuthContext";
 import StudentLayout from "@/src/components/StudentDashboard/Layout/StudentLayout";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BackToDashboard from "../Layout/BackToDashboard";
+import { toast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
 
 /* ----------------------------------------------------------------------
    API FETCHER
@@ -53,6 +56,8 @@ export default function StudentProfilePage() {
     queryKey: ["student-profile", user?.id],
     queryFn: () => fetchStudentProfile(user!.id),
     enabled: !!user?.id,
+    refetchInterval: 30000, // Refetch every 30 seconds to check for updates
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   const handleSavePhoto = async (photo: File) => {
@@ -124,14 +129,27 @@ export default function StudentProfilePage() {
     );
   }
 
-  const { student, sessions, activities, badges } = data;
+  const { student, allSessions, activities, badges } = data;
 
   return (
     <StudentLayout>
       <div className="w-full max-w-7xl mx-auto px-6 py-6 space-y-8">
 
         {/* Back Link */}
- <BackToDashboard />
+        <BackToDashboard />
+        
+        {/* Refresh Button
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh Profile
+          </button>
+        </div> */}
         {/* HEADER CARD */}
         <HeaderCard 
           student={student} 
@@ -143,14 +161,14 @@ export default function StudentProfilePage() {
 
         {/* GRID: PROFILE INFO + SUPPORT */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ProfileInfo student={student} />
+          <ProfileInfo student={student} onProfileUpdate={refetch} />
           <SupportSection />
         </div>
 
         {/* GRID: SESSIONS + ACTIVITY */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SessionsSection 
-            sessions={sessions} 
+            sessions={allSessions} 
             setSelectedSession={setSelectedSession}
             setIsModalOpen={setIsModalOpen}
           />
@@ -183,7 +201,13 @@ export default function StudentProfilePage() {
 /* ---------------------- HEADER CARD ---------------------- */
 function HeaderCard({ student, selectedPhoto, setSelectedPhoto, isSaving, onSavePhoto }: any) {
   const [photoPreview, setPhotoPreview] = useState<string>("");
+  const [currentStudent, setCurrentStudent] = useState(student);
   const { toast } = useToast();
+
+  // Sync currentStudent with student prop when it changes
+  useEffect(() => {
+    setCurrentStudent(student);
+  }, [student]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -263,7 +287,7 @@ function HeaderCard({ student, selectedPhoto, setSelectedPhoto, isSaving, onSave
           <div className="flex flex-wrap gap-4 mt-2 text-[16px] text-[#5F5F75] justify-center sm:justify-start">
             <span>Student ID : {student.studentId || "N/A"}</span>
             <span className="text-[#5F5F75] w-[8px] h-[8px] ">•</span>
-            <span>{student.grade}</span>
+            <span>{currentStudent.grade}</span>
           </div>
           
           {photoPreview && (
@@ -285,11 +309,16 @@ function HeaderCard({ student, selectedPhoto, setSelectedPhoto, isSaving, onSave
 }
 
 /* ---------------------- PROFILE INFO CARD ---------------------- */
-function ProfileInfo({ student }: any) {
+function ProfileInfo({ student, onProfileUpdate }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedStudent, setEditedStudent] = useState(student);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Sync editedStudent with student prop when it changes
+  useEffect(() => {
+    setEditedStudent(student);
+  }, [student]);
 
   const handleEdit = () => {
     setEditedStudent(student);
@@ -324,7 +353,9 @@ function ProfileInfo({ student }: any) {
       });
       setIsEditing(false);
       // Refetch profile data to show updated information
-      window.location.reload();
+      if (onProfileUpdate) {
+        onProfileUpdate();
+      }
     } catch (error) {
       toast({
         title: "Update Failed",
@@ -337,13 +368,13 @@ function ProfileInfo({ student }: any) {
   };
 
   return (
-    <div className="bg-white rounded-[17px] shadow-sm p-6  space-y-4">
+    <div className="bg-white rounded-[17px] w-[663px] shadow-sm p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Profile Information</h2>
+        <h2 className="text-[22px] font-semibold text-gray-800">Profile Information</h2>
         {!isEditing ? (
           <button
             onClick={handleEdit}
-            className="text-[#1E86FD] hover:text-blue-800 text-sm font-medium"
+            className="text-[#00A7DA] hover:text-[#00a7daa4] text-sm font-medium"
           >
             Edit Profile
           </button>
@@ -359,7 +390,7 @@ function ProfileInfo({ student }: any) {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
+              className="text-[#00A7DA] hover:text-[#00a7daa4] text-sm font-medium disabled:opacity-50"
             >
               {isSaving ? "Saving..." : "Save"}
             </button>
@@ -372,11 +403,11 @@ function ProfileInfo({ student }: any) {
           icon={<GraduationCap className="w-4 h-4 text-[#1E86FD]" />} 
           label="Full Name" 
           value={isEditing ? (
-            <input
+            <Input
               type="text"
               value={editedStudent.firstName || ""}
               onChange={(e) => setEditedStudent({...editedStudent, firstName: e.target.value})}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-full border border-gray-300 rounded text-sm"
               placeholder="First Name"
             />
           ) : student.fullName} 
@@ -386,11 +417,11 @@ function ProfileInfo({ student }: any) {
           icon={<Phone className="w-4 h-4 text-[#1E86FD]" />} 
           label="Phone" 
           value={isEditing ? (
-            <input
+            <Input
               type="tel"
               value={editedStudent.phone || ""}
               onChange={(e) => setEditedStudent({...editedStudent, phone: e.target.value})}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-full border border-gray-300 rounded text-sm"
               placeholder="Phone Number"
             />
           ) : student.phone || "Not provided"} 
@@ -400,11 +431,11 @@ function ProfileInfo({ student }: any) {
           icon={<CalendarDays className="w-4 h-4 text-[#1E86FD]" />}
           label="Date of Birth"
           value={isEditing ? (
-            <input
+            <Input
               type="date"
               value={editedStudent.dateOfBirth ? new Date(editedStudent.dateOfBirth).toISOString().split('T')[0] : ""}
               onChange={(e) => setEditedStudent({...editedStudent, dateOfBirth: e.target.value})}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-full border border-gray-300 rounded text-sm"
             />
           ) : student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "Not provided"}
         />
@@ -412,26 +443,14 @@ function ProfileInfo({ student }: any) {
         <InfoItem 
           icon={<GraduationCap className="w-4 h-4 text-[#1E86FD]" />} 
           label="Grade" 
-          value={isEditing ? (
-            <select
-              value={editedStudent.grade || ""}
-              onChange={(e) => setEditedStudent({...editedStudent, grade: e.target.value})}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-            >
-              <option value="">Select Grade</option>
-              <option value="9th Grade">9th Grade</option>
-              <option value="10th Grade">10th Grade</option>
-              <option value="11th Grade">11th Grade</option>
-              <option value="12th Grade">12th Grade</option>
-            </select>
-          ) : student.grade} 
+          value={student.grade}
         />
 
         <InfoItem
           icon={<MessageCircleWarning className="w-4 h-4 text-[#1E86FD]" />}
           label="Emergency Contact"
           value={isEditing ? (
-            <input
+            <Input
               type="tel"
               value={editedStudent.emergencyContact?.phone || ""}
               onChange={(e) => setEditedStudent({
@@ -449,6 +468,31 @@ function ProfileInfo({ student }: any) {
   );
 }
 
+/* ---------------------- SUPPORT SECTION ---------------------- */
+function SupportSection() {
+  return (
+    <div className="bg-white rounded-xl shadow-sm w-[550px] ml-13 p-6 border border-gray-200 space-y-2">
+      <h2 className="text-[22px] font-semibold text-gray-800">Support & Settings</h2>
+
+      <SupportItem icon={<HelpCircle className="w-[26px] h-[26px] " />} label="Help/FAQs" />
+      <SupportItem icon={<MessageCircle className="w-[26px] h-[26px] " />} label="Contact Support" />
+      <SupportItem icon={<Phone className="w-[26px] h-[26px] " />} label="Emergency Contacts" />
+    </div>
+  );
+}
+
+function SupportItem({ icon, label }: any) {
+  return (
+    <button className="group w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-gray-50">
+      <div className="flex items-center gap-3">
+        <div className="w-[60px] h-[60px] bg-gray-100 text-[#676767] group-hover:bg-[#E1ECFA] group-hover:text-[#4399FC] rounded-[16px] flex items-center justify-center">{icon}</div>
+        <span className="text-[16px] font-regular text-[#676767]">{label}</span>
+      </div>
+      <ChevronRight className="w-4 h-4 text-gray-400" />
+    </button>
+  );
+}
+
 /* Info Item Component */
 function InfoItem({ icon, label, value, full }: any) {
   return (
@@ -457,60 +501,54 @@ function InfoItem({ icon, label, value, full }: any) {
         full ? "sm:col-span-2" : ""
       }`}
     >
-      <div className="w-9 h-9 rounded-full bg-[#E1ECFA] shadow flex items-center justify-center">
+      <div className="w-10 h-10 rounded-full bg-[#E1ECFA] shadow flex items-center justify-center">
         {icon}
       </div>
       <div>
-        <p className="text-[12px] text-[#979CA2]">{label}</p>
-        <p className="text-[12px] font-medium text-[#35334C]">{value}</p>
+        <p className="text-[15px] text-[#979CA2]">{label}</p>
+        <div className="text-[15px] font-medium text-[#35334C]">{value}</div>
       </div>
     </div>
-  );
-}
-
-/* ---------------------- SUPPORT SECTION ---------------------- */
-function SupportSection() {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 space-y-2">
-      <h2 className="text-lg font-semibold text-gray-800">Support & Settings</h2>
-
-      <SupportItem icon={<HelpCircle className="w-5 h-5 text-blue-500" />} label="Help/FAQs" />
-      <SupportItem icon={<Phone className="w-5 h-5 text-purple-500" />} label="Contact Support" />
-      <SupportItem icon={<Users className="w-5 h-5 text-gray-600" />} label="Emergency Contacts" />
-    </div>
-  );
-}
-
-function SupportItem({ icon, label }: any) {
-  return (
-    <button className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-gray-50">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">{icon}</div>
-        <span className="text-sm font-medium text-gray-800">{label}</span>
-      </div>
-      <ChevronRight className="w-4 h-4 text-gray-400" />
-    </button>
   );
 }
 
 /* ---------------------- SESSIONS ---------------------- */
 function SessionsSection({ sessions, setSelectedSession, setIsModalOpen }: any) {
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  
+  // Show only 3 sessions initially, then all when "View More" is clicked
+  const displayedSessions = showAllSessions ? sessions : sessions.slice(0, 3);
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-      <h2 className="text-lg font-semibold text-gray-800">My Sessions</h2>
+      <h2 className="text-[22px] font-semibold text-gray-800">My Sessions</h2>
 
       {sessions.length === 0 && (
         <p className="text-gray-500 py-8 text-center">No sessions yet</p>
       )}
 
-      {sessions.map((s: any) => (
-        <SessionCard 
-          key={s.id} 
-          session={s} 
-          setSelectedSession={setSelectedSession}
-          setIsModalOpen={setIsModalOpen}
-        />
-      ))}
+      <div className="max-h-96 overflow-y-auto space-y-3">
+        {displayedSessions.map((s: any) => (
+          <SessionCard 
+            key={s.id} 
+            session={s} 
+            setSelectedSession={setSelectedSession}
+            setIsModalOpen={setIsModalOpen}
+          />
+        ))}
+      </div>
+
+      {/* View More/Less Button */}
+      {sessions.length > 3 && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => setShowAllSessions(!showAllSessions)}
+            className="text-sm text-[#00A7DA] hover:text-[#00a7da79] font-medium"
+          >
+            {showAllSessions ? 'View Less' : `View More (${sessions.length - 3} more)`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -526,26 +564,26 @@ function SessionCard({ session, setSelectedSession, setIsModalOpen }: any) {
     switch (status) {
       case 'Completed':
         return {
-          bg: 'bg-green-50',
-          border: 'border-green-200',
-          badge: 'bg-green-100 text-green-700'
+          // bg: 'bg-green-50',
+          border: 'border-[#E6E3E3]',
+          badge: 'bg-[#D2F4DE] text-[#666666]'
         };
       case 'In Progress':
         return {
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
+          // bg: 'bg-blue-50',
+          border: 'border-[#E6E3E3]',
           badge: 'bg-blue-100 text-blue-700'
         };
       case 'Scheduled':
         return {
-          bg: 'bg-yellow-50',
-          border: 'border-yellow-200',
+          // bg: 'bg-yellow-50',
+          border: 'border-[#E6E3E3]',
           badge: 'bg-yellow-100 text-yellow-700'
         };
       default:
         return {
-          bg: 'bg-gray-50',
-          border: 'border-gray-200',
+          // bg: 'bg-gray-50',
+          border: 'border-[#E6E3E3]',
           badge: 'bg-gray-100 text-gray-700'
         };
     }
@@ -554,11 +592,25 @@ function SessionCard({ session, setSelectedSession, setIsModalOpen }: any) {
   const styling = getStatusStyling(session.status);
 
   return (
-    <div className={`p-4 rounded-lg border flex flex-col gap-2 ${styling.bg} ${styling.border} mt-3`}>
+    <div className={`p-4 rounded-lg border flex flex-col gap-2 ${styling.border} mt-3`}>
+      
       <div className="flex items-center justify-between">
-        <span className={`text-xs px-2 py-1 rounded-full ${styling.badge} w-fit font-medium`}>
+        <span className={`text-[13px] px-3 py-1.5 rounded-full ${styling.badge} font-regular`}>
           {session.status}
         </span>
+        <button
+  onClick={handleViewClick}
+  className="self-end mr-4 flex items-center gap-1 
+              hover:bg-gray-300 
+             text-gray-700 text-sm 
+             px-4 py-1.5 
+             rounded-full 
+             transition-colors"
+>
+  <span>View</span>
+  <ChevronRight className="w-4 h-4 text-gray-600" />
+</button>
+
         {session.hasHighAlerts && session.highAlertsResolved && (
           <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 w-fit font-medium flex items-center gap-1">
             <AlertTriangle className="w-3 h-3" />
@@ -566,27 +618,28 @@ function SessionCard({ session, setSelectedSession, setIsModalOpen }: any) {
           </span>
         )}
       </div>
+      
 
       <p className="font-medium text-gray-800">{session.type}</p>
 
-      <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+      <div className="flex flex-wrap gap-4 text-sm text-[#3A3A3A]">
         <span className="flex items-center gap-1">
-          <Calendar className="w-3 h-3" /> {session.date}
+          <CalendarDays className="w-[12px] h-[12px]" /> {session.date}
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center text-[#676767] text-[12px] gap-1">
           <Clock className="w-3 h-3" /> {session.time}
         </span>
-        <span className="flex items-center gap-1">
+      </div>
+        <span className="flex items-center text-[#676767] text-[12px] gap-1">
           <User className="w-3 h-3" /> {session.doctor}
         </span>
-      </div>
 
-      <button 
+      {/* <button 
         onClick={handleViewClick}
         className="self-end text-sm text-blue-600 hover:text-blue-800"
       >
         View →
-      </button>
+      </button> */}
     </div>
   );
 }
@@ -665,7 +718,7 @@ function ActivitySection({ activities }: any) {
         <div className="mt-4 text-center">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            className="text-sm text-[#00A7DA] hover:text-[#00a7da74] font-medium"
           >
             {showAll ? 'View Less' : `View More (${sortedActivities.length - 6} more)`}
           </button>
@@ -707,14 +760,68 @@ function BadgesSection({ badges }: any) {
 function SessionDetailsModal({ session, onClose }: any) {
   const [reflection, setReflection] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [alertData, setAlertData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch alert data if this is a resolved alert session
+  useEffect(() => {
+    if (session.status === 'Completed' && session.id.startsWith('alert-')) {
+      fetchAlertData();
+    }
+  }, [session]);
+
+  const fetchAlertData = async () => {
+    setIsLoading(true);
+    try {
+      const alertId = session.id.replace('alert-', '');
+      const response = await fetch(`/api/escalation-alerts/${alertId}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setAlertData(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch alert data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSaveReflection = async () => {
     setIsSaving(true);
-    // TODO: Save reflection to API
-    setTimeout(() => {
+    try {
+      // Save reflection to API
+      const response = await fetch('/api/student-reflections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: session.id,
+          reflection: reflection.trim(),
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "Reflection Saved",
+          description: "Your reflection has been saved successfully."
+        });
+        setReflection("");
+      } else {
+        throw new Error(result.message || 'Failed to save reflection');
+      }
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: error instanceof Error ? error.message : "Failed to save reflection. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsSaving(false);
-      // Show success toast
-    }, 1000);
+    }
   };
 
   return (
@@ -745,97 +852,103 @@ function SessionDetailsModal({ session, onClose }: any) {
 
         {/* Modal Content */}
         <div className="p-6 space-y-6">
-          {/* Session Notes */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="font-medium text-gray-800">Session Notes</h3>
-              <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
-                Only you can see
-              </span>
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading session details...</p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-700">
-              We discussed strategies for managing stress during exam periods. Alex showed great insight into recognizing early signs of anxiety.
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Alert Details - Only for resolved alerts */}
+              {session.status === 'Completed' && alertData && (
+                <>
+                  {/* Admin Recommendations */}
+                  {alertData.recommendation && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <h3 className="font-medium text-gray-800">Admin Recommendations</h3>
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded-full">
+                          From {session.doctor}
+                        </span>
+                      </div>
+                      <div className="p-4 bg-blue-50 rounded-lg text-sm text-gray-700 border-l-4 border-blue-400">
+                        {alertData.recommendation}
+                      </div>
+                    </div>
+                  )}
 
-          {/* Your Reflection */}
-          <div>
-            <h3 className="font-medium text-gray-800 mb-3">Your Reflection</h3>
-            <textarea
-              value={reflection}
-              onChange={(e) => setReflection(e.target.value)}
-              placeholder="What stood out to you from this session?"
-              className="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 text-sm"
-            />
-            <button
-              onClick={handleSaveReflection}
-              disabled={isSaving || !reflection.trim()}
-              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSaving ? "Saving..." : "Save Note"}
-            </button>
-          </div>
+                  {/* Alert Context */}
+                  {alertData.context && (
+                    <div>
+                      <h3 className="font-medium text-gray-800 mb-3">Session Context</h3>
+                      <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-700">
+                        {alertData.context}
+                      </div>
+                    </div>
+                  )}
 
-          {/* Recommended for You */}
-          <div>
-            <h3 className="font-medium text-gray-800 mb-3">Recommended for You</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-blue-500" />
+                  {/* Alert Details */}
                   <div>
-                    <p className="font-medium text-gray-800">5 Quick Grounding Techniques</p>
-                    <p className="text-sm text-gray-500">Article • 3 min read</p>
+                    <h3 className="font-medium text-gray-800 mb-3">Alert Details</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Category:</span>
+                        <span className="ml-2 font-medium">{alertData.category}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Severity:</span>
+                        <span className="ml-2 font-medium">{alertData.severity}/10</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Level:</span>
+                        <span className="ml-2 font-medium capitalize">{alertData.level}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Detected:</span>
+                        <span className="ml-2 font-medium">{new Date(alertData.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-              
-              <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <Wind className="w-5 h-5 text-green-500" />
-                  <div>
-                    <p className="font-medium text-gray-800">Box Breathing Practice</p>
-                    <p className="text-sm text-gray-500">Exercise • 5 min</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-              
-              <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-purple-500" />
-                  <div>
-                    <p className="font-medium text-gray-800">Self-Reflection: My Stress Signal</p>
-                    <p className="text-sm text-gray-500">Prompt • 10 min</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-            </div>
-          </div>
 
-          {/* After This Session */}
-          <div>
-            <h3 className="font-medium text-gray-800 mb-3">After This Session</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              You tried 2 activities after this session. That's a positive step.
-            </p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <Check className="w-5 h-5 text-green-500" />
-                <span className="text-sm text-gray-700">Breathing exercise completed</span>
+                  {/* Message Content */}
+                  {alertData.messageContent && (
+                    <div>
+                      <h3 className="font-medium text-gray-800 mb-3">Message That Triggered Alert</h3>
+                      <div className="p-4 bg-yellow-50 rounded-lg text-sm text-gray-700 border-l-4 border-yellow-400">
+                        <p className="italic">"{alertData.messageContent}"</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Your Reflection */}
+              <div>
+                <h3 className="font-medium text-gray-800 mb-3">Your Reflection</h3>
+                <textarea
+                  value={reflection}
+                  onChange={(e) => setReflection(e.target.value)}
+                  placeholder="What stood out to you from this session? How did the admin's recommendations help you?"
+                  className="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 text-sm"
+                />
+                <button
+                  onClick={handleSaveReflection}
+                  disabled={isSaving || !reflection.trim()}
+                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? "Saving..." : "Save Reflection"}
+                </button>
               </div>
-              <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <Check className="w-5 h-5 text-green-500" />
-                <span className="text-sm text-gray-700">Journaling entry added</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <div className="w-5 h-5 border-2 border-gray-300 rounded"></div>
-                <span className="text-sm text-gray-500">Grounding technique tried</span>
-              </div>
-            </div>
-          </div>
+
+              {/* Show placeholder for active alerts */}
+              {session.status === 'In Progress' && (
+                <div className="text-center py-8 text-gray-500">
+                  <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Alert details will be available once this session is resolved.</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

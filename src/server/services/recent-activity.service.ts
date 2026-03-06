@@ -11,6 +11,18 @@ export interface ActivityItem {
   metadata?: Record<string, any>;
 }
 
+// Type description helper
+const typeDescriptions: Record<string, string> = {
+  mood: "Student mood check-in",
+  journal: "Student journal entry",
+  meditation: "Student meditation session",
+  music: "Student music therapy session",
+  badge: "Student earned badge",
+  streak: "Student streak updated",
+  session: "Student chat with buddy",
+  alert: "Student alert triggered",
+};
+
 export class RecentActivityService {
   /**
    * Get recent activities with role-based filtering
@@ -438,12 +450,12 @@ export class RecentActivityService {
       })));
     }
 
-    // Support sessions
+    // Chat sessions (bot interactions)
     if (!type || type === 'session') {
-      const sessions = await prisma.session.findMany({
+      const chatSessions = await prisma.chatSession.findMany({
         where: {
           user: userFilter,
-          createdAt: dateFilter,
+          startedAt: dateFilter,
           ...(search && {
             user: {
               OR: [
@@ -461,20 +473,20 @@ export class RecentActivityService {
             }
           }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { startedAt: 'desc' },
         take: limit,
         skip: offset
       });
 
-      activities.push(...sessions.map((session: any) => ({
-        id: `session-${session.id}`,
+      activities.push(...chatSessions.map((chatSession: any) => ({
+        id: `chat-${chatSession.id}`,
         type: 'session' as const,
-        studentId: session.userId,
-        studentName: `${session.user.firstName} ${session.user.lastName}`,
-        classSection: session.user.classRef?.name,
-        description: 'Support session completed',
-        timestamp: session.createdAt,
-        metadata: { sessionId: session.sessionId }
+        studentId: chatSession.userId,
+        studentName: `${chatSession.user.firstName} ${chatSession.user.lastName}`,
+        classSection: chatSession.user.classRef?.name,
+        description: 'Chat session with buddy',
+        timestamp: chatSession.startedAt,
+        metadata: { chatSessionId: chatSession.id }
       })));
     }
 

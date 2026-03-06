@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, ArrowRight } from 'lucide-react';
+import { Clock, ArrowRight, ChevronRight } from 'lucide-react';
 // import { motion } from 'framer-motion';
 
 interface CourseCardProps {
@@ -79,7 +79,7 @@ export default function CourseCard({ id, title, category, time, description, col
           <button className="flex items-center gap-2 text-[#1C76DC] text-xs sm:text-sm lg:text-[13px] font-bold group/btn hover:gap-3 transition-all">
             <span className="hidden xs:block sm:block">Start Learning</span>
             <span className="block xs:hidden sm:hidden">Start</span>
-            <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 transition-transform group-hover/btn:translate-x-1" />
+            <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 transition-transform group-hover/btn:translate-x-1" />
           </button>
         </div>
       </div>

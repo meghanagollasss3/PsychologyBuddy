@@ -10,8 +10,8 @@ interface FeatureCardProps {
 
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, description, imageSrc }) => {
   return (
-    <div className="bg-white border border-[#eeeeee] rounded-3xl pl-6 pr-2 pt-7 pb-9 shadow-sm hover:shadow-[#bee0f7] hover:shadow-xl hover:border-none transition-shadow duration-300">
-      <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4 overflow-hidden">
+    <div className="bg-white border-0.5 border-[#D4D4D4] rounded-3xl md:w-[299px] md:h-[222px] pl-6 pr-2 pt-7 pb-9 drop-shadow-lg hover:shadow-[#00ABFF1A] hover:shadow-xl hover:border-none transition-shadow duration-300">
+      <div className="w-[54px] h-[51px] rounded-xl flex items-center justify-center mb-4 overflow-hidden">
         {imageSrc ? (
           <img
             src={imageSrc}
@@ -24,8 +24,8 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, descriptio
           </div>
         )}
       </div>
-      <h3 className="text-xl font-medium text-black mb-3">{title}</h3>
-      <p className="text-[#767676] text-lg leading-relaxed">{description}</p>
+      <h3 className="text-[20px] font-medium text-[#2F3D43] mb-3">{title}</h3>
+      <p className="text-[#767676] text-[14px] leading-relaxed">{description}</p>
     </div>
   );
 };

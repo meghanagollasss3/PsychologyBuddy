@@ -35,6 +35,82 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
 
+// Emoji mappings for different badge types
+const BADGE_TYPE_EMOJIS = {
+  STREAK: [
+    { emoji: '🔥' },
+    { emoji: '⚡' },
+    { emoji: '💫' },
+    { emoji: '🌟' },
+    { emoji: '✨' },
+    { emoji: '🎯' },
+    { emoji: '🏆' },
+    { emoji: '🥇' },
+    { emoji: '👑' },
+    { emoji: '💎' },
+  ],
+  JOURNAL_COUNT: [
+    { emoji: '📖' },
+    { emoji: '📝' },
+    { emoji: '✍️' },
+    { emoji: '📓' },
+    { emoji: '📚' },
+    { emoji: '🖋️' },
+    { emoji: '📄' },
+    { emoji: '📜' },
+    { emoji: '🗒️' },
+    { emoji: '✒️' },
+  ],
+  ARTICLE_READ: [
+    { emoji: '📰' },
+    { emoji: '🗞️' },
+    { emoji: '📑' },
+    { emoji: '🔖' },
+    { emoji: '🗂️' },
+    { emoji: '📋' },
+    { emoji: '📎' },
+    { emoji: '📌' },
+    { emoji: '📐' },
+    { emoji: '📏' },
+  ],
+  MEDITATION_COUNT: [
+    { emoji: '🧘' },
+    { emoji: '🕉️' },
+    { emoji: '🔔' },
+    { emoji: '🧘‍♂️' },
+    { emoji: '🧘‍♀️' },
+    { emoji: '🌅' },
+    { emoji: '🌙' },
+    { emoji: '🕊️' },
+    { emoji: '💆' },
+    { emoji: '🌸' },
+  ],
+  MUSIC_COUNT: [
+    { emoji: '🎵' },
+    { emoji: '🎶' },
+    { emoji: '🎧' },
+    { emoji: '🎤' },
+    { emoji: '🎼' },
+    { emoji: '🎹' },
+    { emoji: '🥁' },
+    { emoji: '🎸' },
+    { emoji: '🎺' },
+    { emoji: '🎷' },
+  ],
+  MOOD_CHECKIN: [
+    { emoji: '😊' },
+    { emoji: '😌' },
+    { emoji: '🤗' },
+    { emoji: '😎' },
+    { emoji: '😇' },
+    { emoji: '🌈' },
+    { emoji: '💖' },
+    { emoji: '🦋' },
+    { emoji: '🌺' },
+    { emoji: '🐻' },
+  ],
+};
+
 interface Badge {
   id: string;
   name: string;
@@ -97,7 +173,7 @@ export default function BadgesAndStreaks() {
   const [createLoading, setCreateLoading] = useState(false);
   const [formData, setFormData] = useState<CreateBadgeData>({
     name: "",
-    icon: "",
+    icon: BADGE_TYPE_EMOJIS.STREAK?.[0]?.emoji || '🔥', // Default to first streak emoji
     description: "",
     requirement: "",
     type: "STREAK",
@@ -107,7 +183,7 @@ export default function BadgesAndStreaks() {
   });
   const [selectedSchoolForBadge, setSelectedSchoolForBadge] = useState<string>('');
 
-  // Fetch badges and stats
+  // Fetch badges and Stats
   const fetchBadges = async () => {
     try {
       setLoading(true);
@@ -117,23 +193,37 @@ export default function BadgesAndStreaks() {
       if (typeFilter !== 'all') params.append('type', typeFilter);
       if (selectedSchoolId && selectedSchoolId !== 'all') params.append('schoolId', selectedSchoolId);
       
-      const response = await fetch(`/api/admin/badges?${params.toString()}`);
-      const data = await response.json();
+      const [badgesResponse, analyticsResponse] = await Promise.all([
+        fetch(`/api/admin/badges?${params.toString()}`),
+        fetch(`/api/admin/analytics/badges-streaks?${params.toString()}`),
+      ]);
       
-      if (data.success) {
-        setBadges(data.data.badges);
-        // Calculate stats from real data
-        const totalEarned = data.data.badges.reduce((sum: number, badge: Badge) => 
+      const badgesData = await badgesResponse.json();
+      const analyticsData = await analyticsResponse.json();
+      
+      if (badgesData.success && analyticsData.success) {
+        setBadges(badgesData.data.badges);
+        
+        // Calculate real stats from analytics data
+        const totalEarned = badgesData.data.badges.reduce((sum: number, badge: Badge) => 
           sum + (badge._count?.userBadges || 0), 0
         );
+        
+        // Calculate real active streaks from analytics
+        const currentWeekData = analyticsData.data.badgesStreaks?.[analyticsData.data.badgesStreaks.length - 1];
+        const realActiveStreaks = currentWeekData?.activeStreaks || 0;
+        
+        // Calculate average engagement (badges earned per active user)
+        const avgEngagement = totalEarned > 0 ? Math.round((totalEarned / Math.max(realActiveStreaks, 1))) : 0;
+        
         setStats({
-          totalBadges: data.data.badges.length,
+          totalBadges: badgesData.data.badges.length,
           totalEarned,
-          activeStreaks: 342, // TODO: Get from API
-          avgEngagement: 78, // TODO: Get from API
+          activeStreaks: realActiveStreaks,
+          avgEngagement,
         });
       } else {
-        toast({ title: "Error", description: data.error?.message || "Failed to fetch badges", variant: "destructive" });
+        toast({ title: "Error", description: badgesData.error?.message || "Failed to fetch badges", variant: "destructive" });
       }
     } catch (error) {
       toast({ title: "Error", description: "Failed to fetch badges", variant: "destructive" });
@@ -467,7 +557,7 @@ export default function BadgesAndStreaks() {
 
       {/* Create Badge Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Badge</DialogTitle>
             <DialogDescription>
@@ -486,16 +576,32 @@ export default function BadgesAndStreaks() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="icon">Icon (Emoji)</Label>
-              <Input 
-                id="icon" 
-                placeholder="e.g., 🏆" 
-                value={formData.icon}
-                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-              />
+              <Select value={formData.icon} onValueChange={(value) => setFormData({ ...formData, icon: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an emoji">
+                    {formData.icon ? (
+                      <span className="text-lg">{formData.icon}</span>
+                    ) : (
+                      "Select an emoji"
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {BADGE_TYPE_EMOJIS[formData.type]?.map((item) => (
+                    <SelectItem key={item.emoji} value={item.emoji}>
+                      <span className="text-lg">{item.emoji}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="type">Badge Type</Label>
-              <Select value={formData.type} onValueChange={(value: Badge['type']) => setFormData({ ...formData, type: value })}>
+              <Select value={formData.type} onValueChange={(value: Badge['type']) => {
+                // Reset icon when type changes to avoid showing emoji from different category
+                const firstEmoji = BADGE_TYPE_EMOJIS[value]?.[0]?.emoji || '';
+                setFormData({ ...formData, type: value, icon: firstEmoji });
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select badge type" />
                 </SelectTrigger>
@@ -607,16 +713,32 @@ export default function BadgesAndStreaks() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-icon">Icon (Emoji)</Label>
-              <Input 
-                id="edit-icon" 
-                placeholder="e.g., 🏆" 
-                value={formData.icon}
-                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-              />
+              <Select value={formData.icon} onValueChange={(value) => setFormData({ ...formData, icon: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an emoji">
+                    {formData.icon ? (
+                      <span className="text-lg">{formData.icon}</span>
+                    ) : (
+                      "Select an emoji"
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {BADGE_TYPE_EMOJIS[formData.type]?.map((item) => (
+                    <SelectItem key={item.emoji} value={item.emoji}>
+                      <span className="text-lg">{item.emoji}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-type">Badge Type</Label>
-              <Select value={formData.type} onValueChange={(value: Badge['type']) => setFormData({ ...formData, type: value })}>
+              <Select value={formData.type} onValueChange={(value: Badge['type']) => {
+                // Reset icon when type changes to avoid showing emoji from different category
+                const firstEmoji = BADGE_TYPE_EMOJIS[value]?.[0]?.emoji || '';
+                setFormData({ ...formData, type: value, icon: firstEmoji });
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select badge type" />
                 </SelectTrigger>
