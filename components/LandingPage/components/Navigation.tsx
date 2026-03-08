@@ -39,7 +39,7 @@ const Navigation: React.FC = () => {
           </div>
 
           <span className="text-[21px] font-semibold bg-gradient-to-b from-[#00A7DA] to-[#0F71A1] bg-clip-text text-transparent">
-            Psychology Buddy
+            <Link href="/">Psychology Buddy</Link>
           </span>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,7 @@ import { SearchParamsUtils } from "@/src/lib/ai/search-params";
 import { getAuthHeaders } from "@/src/utils";
 import BackToDashboard from "../Layout/BackToDashboard";
 import { useServerAuth } from "@/src/hooks";
+import { useToast } from '@/components/ui/use-toast';
 
 type Mood = "Happy" | "Okay" | "Sad" | "Anxious" | "Tired" | null;
 type Factor = "friends" | "exams" | "family" | "social" | "sleep" | "school" | "health" | "others";
@@ -25,11 +26,11 @@ interface FactorOption {
 }
 
 const moodOptions: MoodOption[] = [
-  { emoji: "/Emojis/Happy.png", label: "Happy" },
-  { emoji: "/Emojis/Okay1.png", label: "Okay" },
-  { emoji: "/Emojis/Sad.png", label: "Sad" },
-  { emoji: "/Emojis/Angry.png", label: "Anxious" },
-  { emoji: "/Emojis/Tired1.png", label: "Tired" },
+  { emoji: "/mood/Happy.svg", label: "Happy" },
+  { emoji: "/mood/Okay.svg", label: "Okay" },
+  { emoji: "/mood/Sad.svg", label: "Sad" },
+  { emoji: "/mood/Angry.svg", label: "Anxious" },
+  { emoji: "/mood/Tired.svg", label: "Tired" },
 ];
 
 const factorOptions: FactorOption[] = [
@@ -46,12 +47,40 @@ const factorOptions: FactorOption[] = [
 export default function MoodCheckIn() {
   const router = useRouter();
   const { user } = useServerAuth(); // Use proper authentication
+  const { toast } = useToast();
   const [selectedMood, setSelectedMood] = useState<Mood>(null);
   const [selectedFactors, setSelectedFactors] = useState<Factor[]>([]);
   const [notes, setNotes] = useState("");
   const [showAdditionalQuestions, setShowAdditionalQuestions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streakCount, setStreakCount] = useState<number>(0);
+
+  // Fetch user's streak on component mount
+  useEffect(() => {
+    const fetchStreak = async () => {
+      if (!user) return;
+      
+      try {
+        console.log("Fetching streak from API...");
+        const response = await fetch('/api/student/stats', {
+          headers: getAuthHeaders(),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Stats data received:", data);
+          setStreakCount(data.data?.currentStreak || 0);
+        } else {
+          console.error("Stats API response not ok:", response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('Failed to fetch streak:', error);
+      }
+    };
+
+    fetchStreak();
+  }, [user]);
 
   const handleMoodSelect = (mood: Mood) => {
     setSelectedMood(mood);
@@ -112,20 +141,31 @@ export default function MoodCheckIn() {
       });
 
       if (!response.ok) {
-        let errorData;
+        let errorData: { message?: string; error?: string } = {};
+        let errorMessage = '';
+        
         try {
           errorData = await response.json();
+          errorMessage = errorData?.message || errorData?.error || '';
         } catch (parseError) {
-          console.error("Failed to parse error response:", parseError);
-          errorData = {};
+          // Silently continue if parsing fails
         }
         
-        console.error("API Error Response:", errorData);
-        console.error("Response status:", response.status, response.statusText);
+        // Only log unexpected errors, not expected ones like 409
+        if (response.status !== 409) {
+          console.error("Response status:", response.status, response.statusText);
+        }
         
-        // Handle specific status codes even if response body is empty
+        // Handle specific status codes
         if (response.status === 409) {
-          throw new Error('You have already checked in today. Please try again tomorrow.');
+          // Show toast for already checked in and return early
+          toast({
+            title: 'You have already checked in today. Please try again tomorrow.',
+            variant: 'destructive'
+          });
+          setError('You have already checked in today. Please try again tomorrow.');
+          setIsSubmitting(false);
+          return;
         }
         
         if (response.status === 401) {
@@ -140,15 +180,17 @@ export default function MoodCheckIn() {
           throw new Error('The requested resource was not found.');
         }
         
-        const errorMessage = errorData?.message || errorData?.error || `Request failed with status ${response.status}`;
-        throw new Error(errorMessage);
+        // Use parsed error message or fallback
+        throw new Error(errorMessage || `Request failed with status ${response.status}`);
       }
 
       const result = await response.json();
       console.log("Check-in submitted successfully:", result);
 
       // Show success message and navigate to chat with mood data
-      alert("Thank you for checking in! Your mood has been recorded.");
+      toast({
+        title: "Your mood has been recorded.",
+      });
       
       // Navigate to chat with mood and trigger data using utility
       const params = SearchParamsUtils.createChatParams({
@@ -159,6 +201,13 @@ export default function MoodCheckIn() {
       router.push(`/students/chat${params ? `?${params}` : ''}`)
     } catch (err) {
       console.error("Error submitting mood check-in:", err);
+      
+      // Show error toast for any submission error
+      toast({
+        title: err instanceof Error ? err.message : "An unexpected error occurred",
+        variant: "destructive"
+      });
+      
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
@@ -231,8 +280,8 @@ export default function MoodCheckIn() {
               <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-[#1a9bcc]" />
               <span className="text-center">
                 You've checked in{" "}
-                <span className="text-[#1a9bcc] font-semibold">7 days</span> in a
-                row! 🎉
+                <span className="text-[#1a9bcc] font-semibold">{streakCount} days</span> in a
+                row{streakCount > 0 && " 🎉"}
               </span>
             </div>
           )}
@@ -300,7 +349,7 @@ export default function MoodCheckIn() {
               </div>
 
               {/* Error Display - Moved near submit button */}
-              {error && (
+              {/* {error && (
                 <div className="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-400 rounded-lg p-4 mb-6 shadow-sm">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
@@ -313,7 +362,7 @@ export default function MoodCheckIn() {
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Submit Button */}
               {selectedFactors.length > 0 && (

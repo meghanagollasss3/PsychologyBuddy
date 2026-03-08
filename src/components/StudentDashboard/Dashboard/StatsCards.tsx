@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,13 +64,20 @@ const StatCard = React.memo(function StatCard({
   config,
   value,
   loading,
+  onClick,
 }: {
   config: any;
   value: number;
   loading: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Card className={`relative w-[293px] h-auto overflow-hidden rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] ${config.className}`}>
+    <Card 
+      className={`relative w-[293px] h-auto overflow-hidden rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] ${config.className} ${
+        onClick ? 'cursor-pointer hover:shadow-lg transition-shadow duration-200' : ''
+      }`}
+      onClick={onClick}
+    >
       {/* Gradient BG */}
       <div
         className={`absolute inset-0 w-[150px] h-[150px] left-[186px] top-[-55px] rounded-full bg-gradient-to-br ${config.gradient} opacity-70`}
@@ -128,6 +136,8 @@ StatCard.displayName = "StatCard";
    Main Optimized StatsCards Component
 --------------------------------------------------- */
 export default function StatsCards() {
+  const router = useRouter();
+  
   /* --- Fetch stats with react-query --- */
   const { data, isLoading, error } = useQuery({
     queryKey: ["studentStats"],
@@ -142,6 +152,11 @@ export default function StatsCards() {
 
   const animationRef = useRef<number | null>(null);
   const startTimestamp = useRef<number>(0);
+
+  /* --- Handle click for totalCheckins card --- */
+  const handleCheckinClick = () => {
+    router.push('/students/mood-checkin');
+  };
 
   /* --- Start animation when data loads --- */
   useEffect(() => {
@@ -176,6 +191,7 @@ export default function StatsCards() {
           config={config}
           value={values[idx]}
           loading={isLoading}
+          onClick={config.key === 'totalCheckins' ? handleCheckinClick : undefined}
         />
       ))}
     </div>

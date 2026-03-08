@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { useState } from "react";
+import Image from "next/image";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui";
+
 
 const ContactPage = () => {
   const [form, setForm] = useState({
@@ -22,140 +26,147 @@ const ContactPage = () => {
   };
 
   return (
-    <div className="w-full bg-gray-50 font-sans">
+    <div className="w-full bg-[#F4F6F9]">
       {/* Hero Banner */}
-      <div className="relative bg-[#1a9fd4] overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-4 left-10 text-white text-8xl">💬</div>
-          <div className="absolute bottom-4 right-10 text-white text-7xl">🤝</div>
-        </div>
-        <div className="relative z-10 max-w-2xl mx-auto text-center py-14 px-6">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-3 leading-tight">
-            Get in touch, Let us Know how<br />we can help.
-          </h1>
-          <p className="text-white/85 text-sm md:text-base">
-            Psychology buddy is ready to provide the right solution according to your needs
-          </p>
-        </div>
-      </div>
+      <div className="relative w-full h-[354px] bg-gradient-to-b from-[#1f94ce] to-[#1e8cc6]">
+              {/* Background Image */}
+              <Image 
+                src="/about/2.svg" 
+                alt="Psychology Buddy Background" 
+                fill
+                className="object-contain"
+              />
+              
+            </div>
 
       {/* Contact Info Cards */}
-      <div className="max-w-4xl mx-auto px-6 -mt-1 py-8">
+      <div className="max-w-7xl mx-auto px-6 -mt-1 py-8">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Chat to sales */}
-          <div className="bg-white rounded-xl p-5 flex items-start gap-4 shadow-sm border border-gray-100">
-            <div className="w-10 h-10 rounded-full bg-[#e8f6fd] flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-[#1a9fd4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+          <div className="bg-white rounded-[24px] p-5 flex items-start gap-4 shadow-sm border border-gray-100">
+            <div className="rounded-full bg-[#e8f6fd] flex items-center justify-center flex-shrink-0">
+              <Image 
+                        src="/contact/1.svg" 
+                        alt="Psychology Buddy Background" 
+                        width={70}
+                        height={70}
+                        className="object-cover "
+                      />
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">Chat to sales</p>
-              <p className="text-gray-400 text-xs mb-1">Speak to our friendly team.</p>
-              <p className="text-[#1a9fd4] text-xs font-medium">Psychologybuddysales@gmail.com</p>
+              <p className="font-semibold text-[#2F3D43] text-[18px]">Chat to sales</p>
+              <p className="text-[#767676] text-[14px] mb-1">Speak to our friendly team.</p>
+              <p className="text-[#686D70] text-[14px] font-medium">Psychologybuddysales@gmail.com</p>
             </div>
           </div>
 
           {/* Call us */}
-          <div className="bg-white rounded-xl p-5 flex items-start gap-4 shadow-sm border border-gray-100">
-            <div className="w-10 h-10 rounded-full bg-[#e8f6fd] flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-[#1a9fd4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
+          <div className="bg-white rounded-[24px] p-5 flex items-start gap-4 shadow-sm border border-gray-100">
+            <div className="rounded-full bg-[#e8f6fd] flex items-center justify-center flex-shrink-0">
+              <Image 
+                        src="/contact/2.svg" 
+                        alt="Psychology Buddy Background" 
+                        width={70}
+                        height={70}
+                        className="object-cover "
+                      />
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">Call us</p>
-              <p className="text-gray-400 text-xs mb-1">Mon-Fri from 9am to 5pm.</p>
-              <p className="text-gray-700 text-xs font-medium">+91 000000000</p>
+              <p className="font-semibold text-[#2F3D43] text-[18px]">Call us</p>
+              <p className="text-[#767676] text-[14px] mb-1">Mon-Fri from 9am to 5pm.</p>
+              <p className="text-[#686D70] text-[14px] font-medium">+91 000000000</p>
             </div>
           </div>
 
           {/* Visit us */}
-          <div className="bg-white rounded-xl p-5 flex items-start gap-4 shadow-sm border border-gray-100">
-            <div className="w-10 h-10 rounded-full bg-[#e8f6fd] flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-[#1a9fd4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+          <div className="bg-white rounded-[24px] p-5 flex items-start gap-4 shadow-sm border border-gray-100">
+            <div className=" rounded-full bg-[#e8f6fd] flex items-center justify-center flex-shrink-0">
+              <Image 
+                        src="/contact/3.svg" 
+                        alt="Psychology Buddy Background" 
+                        width={70}
+                        height={70}
+                        className="object-cover "
+                      />
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">Visit us</p>
-              <p className="text-gray-400 text-xs mb-1">Visit our office HQ.</p>
-              <p className="text-gray-700 text-xs font-medium">PragatiNagar, Hyderabad</p>
+              <p className="font-semibold text-[#2F3D43] text-[18px]">Visit us</p>
+              <p className="text-[#767676] text-[14px] mb-1">Visit our office HQ.</p>
+              <p className="text-[#686D70] text-[14px] font-medium">PragatiNagar, Hyderabad</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Contact Form + Map */}
-      <div className="max-w-4xl mx-auto px-6 pb-10">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6 pb-10">
+        <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-2">
             {/* Form */}
-            <div className="p-8">
-              <p className="text-[#1a9fd4] text-xs font-semibold mb-1">Contact us</p>
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">Get in touch</h2>
-              <p className="text-gray-400 text-sm mb-6">We'd love to hear from you. Please fill out this form.</p>
+            <div className="p-8 flex flex-col justify-center items-center">
+              <p className="text-[#1B9EE0] text-[16px] font-semibold mb-1">Contact us</p>
+              <h2 className="text-[36px] font-semibold text-[#2F3D43] mb-1">Get in touch</h2>
+              <p className="text-[#686D70] text-[20px] mb-6">We'd love to hear from you. Please fill out this form.</p>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 w-full">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">First full name</label>
-                  <input
+                  <label className="block text-[14px] font-medium text-[#344054] mb-1">First full name</label>
+                  <Input
                     type="text"
                     name="fullName"
                     value={form.fullName}
                     onChange={handleChange}
                     placeholder="Enter your full name"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
+                    // className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">School/Institution Name</label>
-                  <input
+                  <label className="block text-[14px] font-medium text-[#344054] mb-1">School/Institution Name</label>
+                  <Input
                     type="text"
                     name="schoolName"
                     value={form.schoolName}
                     onChange={handleChange}
                     placeholder="Enter your name"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
+                    // className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Email ID</label>
-                  <input
+                  <label className="block text-[14px] font-medium text-[#344054] mb-1">Email ID</label>
+                  <Input
                     type="email"
                     name="email"
                     value={form.email}
                     onChange={handleChange}
                     placeholder="Enter your email"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
+                    // className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone number</label>
+                  <label className="block text-[14px] font-medium text-[#344054] mb-1">Phone number</label>
                   <div className="flex gap-2">
                     <select className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] bg-white">
                       <option value="IN">IN</option>
                       <option value="US">US</option>
                       <option value="UK">UK</option>
                     </select>
-                    <input
+                    <Input
                       type="tel"
                       name="phone"
                       value={form.phone}
                       onChange={handleChange}
                       placeholder="+91 0000000000"
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
+                      // className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a9fd4]/30 focus:border-[#1a9fd4] transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Message</label>
-                  <textarea
+                  <label className="block text-[14px] font-medium text-[#344054] mb-1">Message</label>
+                  <Textarea
                     name="message"
                     value={form.message}
                     onChange={handleChange}
@@ -165,7 +176,7 @@ const ContactPage = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <input
+                  <Input
                     type="checkbox"
                     name="agreed"
                     id="agree"
@@ -173,7 +184,7 @@ const ContactPage = () => {
                     onChange={handleChange}
                     className="w-4 h-4 accent-[#1a9fd4]"
                   />
-                  <label htmlFor="agree" className="text-xs text-gray-500">
+                  <label htmlFor="agree" className="text-[16px] text-[#667085]">
                     You agree to our friendly{" "}
                     <Link href="#" className="text-[#1a9fd4] underline">privacy policy</Link>.
                   </label>
@@ -181,7 +192,7 @@ const ContactPage = () => {
 
                 <button
                   type="submit"
-                  className="w-full bg-[#1a9fd4] hover:bg-[#1589b8] text-white font-semibold text-sm py-2.5 rounded-lg transition-colors duration-200"
+                  className="w-full bg-[#1B9EE0] hover:bg-[#1589b8] text-white font-semibold text-[16px] py-3 rounded-[16px] transition-colors duration-200"
                 >
                   Send message
                 </button>
@@ -189,9 +200,9 @@ const ContactPage = () => {
             </div>
 
             {/* Map */}
-            <div className="h-64 md:h-auto min-h-[400px]">
+            <div className="h-64 md:h-auto min-h-[400px] px-8 py-16">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d243647.3160087256!2d78.24323046132812!3d17.412281099999998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb99daeaebd2c7%3A0xae93b78392bafbc2!2sHyderabad%2C%20Telangana!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin"
+                src="https://www.google.com/maps?q=17.5195056,78.3918841&z=17&output=embed"
                 width="100%"
                 height="100%"
                 style={{ border: 0, minHeight: "400px" }}
@@ -199,6 +210,7 @@ const ContactPage = () => {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 title="Hyderabad Map"
+                className="rounded-[12px] border-2 border-[#D4D4D4]"
               />
             </div>
           </div>
@@ -206,21 +218,24 @@ const ContactPage = () => {
       </div>
 
       {/* Bottom CTA */}
-      <div className="bg-[#f0f9ff] border-t border-[#d0ecf9]">
+      <div className="flex items-center justify-center ">
+
+      <div className="bg-white m-4 rounded-[16px] drop-shadow-lg max-w-5xl w-full">
         <div className="max-w-2xl mx-auto px-6 py-12 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl md:text-[30px] font-semibold text-[#2F3D43] mb-2">
             Let's get started on something great
           </h2>
-          <p className="text-gray-400 text-sm mb-6">
+          <p className="text-[#686D70] text-16px mb-6">
             Join over 4,000+ startups already growing with Untitled.
           </p>
           <Link
             href="#"
-            className="inline-flex items-center bg-[#1a9fd4] hover:bg-[#1589b8] text-white font-semibold text-sm px-6 py-2.5 rounded-full transition-colors duration-200 shadow-md"
-          >
+            className="inline-flex items-center bg-[#1B9EE0] hover:bg-[#1589b8] text-white font-medium text-[16px] px-6 py-2.5 rounded-full transition-colors duration-200 shadow-md"
+            >
             Get started
           </Link>
         </div>
+            </div>
       </div>
     </div>
   );

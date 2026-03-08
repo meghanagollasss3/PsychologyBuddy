@@ -2,7 +2,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/src/contexts/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
-import QueryProvider from "@/src/providers/QueryProvider"; // ← NEW
+import QueryProvider from "@/src/providers/QueryProvider"; 
 
 const inter = Inter({ subsets: ["latin"] });
 

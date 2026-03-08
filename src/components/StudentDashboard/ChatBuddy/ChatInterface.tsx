@@ -1,5 +1,5 @@
 "use client";
-import { X, Sparkles, Lightbulb, Shield } from "lucide-react";
+import { X, Sparkles, Lightbulb, Shield, ArrowUpRight } from "lucide-react";
 
 import React, { useState, useRef, useCallback } from "react";
 import { Send } from "lucide-react";
@@ -12,16 +12,43 @@ import { NavigationUtils } from "@/src/utils";
 import { FullPageLoading } from "@/components/ui/LoadingSpinner";
 import { AuthError } from "@/components/ui/ErrorMessage";
 import BackToDashboard from "../Layout/BackToDashboard";
-import AutomaticTerminationIndicator from "./AutomaticTerminationIndicator";
+import ReactMarkdown from 'react-markdown';
 
 // Format timestamp to show only hours and minutes
 const formatTime = (timestamp: string) => {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: true 
-  });
+  try {
+    // Handle different timestamp formats
+    let date: Date;
+    
+    if (timestamp.includes('T')) {
+      // ISO format: 2024-03-07T18:30:00.000Z
+      date = new Date(timestamp);
+    } else if (timestamp.includes(':')) {
+      // Time format: 18:30:00
+      const today = new Date();
+      const [hours, minutes, seconds] = timestamp.split(':');
+      date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 
+                    parseInt(hours), parseInt(minutes), parseInt(seconds || '0'));
+    } else {
+      // Fallback - treat as ISO or try direct parsing
+      date = new Date(timestamp);
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp:', timestamp);
+      return 'Invalid Date';
+    }
+    
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  } catch (error) {
+    console.warn('Timestamp parsing error:', error, 'for:', timestamp);
+    return 'Invalid Date';
+  }
 };
 
 // Types
@@ -117,7 +144,18 @@ function ChatMessage({
           <div
             className={`px-3 py-2 sm:px-4 sm:py-3 rounded-[24px] bg-[#F2F8FD] text-gray-800 rounded-tl-sm`}
           >
-            <p className="text-[13px] sm:text-[15px] leading-relaxed break-words">{message.content}</p>
+            <div className="text-[13px] sm:text-[15px] leading-relaxed break-words">
+              {/* Custom parser for bullet points */}
+              <div 
+                dangerouslySetInnerHTML={{
+                  __html: message.content
+                    .replace(/\n/g, '<br>')
+                    .replace(/• (.*?)(<br>|$)/g, '<li class="mb-2 block">• $1</li><br>')
+                    .replace(/<li.*?<br>/g, '<ul class="mb-3 last:mb-0 ml-6 list-disc pl-6"><li')
+                    .replace(/<\/li><br>/g, '</li></ul><br>')
+                }}
+              />
+            </div>
             
             {/* Legacy Import Suggestion UI (for backward compatibility) */}
             {message.importSuggestion?.show && (
@@ -229,6 +267,93 @@ function ChatInput({
         >
           <Image src="/Icons/Vector.png" alt="Send" width={16} height={16} className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6"></Image>
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// Exercise Suggestions Component (as bot message)
+function ExerciseSuggestions({ 
+  suggestions, 
+  onSuggestionClick, 
+  onDismiss 
+}: { 
+  suggestions: any[];
+  onSuggestionClick: (suggestion: any) => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="flex justify-start mb-4">
+      <div className="flex gap-2 max-w-[85%] sm:max-w-[75%]">
+        {/* <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1B9EE0] to-[#4FC3F7] flex items-center justify-center flex-shrink-0">
+          <Image
+            src="/Logo.png"
+            alt="Psychology Buddy"
+            width={20}
+            height={20}
+            className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
+          />
+        </div> */}
+        
+        <div className="flex-1">
+          <div className="mb-1 sm:hidden">
+            <span className="inline-block align-middle">
+              <Image 
+                src="/Logo.png" 
+                alt="Psychology Buddy Logo" 
+                width={16}
+                height={16}
+                className="w-4 h-4"
+              />
+            </span>
+            <span className="inline-block align-middle text-[11px] font-semibold bg-gradient-to-r from-[#206894] to-[#36AFFA] bg-clip-text text-transparent ml-1">
+              Psychology Buddy
+            </span>
+          </div>
+          
+          {/* Logo and Label on Same Line - Desktop Only */}
+          <div className="mb-1 hidden sm:block">
+            <span className="inline-block align-middle">
+              <Image 
+                src="/Logo.png" 
+                alt="Psychology Buddy Logo" 
+                width={20}
+                height={20}
+                className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
+              />
+            </span>
+            <span className="inline-block align-middle text-[13px] font-semibold bg-gradient-to-r from-[#206894] to-[#36AFFA] bg-clip-text text-transparent ml-2">
+              Psychology Buddy
+            </span>
+          </div>
+          
+          <div className="px-3 py-2 sm:px-4 sm:py-3 rounded-[24px] bg-[#F2F8FD] text-gray-800 rounded-tl-sm">
+            <div className="text-[13px] sm:text-[15px] leading-relaxed break-words">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-[#2F3D43] mb-2">Try these exercises</h3>
+                <p className="text-xs text-gray-600">
+                  Based on our conversation, these exercises might help you feel better:
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                {suggestions.map((suggestion, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="text-[#2F3D43] px-2 bg-[#D5E4EF] w-[25px] h-[25px] rounded-full font-medium">{index + 1}</span>
+                    <button
+                      onClick={() => onSuggestionClick(suggestion)}
+                      className="text-[16px] text-[#1B9EE0] hover:text-blue-800 underline font-medium flex items-center gap-1"
+                    >
+                      {suggestion.title}
+                      {/* <span>→</span> */}
+                      <ArrowUpRight className="w-4 h-4"/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -511,12 +636,149 @@ export default function ChatInterface({
     }
   }, [user, mood, accessMood, triggers, accessTriggers, notes, accessNotes, hookMessages, hookSessionId, hookIsLoading, initializeChat]);
 
-  // Auto-scroll to bottom
+  // State to track if last message was from user
+  const [lastMessageWasFromUser, setLastMessageWasFromUser] = useState(false);
+  
+  // State for exercise suggestions
+  const [showExerciseSuggestions, setShowExerciseSuggestions] = useState(false);
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<any[]>([]);
+  const [studentMessageCount, setStudentMessageCount] = useState(0);
+
+  // Auto-scroll to bottom - only when user sends message, not when bot responds
   React.useEffect(() => {
-    if (chatRef.current) {
+    if (chatRef.current && lastMessageWasFromUser) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      setLastMessageWasFromUser(false);
     }
-  }, [hookMessages, isLoading]);
+  }, [hookMessages, lastMessageWasFromUser]);
+
+  // Track when user sends messages and count them
+  React.useEffect(() => {
+    if (hookMessages.length > 0) {
+      const lastMessage = hookMessages[hookMessages.length - 1];
+      if (lastMessage.sender === 'student') {
+        setLastMessageWasFromUser(true);
+        setStudentMessageCount(prev => {
+          const newCount = prev + 1;
+          // Show exercise suggestions after 5 student messages
+          if (newCount === 5) {
+            fetchExerciseSuggestions();
+          }
+          return newCount;
+        });
+      }
+    }
+  }, [hookMessages]);
+
+  // Fetch exercise suggestions
+  const fetchExerciseSuggestions = async () => {
+    try {
+      const [musicRes, meditationRes, articlesRes] = await Promise.all([
+        fetch('/api/student/music/recommended'),
+        fetch('/api/student/meditation'),
+        fetch('/api/articles')
+      ]);
+
+      // Handle different response formats
+      let musicData = [];
+      let meditationData = [];
+      let articlesData = [];
+
+      if (musicRes.ok) {
+        const musicResult = await musicRes.json();
+        musicData = Array.isArray(musicResult) ? musicResult : (musicResult.data || musicResult.music || []);
+      }
+
+      if (meditationRes.ok) {
+        const meditationResult = await meditationRes.json();
+        meditationData = Array.isArray(meditationResult) ? meditationResult : (meditationResult.data || meditationResult.meditations || []);
+      }
+
+      if (articlesRes.ok) {
+        const articlesResult = await articlesRes.json();
+        articlesData = Array.isArray(articlesResult) ? articlesResult : (articlesResult.data || articlesResult.articles || []);
+      }
+
+      const suggestions = [
+        ...musicData.slice(0, 2).map((item: any) => ({
+          type: 'music',
+          title: item.title || 'Music Therapy',
+          description: item.description || 'Calming music session',
+          url: '/students/selfhelptools/music',
+          icon: '🎵'
+        })),
+        ...meditationData.slice(0, 2).map((item: any) => ({
+          type: 'meditation',
+          title: item.title || 'Meditation',
+          description: item.description || 'Guided meditation',
+          url: '/students/selfhelptools/meditation',
+          icon: '🧘'
+        })),
+        ...articlesData.slice(0, 2).map((item: any) => ({
+          type: 'article',
+          title: item.title || 'Helpful Article',
+          description: item.description || 'Educational content',
+          url: '/students/library',
+          icon: '📚'
+        })),
+        {
+          type: 'journaling',
+          title: 'Journaling',
+          description: 'Express your thoughts through writing',
+          url: '/students/selfhelptools/journaling',
+          icon: '📝'
+        }
+      ].slice(0, 4); // Limit to 4 suggestions
+
+      setExerciseSuggestions(suggestions);
+      setShowExerciseSuggestions(true);
+    } catch (error) {
+      console.error('Error fetching exercise suggestions:', error);
+      // Fallback to default suggestions if API fails
+      const fallbackSuggestions = [
+        {
+          type: 'music',
+          title: 'Music Therapy',
+          description: 'Calming music to help you relax',
+          url: '/students/selfhelptools/music',
+          icon: '🎵'
+        },
+        {
+          type: 'meditation',
+          title: 'Meditation',
+          description: 'Guided meditation exercises',
+          url: '/students/selfhelptools/meditation',
+          icon: '🧘'
+        },
+        {
+          type: 'journaling',
+          title: 'Journaling',
+          description: 'Write down your thoughts and feelings',
+          url: '/students/selfhelptools/journaling',
+          icon: '📝'
+        },
+        {
+          type: 'article',
+          title: 'Helpful Articles',
+          description: 'Educational content about mental health',
+          url: '/students/library',
+          icon: '📚'
+        }
+      ];
+      setExerciseSuggestions(fallbackSuggestions);
+      setShowExerciseSuggestions(true);
+    }
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion: any) => {
+    router.push(suggestion.url);
+  };
+
+  // Dismiss suggestions
+  const dismissSuggestions = () => {
+    setShowExerciseSuggestions(false);
+  };
 
   // Auto-import summary text into input when coming from summaries page
   // REMOVED: We don't want to automatically set the input when importing from reflections
@@ -577,12 +839,6 @@ export default function ChatInterface({
           </div>
           )}
 
-          {/* Automatic Termination Indicator */}
-          <AutomaticTerminationIndicator 
-            isActive={!!hookSessionId && !isImportingFromReflections}
-            messageCount={hookMessages.length}
-          />
-
           {/* Chat Area */}
           <div ref={chatRef} className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-15 py-3 sm:py-4 lg:py-6 bg-white">
            
@@ -621,6 +877,15 @@ export default function ChatInterface({
                 onDismissSummary={handleDismissSummary}
               />
             ))}
+
+            {/* Exercise Suggestions */}
+            {showExerciseSuggestions && (
+              <ExerciseSuggestions
+                suggestions={exerciseSuggestions}
+                onSuggestionClick={handleSuggestionClick}
+                onDismiss={dismissSuggestions}
+              />
+            )}
 
             {isLoading && <TypingIndicator />}
 

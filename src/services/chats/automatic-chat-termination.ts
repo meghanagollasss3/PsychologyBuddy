@@ -9,10 +9,10 @@ export interface ChatTerminationResult {
 
 export class AutomaticChatTermination {
   private static terminationCheckInterval = 3000; // Check every 3 seconds after 10 messages
-  private static minMessagesForAnalysis = 10; // Production threshold
+  private static minMessagesForAnalysis = 50; // Increased to prevent early termination
   private static terminationThreshold = 70; // Production threshold
-  private static maxSessionDuration = Number(process.env.CHAT_SESSION_DURATION_MINUTES || 1) * 60 * 1000; // Configurable: default 10 minutes
-  private static warningTime = Number(process.env.CHAT_WARNING_TIME_MINUTES || 2) * 60 * 1000; // Configurable: default 2 minutes
+  private static maxSessionDuration = Number(process.env.CHAT_SESSION_DURATION_MINUTES || 15) * 60 * 1000; // Configurable: default 15 minutes
+  private static warningTime = Number(process.env.CHAT_WARNING_TIME_MINUTES || 3) * 60 * 1000; // Configurable: default 3 minutes
 
   /**
    * Configure session duration settings
@@ -95,32 +95,6 @@ export class AutomaticChatTermination {
       };
     }
 
-    // TEMPORARY TEST: Force termination for testing summary generation
-    const lastUserMessage = messages.filter(m => m.sender === 'student').pop();
-    if (lastUserMessage && (
-      lastUserMessage.content.toLowerCase().includes('test') ||
-      lastUserMessage.content.toLowerCase().includes('end') ||
-      lastUserMessage.content.toLowerCase().includes('thank') ||
-      lastUserMessage.content.toLowerCase().includes('bye') ||
-      lastUserMessage.content.toLowerCase().includes('goodbye') ||
-      lastUserMessage.content.toLowerCase().includes('summary') // Added 'summary' keyword for testing
-    )) {
-      console.log(`[AutoTermination] TEST TRIGGER: Found test keyword in "${lastUserMessage.content}"`);
-      return {
-        shouldTerminate: true,
-        reason: 'TEST: Forced termination for debugging summary generation',
-        analysis: {
-          shouldEnd: true,
-          reason: 'Test trigger',
-          completionScore: 100,
-          nextSteps: [],
-          emotionalProgress: { improvement: true },
-          conversationQuality: { depth: 'deep', engagement: 'high', resolution: 'complete' }
-        },
-        closingMessage: "This is a test closing message. Let me generate a summary for our conversation."
-      };
-    }
-
     console.log(`[AutoTermination] Proceeding with normal analysis`);
     
     try {
@@ -138,7 +112,7 @@ export class AutomaticChatTermination {
         shouldTerminate: analysis.shouldEnd,
         reason: analysis.reason,
         analysis,
-        closingMessage
+        closingMessage,
       };
     } catch (error) {
       console.error(`[AutoTermination] Error in conversation analysis:`, error);
