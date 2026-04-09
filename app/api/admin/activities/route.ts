@@ -9,13 +9,31 @@ export const GET = withPermission({
   try {
     // Parse query parameters
     const { searchParams } = new URL(request.url);
+    console.log('Activities API: Raw URL', request.url);
+    console.log('Activities API: Raw searchParams', Object.fromEntries(searchParams.entries()));
+    
     const search = searchParams.get('search') || undefined;
     const type = searchParams.get('type') || undefined;
     const classId = searchParams.get('classId') || undefined;
     const schoolId = searchParams.get('schoolId') || undefined;
     const dateRange = searchParams.get('dateRange') || undefined;
+    const timeFilter = searchParams.get('timeFilter') || undefined;
+    const startDate = searchParams.get('startDate') || undefined;
+    const endDate = searchParams.get('endDate') || undefined;
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
+
+    console.log('Activities API: Received params', {
+      timeFilter,
+      startDate,
+      endDate,
+      search,
+      type,
+      classId,
+      schoolId,
+      limit,
+      offset
+    });
 
     // Get activities with role-based filtering
     const result = await RecentActivityService.getRecentActivities(
@@ -26,6 +44,9 @@ export const GET = withPermission({
         classId,
         schoolId,
         dateRange,
+        timeFilter,
+        startDate,
+        endDate,
         limit,
         offset
       }

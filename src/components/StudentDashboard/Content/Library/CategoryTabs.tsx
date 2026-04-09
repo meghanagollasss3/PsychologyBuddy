@@ -31,7 +31,7 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange }: Cat
     const fetchCategories = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/library/metadata');
+        const response = await fetch('/api/student/library/metadata');
         
         if (!response.ok) {
           throw new Error('Failed to fetch categories');
@@ -69,9 +69,9 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange }: Cat
   if (loading) {
     return (
       <div className="w-full overflow-x-auto pb-2 sm:pb-4 scrollbar-hide">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-max">
+        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 min-w-max">
           {[...Array(6)].map((_, index) => (
-            <div key={index} className="h-10 sm:h-12 lg:h-14 px-3 sm:px-4 lg:px-6 rounded-xl sm:rounded-2xl bg-gray-200 animate-pulse w-20 sm:w-24"></div>
+            <div key={index} className="h-8 sm:h-10 md:h-12 lg:h-14 px-2 sm:px-3 md:px-4 lg:px-6 rounded-lg sm:rounded-xl md:rounded-2xl bg-gray-200 animate-pulse w-16 sm:w-20 md:w-24"></div>
           ))}
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange }: Cat
 
   return (
     <div className="w-full ml-[2px] overflow-x-auto pb-2 sm:pb-4 scrollbar-hide">
-      <div className="flex items-center gap-2 sm:gap-3 min-w-max h-10 sm:h-12 lg:h-[66px]">
+      <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 min-w-max h-8 sm:h-10 md:h-12 lg:h-14">
         {allCategories.map((cat) => {
           const Icon = defaultIconMap[cat.name];
           const isActive = selectedCategory === cat.id;
@@ -88,19 +88,20 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange }: Cat
           return (
             <button
               key={cat.id}
-              
               onClick={() => onCategoryChange(cat.id)}
               className={`
-                h-10 sm:h-12 lg:h-14 px-3 sm:px-4 lg:px-6 rounded-xl sm:rounded-[16px] flex items-center gap-2 sm:gap-3 font-base transition-all shadow-sm border text-xs sm:text-sm lg:text-base
+                h-7 sm:h-9 md:h-11 lg:h-14 px-2 sm:px-3 md:px-4 lg:px-6 rounded-lg sm:rounded-xl md:rounded-[16px] flex items-center gap-1.5 sm:gap-2 md:gap-3 font-base transition-all shadow-sm border text-xs sm:text-sm md:text-base lg:text-base flex-shrink-0
                 ${isActive 
                   ? 'bg-[#1C76DC] text-white' 
                   : 'bg-white text-slate-600 border-slate-200 hover:shadow-md'
                 }
               `}
             >
-              {Icon && <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />}
-              <span className="hidden xs:block sm:block">{cat.name}</span>
-              <span className="block xs:hidden sm:hidden text-xs">{cat.name.length > 10 ? cat.name.substring(0, 8) + '...' : cat.name}</span>
+              {Icon && <Icon className={`w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />}
+              <span className="hidden sm:block">{cat.name}</span>
+              <span className="block sm:hidden text-xs">
+                {cat.name.length > 8 ? cat.name.substring(0, 6) + '...' : cat.name}
+              </span>
             </button>
           );
         })}

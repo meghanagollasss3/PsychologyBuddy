@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react'
 
-export interface SummaryPreview {
+export interface LastSessionMessage {
   id: string
-  mainTopic: string
-  createdAt: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
 }
 
-// Add debug interface to see what we actually get
-interface RawSummaryData {
-  id?: string
-  mainTopic?: string
-  title?: string // Might be 'title' instead of 'mainTopic'
-  createdAt?: string
-  [key: string]: any
+export interface LastSessionData {
+  sessionId: string
+  id: string // Add missing id field for compatibility
+  mainTopic: string
+  conversationAbout?: string
+  reflection?: string
+  createdAt: string
+  messages: LastSessionMessage[]
+  sessionStartedAt: string
 }
 
 export interface UseChatSummaryOptions {
@@ -20,39 +23,31 @@ export interface UseChatSummaryOptions {
 }
 
 export function useChatSummary({ studentId }: UseChatSummaryOptions) {
-  const [lastSummary, setLastSummary] = useState<SummaryPreview | null>(null)
+  const [lastSession, setLastSession] = useState<LastSessionData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchLastSummary = async () => {
+  const fetchLastSession = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch(`/api/students/summary/last?studentId=${studentId}`)
+      const response = await fetch(`/api/students/chat/last-session?studentId=${studentId}`)
       const data = await response.json()
       
-      console.log('Last summary API response:', data) // Debug log
+      console.log('Last session API response:', data)
       
       if (data.success && data.data) {
-        const rawData: RawSummaryData = data.data
-        console.log('Raw summary data:', rawData) // Debug log
+        const sessionData = data.data
+        console.log('Full session data:', sessionData)
         
-        // Transform the data to match our interface
-        const transformedSummary: SummaryPreview = {
-          id: rawData.id || '',
-          mainTopic: rawData.mainTopic || rawData.title || 'Previous Conversation',
-          createdAt: rawData.createdAt || new Date().toISOString()
-        }
-        
-        console.log('Transformed summary:', transformedSummary) // Debug log
-        setLastSummary(transformedSummary)
+        setLastSession(sessionData)
       } else {
-        console.log('No summary data found or API returned error:', data) // Debug log
-        setLastSummary(null)
+        console.log('No session data found:', data)
+        setLastSession(null)
       }
     } catch (err) {
-      console.error('Error fetching last summary:', err) // Debug log
+      console.error('Error fetching last session:', err)
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)
@@ -61,29 +56,50 @@ export function useChatSummary({ studentId }: UseChatSummaryOptions) {
 
   useEffect(() => {
     if (studentId) {
-      fetchLastSummary()
+      fetchLastSession()
     }
   }, [studentId])
 
-  const importLastSummary = () => {
-    console.log('importLastSummary called, lastSummary:', lastSummary) // Debug log
+  const importLastSession = () => {
+    console.log('importLastSession called, lastSession:', lastSession)
     
-    if (!lastSummary) {
-      console.log('No last summary found') // Debug log
+    if (!lastSession) {
+      console.log('No last session found')
       return ''
     }
     
-    const topic = lastSummary.mainTopic || 'our previous conversation'
-    console.log('Using topic:', topic) // Debug log
+    const topic = lastSession.mainTopic || 'our previous conversation'
+    console.log('Using topic:', topic)
     
     return `I want to continue talking about: ${topic}`
   }
 
+  const getLastSessionMessages = () => {
+    console.log('getLastSessionMessages called - lastSession:', lastSession)
+    if (!lastSession?.messages) {
+      console.log('No lastSession or messages found')
+      return []
+    }
+    
+    console.log('Converting messages:', lastSession.messages)
+    // Convert database messages to chat format
+    const convertedMessages = lastSession.messages.map(msg => ({
+      id: msg.id,
+      sender: (msg.role === 'user' ? 'student' : 'bot') as "student" | "bot",
+      content: msg.content,
+      timestamp: msg.timestamp,
+      type: 'normal' as const
+    }))
+    console.log('Converted messages:', convertedMessages)
+    return convertedMessages
+  }
+
   return {
-    lastSummary,
+    lastSession,
     loading,
     error,
-    fetchLastSummary,
-    importLastSummary
+    fetchLastSession,
+    importLastSession,
+    getLastSessionMessages
   }
 }

@@ -4,6 +4,7 @@ import React from "react";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { usePermissions } from "@/src/hooks/usePermissions";
 import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
+import { useTimeFilter } from "@/src/contexts/TimeFilterContext";
 
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
 import StatsCards from "./StatsCards";
@@ -23,21 +24,23 @@ export function DashboardOverview() {
   const { user } = useAuth();
   const permissions = usePermissions();
   const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } = useSchoolFilter();
+  const { timeFilter, dateRange } = useTimeFilter();
 
-  const { data: stats, isLoading } = useDashboardStats(selectedSchoolId, isSuperAdmin, user);
-  const { data: classData } = useClassData(selectedSchoolId, isSuperAdmin, user);
-  const { data: moodData } = useMoodData(selectedSchoolId, isSuperAdmin, user);
-  const { data: triggerData } = useTriggerData(selectedSchoolId, isSuperAdmin, user);
+  const { data: stats, isLoading } = useDashboardStats(selectedSchoolId, isSuperAdmin, user, timeFilter, dateRange);
+  const { data: classData } = useClassData(selectedSchoolId, isSuperAdmin, user, timeFilter, dateRange);
+  const { data: moodData } = useMoodData(selectedSchoolId, isSuperAdmin, user, timeFilter, dateRange);
+  const { data: triggerData } = useTriggerData(selectedSchoolId, isSuperAdmin, user, timeFilter, dateRange);
 
   return (
     <div>
       <AdminHeader
         title={`Welcome back, ${user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "Admin"}`}
         subtitle="Here's what's happening today"
-        showSchoolFilter={isSuperAdmin}
+        showSchoolFilter={user?.role?.name === 'SUPERADMIN'}
         schoolFilterValue={selectedSchoolId}
         schools={schools}
         onSchoolFilterChange={setSelectedSchoolId}
+        showTimeFilter={true}
       />
     <div className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">
 
@@ -60,13 +63,14 @@ export function DashboardOverview() {
                 data={Array.isArray(moodData?.chartData) ? moodData.chartData : []}
                 totalCheckins={moodData?.totalCheckins || 0}
                 dominantMood={moodData?.dominantMood || null}
+                timeRange={timeFilter || 'all'}
               />
       
               {/* Emotional Triggers Chart */}
               <TriggerAnalysisChart 
                 data={Array.isArray(triggerData?.chartData) ? triggerData.chartData : []}
                 totalReports={triggerData?.totalReports || 0}
-                timeRange={triggerData?.timeRange || 'week'}
+                timeRange={timeFilter || 'all'}
               />
             </div>
               <div className="flex-1 overflow-auto space-y-6 animate-fade-in">

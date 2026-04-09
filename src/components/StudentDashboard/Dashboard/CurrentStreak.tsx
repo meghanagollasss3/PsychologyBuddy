@@ -61,14 +61,14 @@ export default function CurrentStreak() {
   /* ------------------------------ Loading State ------------------------------ */
   if (isLoading) {
     return (
-      <div className="rounded-2xl p-5 bg-orange-50 animate-pulse h-[150px]" />
+      <div className="rounded-2xl p-4 sm:p-5 bg-orange-50 animate-pulse h-[130px] sm:h-[150px]" />
     );
   }
 
   /* ------------------------------ Error State ------------------------------ */
   if (isError || !data) {
     return (
-      <div className="rounded-2xl p-5 bg-orange-50 h-[150px] flex items-center justify-center">
+      <div className="rounded-2xl p-4 sm:p-5 bg-orange-50 h-[130px] sm:h-[150px] flex items-center justify-center">
         <p className="text-sm text-gray-600">Failed to load streak</p>
       </div>
     );
@@ -78,47 +78,43 @@ export default function CurrentStreak() {
   return (
     <div
       className="
-        rounded-2xl p-5 
+        rounded-[12px] sm:rounded-[14px] md:rounded-2xl p-4 sm:p-5 
         bg-gradient-to-br 
                  from-[#ffeada8f] via-[#FFFBF8] to-[#ffeada88] drop-shadow-sm
         border-2 border-[#ffffff] 
-        shadow-sm w-auto
+        shadow-sm w-full
       "
     >
-      {/* HEADER */}
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3 ml-5">
-          <div className="w-[48px] h-[48px] rounded-xl flex items-center justify-center 
+        <div className="flex items-center gap-2 sm:gap-3 ml-2 sm:ml-5">
+          <div className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px] md:w-[48px] md:h-[48px] rounded-xl flex items-center justify-center 
                          bg-gradient-to-br from-[#FFECDE] to-[#FBE1CF] drop-shadow-xl">
-            <Flame className="h-6 w-6 text-[#FB9A56]" />
+            <Flame className="h-5 w-5 sm:h-5.5 sm:w-5.5 md:h-6 md:w-6 text-[#FB9A56]" />
           </div>
 
           <div>
-            <h3 className="text-[20px] font-semibold text-[#2F3D43]">
+            <h3 className="text-[16px] sm:text-[18px] md:text-[20px] font-semibold text-[#2F3D43]">
               Current Streak
             </h3>
-            <p className="text-[14px] text-[#767676]">Keep showing up!</p>
+            <p className="text-[12px] sm:text-[13px] md:text-[14px] text-[#767676]">Keep showing up!</p>
           </div>
         </div>
 
-        {/* Number (07 Days) */}
-        <div className="text-right mr-4">
-          <p className="text-[32px] font-semibold text-[#E57C30] leading-none">
+        <div className="text-right mr-2 sm:mr-4">
+          <p className="text-[24px] sm:text-[28px] md:text-[32px] font-semibold text-[#E57C30] leading-none">
             {String(displayValue).padStart(2, "0")}
           </p>
-          <p className="text-[16px] text-[#7C7C7C]">Days</p>
+          <p className="text-[14px] sm:text-[15px] md:text-[16px] text-[#7C7C7C]">Days</p>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="w-[480px] ml-6 mt-8 h-[1px] bg-[#D0D0D0] my-4" />
+      <div className="w-full sm:w-[400px] md:w-[480px] ml-2 sm:ml-6 mt-6 sm:mt-8 h-[1px] bg-[#D0D0D0] my-3 sm:my-4" />
 
-      {/* BEST STREAK */}
-      <div className="flex items-center gap-2 ml-5 mt-1">
-        <Trophy className="h-[20px] w-[20px] text-[#9770DB]" />
-        <p className="text-[14px] text-[#767676]">
+      <div className="flex items-center gap-2 ml-2 sm:ml-5 mt-1">
+        <Trophy className="h-[16px] w-[16px] sm:h-[18px] sm:w-[18px] md:h-[20px] md:w-[20px] text-[#9770DB]" />
+        <p className="text-[12px] sm:text-[13px] md:text-[14px] text-[#767676]">
           Your best:{" "}
-          <span className="text-[16px] font-semibold text-[#3A3A3A]">
+          <span className="text-[14px] sm:text-[15px] md:text-[16px] font-semibold text-[#3A3A3A]">
             {streakDetails.best} days
           </span>
         </p>

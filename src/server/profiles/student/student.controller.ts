@@ -33,18 +33,23 @@ export class StudentController {
   static getStudents = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'VIEW' 
-  })(async (req: NextRequest, { user }: any) => {
+  })(async (req: NextRequest, ctx: any) => {
     try {
       const { searchParams } = new URL(req.url);
       const search = searchParams.get('search') || undefined;
       const status = searchParams.get('status') || undefined;
       const classId = searchParams.get('classId') || undefined;
+      const locationId = searchParams.get('locationId') || undefined;
       const schoolIdParam = searchParams.get('schoolId') || undefined;
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = parseInt(searchParams.get('limit') || '5');
 
       // Get schoolId from user, but allow override for SUPERADMIN
-      const userSchoolId = user.school?.id || user.schoolId;
+      const userSchoolId = ctx.user.school?.id || ctx.user.schoolId;
       let schoolId;
-      if (user.role.name === 'SUPERADMIN') {
+      let effectiveLocationId = locationId;
+
+      if (ctx.user.role.name === 'SUPERADMIN') {
         // For SUPERADMIN: 
         // - If schoolIdParam is 'all' or not provided, show all schools (undefined)
         // - If specific schoolIdParam is provided, show that school only
@@ -55,17 +60,31 @@ export class StudentController {
         }
       } else {
         schoolId = userSchoolId; // Must exist for non-SUPERADMIN
+
+        // For ADMIN users, restrict to their assigned locations
+        if (ctx.user.role.name === 'ADMIN' && ctx.userLocationIds && ctx.userLocationIds.length > 0) {
+          // If no location filter is specified, default to their first assigned location
+          if (!effectiveLocationId || effectiveLocationId === 'all') {
+            effectiveLocationId = ctx.userLocationIds[0];
+          } else {
+            // Verify the requested location is one of their assigned locations
+            if (!ctx.userLocationIds.includes(effectiveLocationId)) {
+              effectiveLocationId = ctx.userLocationIds[0]; // Fall back to first assigned location
+            }
+          }
+        }
       }
 
-      console.log('getStudents called with:', { userRole: user.role.name, schoolId, schoolIdParam, userSchoolId });
+      console.log('getStudents called with:', { userRole: ctx.user.role.name, schoolId, schoolIdParam, userSchoolId, locationId, effectiveLocationId });
       console.log('User object:', { 
-        userId: user.id, 
-        userSchoolId: user.schoolId, 
-        userSchool: user.school,
-        userRole: user.role?.name 
+        userId: ctx.user.id, 
+        userSchoolId: ctx.user.schoolId, 
+        userSchool: ctx.user.school,
+        userRole: ctx.user.role?.name,
+        userLocationIds: ctx.userLocationIds
       });
 
-      const result = await StudentService.getStudentsBySchool(schoolId, { search, status, classId });
+      const result = await StudentService.getStudentsBySchool(schoolId, { search, status, classId, locationId: effectiveLocationId, page, limit });
       return NextResponse.json(result);
     } catch (error) {
       console.error('Get students error:', error);
@@ -220,10 +239,12 @@ export class StudentController {
     action: 'UPDATE' 
   })(async (req: NextRequest, { params }: any) => {
     try {
+      // Await params for Next.js 15+
+      const { id } = await params;
       const body = await req.json();
       const validatedData = UpdateStudentStatusSchema.parse(body);
       
-      const result = await StudentService.updateStudentStatus(params.id, validatedData);
+      const result = await StudentService.updateStudentStatus(id, validatedData);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Update student status error:', error);
@@ -238,7 +259,9 @@ export class StudentController {
     action: 'DELETE' 
   })(async (req: NextRequest, { params }: any) => {
     try {
-      const result = await StudentService.deleteStudent(params.id);
+      // Await params for Next.js 15+
+      const { id } = await params;
+      const result = await StudentService.deleteStudent(id);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Delete student error:', error);

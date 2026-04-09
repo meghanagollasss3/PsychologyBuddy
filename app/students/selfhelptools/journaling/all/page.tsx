@@ -183,7 +183,7 @@ export default function AllJournalsPage() {
                   key={journal.id}
                   className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-lg hover:shadow-cyan-500/5 transition-all cursor-pointer group"
                   onClick={() =>
-                    router.push(`/students/journaling/${journal.id}`)
+                    router.push(`/students/selfhelptools/journaling/${journal.id}`)
                   }
                 >
                   <div className="flex items-start justify-between mb-4">

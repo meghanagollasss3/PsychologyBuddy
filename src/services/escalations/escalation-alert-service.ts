@@ -78,28 +78,143 @@ export class EscalationAlertService {
   }
 
   /**
-   * Generates alert description for display
+   * Generates alert description for display using AI
    */
-  private static generateAlertDescription(detection: EscalationDetection): string {
-    const categoryDescriptions = {
-      self_harm: 'Self-harm or suicidal ideation detected in conversation',
-      violence: 'Violent thoughts or threats detected in conversation',
-      abuse: 'Abuse or harassment disclosure detected in conversation',
-      substance_abuse: 'Substance abuse concerns detected in conversation',
-      mental_health_crisis: 'Mental health crisis indicators detected in conversation',
-      behavioral_concern: 'Behavioral concerns detected in conversation',
-      check_in_missed: 'Student has missed scheduled check-ins',
-      mood_trend_decline: 'Declining mood trend detected in recent check-ins',
-      other: 'Concerning content detected in conversation'
-    };
-
-    const baseDescription = categoryDescriptions[detection.category.type] || 'Concerning content detected';
+  private static async generateAlertDescription(detection: EscalationDetection): Promise<string> {
+    const { category, detectedPhrases, context } = detection;
     
-    if (detection.detectedPhrases.length > 0) {
-      return `${baseDescription}. Key indicators: ${detection.detectedPhrases.slice(0, 3).join(', ')}`;
+    // For behavioral alerts, use contextual descriptions
+    if (category.type === 'check_in_missed' || category.type === 'mood_trend_decline') {
+      switch (category.type) {
+        case 'check_in_missed':
+          return 'Check-in compliance issues detected. Student has missed scheduled wellness check-ins and may need outreach support.';
+        case 'mood_trend_decline':
+          return 'Mood decline indicators detected in check-ins. Student reported worsening emotional state over time.';
+      }
     }
     
-    return baseDescription;
+    // For content-based escalations, generate AI-powered contextual summary
+    return this.generateContextualSummary(detection);
+  }
+
+  /**
+   * Generates AI-powered contextual summary based on student's actual message
+   */
+  private static async generateContextualSummary(detection: EscalationDetection): Promise<string> {
+    const { category, detectedPhrases, context } = detection;
+    
+    // Use AI to generate a dynamic, contextual summary
+    return this.generateAISummary(detection);
+  }
+
+  /**
+   * Uses AI to generate dynamic, personalized alert summaries
+   */
+  private static async generateAISummary(detection: EscalationDetection): Promise<string> {
+    try {
+      const { category, detectedPhrases, context } = detection;
+      
+      // Create a prompt for the AI to generate a contextual summary
+      const prompt = `You are a school mental health professional analyzing a student's message for escalation alerts. 
+
+Student's message: "${context}"
+
+Detected concern category: ${category.type.replace('_', ' ')}
+Trigger phrases: ${detectedPhrases.join(', ')}
+
+Generate a concise, professional 2-sentence alert summary that:
+1. Identifies the type of concern detected
+2. Briefly explains how the student expressed their feelings in their own words
+3. Indicates the level of urgency
+
+Requirements:
+- Use professional but caring language
+- Include a brief quote or paraphrase of the student's actual expression
+- Be specific to this student's message (not generic)
+- Keep it under 150 characters total
+- Focus on the student's emotional state and expression
+
+Examples:
+- "Self-harm ideation detected. Student expressed feeling hopeless and wanting to end their life - requires immediate intervention."
+- "Anxiety indicators detected. Student reported overwhelming panic and inability to focus - needs urgent support."
+- "Substance abuse concerns detected. Student disclosed addiction patterns and drinking problems - requires treatment referral."
+
+Generate the summary:`;
+
+      // Call AI to generate the summary
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a professional school counselor creating concise, factual alert summaries for administrators.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 100,
+          temperature: 0.3,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('[EscalationAlert] AI summary generation failed:', response.status);
+        return this.getFallbackSummary(detection);
+      }
+
+      const data = await response.json();
+      const aiSummary = data.choices?.[0]?.message?.content?.trim();
+      
+      if (aiSummary) {
+        return aiSummary;
+      } else {
+        return this.getFallbackSummary(detection);
+      }
+      
+    } catch (error) {
+      console.error('[EscalationAlert] Error generating AI summary:', error);
+      return this.getFallbackSummary(detection);
+    }
+  }
+
+  /**
+   * Fallback summary generation if AI fails
+   */
+  private static getFallbackSummary(detection: EscalationDetection): string {
+    const { category, context } = detection;
+    
+    // Extract the most relevant part of student's message
+    const studentMessage = context.length > 80 ? context.substring(0, 80) + '...' : context;
+    
+    const categoryLabels = {
+      self_harm: 'Self-harm concerns',
+      violence: 'Violent ideation',
+      abuse: 'Abuse disclosure',
+      substance_abuse: 'Substance abuse',
+      mental_health_crisis: 'Mental health crisis',
+      behavioral_concern: 'Behavioral concerns',
+      check_in_missed: 'Check-in compliance',
+      mood_trend_decline: 'Mood decline',
+      other: 'Concerning content'
+    };
+    
+    const label = categoryLabels[category.type] || 'Concerning content';
+    
+    if (category.type === 'check_in_missed') {
+      return 'Student missed scheduled check-ins - requires follow-up and wellness check.';
+    } else if (category.type === 'mood_trend_decline') {
+      return 'Declining mood trend detected in check-ins - needs proactive support and monitoring.';
+    } else {
+      return `${label} detected. Student expressed: "${studentMessage}" - requires professional attention.`;
+    }
   }
 
   /**
@@ -161,7 +276,7 @@ export class EscalationAlertService {
           detectedPhrases: detection.detectedPhrases,
           context: detection.context,
           recommendation: detection.recommendation,
-          description: this.generateAlertDescription(detection),
+          description: await this.generateAlertDescription(detection),
           detectionMethod: this.generateTriggerSource(detection),
           messageContent: detection.context, // Use context as message content for behavioral alerts
           messageTimestamp: detection.timestamp,
@@ -286,7 +401,7 @@ export class EscalationAlertService {
           detectedPhrases: detection.detectedPhrases,
           context: detection.context,
           recommendation: detection.recommendation,
-          description: this.generateAlertDescription(detection),
+          description: await this.generateAlertDescription(detection),
           detectionMethod: this.generateTriggerSource(detection),
           messageContent,
           messageTimestamp,
@@ -330,8 +445,12 @@ export class EscalationAlertService {
     requiresImmediateAction: boolean
   ): Promise<void> {
     try {
+      console.log(`[EscalationAlert] Starting notifications for alert ${alertId} (level: ${level})`)
+      
       // Get notification settings based on escalation level
       const notificationSettings = await this.getNotificationSettings(level)
+      
+      console.log(`[EscalationAlert] Email notifications enabled: ${notificationSettings.channels.find(c => c.type === 'email')?.enabled}`)
       
       // Get relevant staff members to notify
       const staffToNotify = await this.getStaffToNotify(level, requiresImmediateAction)
@@ -341,6 +460,7 @@ export class EscalationAlertService {
       // Send notifications through each enabled channel
       for (const channel of notificationSettings.channels) {
         if (channel.enabled) {
+          console.log(`[EscalationAlert] Sending ${channel.type} notification for alert ${alertId}`)
           await this.sendChannelNotification(alertId, channel, staffToNotify, level)
         }
       }
@@ -367,7 +487,7 @@ export class EscalationAlertService {
         },
         {
           type: 'email' as const,
-          enabled: level === 'critical' || level === 'high',
+          enabled: true, // Enable emails for all escalation levels
           config: {
             template: 'escalation_alert',
             urgent: level === 'critical'

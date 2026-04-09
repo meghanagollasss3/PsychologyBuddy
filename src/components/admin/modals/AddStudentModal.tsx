@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { X, UserPlus } from 'lucide-react';
+import { X, UserPlus, ChevronDown, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { SchoolSearch } from './SchoolSearch';
+import { useToast } from '@/components/ui/use-toast';
 
 interface AddStudentModalProps {
   onClose: () => void;
@@ -31,12 +35,14 @@ interface FormData {
   section: string;
   phone: string;
   schoolId: string;
+  locationId: string;
 }
 
 export function AddStudentModal({ onClose, onSuccess, schools, classes, onClassesUpdated }: AddStudentModalProps) {
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const { user } = useAuth();
+  const { toast } = useToast();
   const [formData, setFormData] = useState<FormData>({
     studentId: '',
     firstName: '',
@@ -46,9 +52,75 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
     grade: '10',
     section: 'A',
     phone: '',
-    schoolId: ''
+    schoolId: '',
+    locationId: ''
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+  
+  // School-related sections state
+  const [isSectionPopoverOpen, setIsSectionPopoverOpen] = useState(false);
+  const [newSection, setNewSection] = useState('');
+  const [sections, setSections] = useState<string[]>([]);
+  const [loadingSections, setLoadingSections] = useState(false);
+
+  // School-related locations state
+  const [locations, setLocations] = useState<any[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+
+  // Fetch school sections when school is selected
+  useEffect(() => {
+    const fetchSchoolSections = async () => {
+      if (formData.schoolId) {
+        setLoadingSections(true);
+        try {
+          const response = await fetch(`/api/admin/schools/${formData.schoolId}/sections`);
+          const data = await response.json();
+          if (data.success) {
+            setSections(data.sections || []);
+          } else {
+            setSections([]);
+            toast({ title: "Error", description: "Failed to load school sections", variant: "destructive" });
+          }
+        } catch (error) {
+          console.error('Error fetching school sections:', error);
+          setSections([]);
+          toast({ title: "Error", description: "Failed to load school sections", variant: "destructive" });
+        } finally {
+          setLoadingSections(false);
+        }
+      } else {
+        setSections([]);
+        setFormData(prev => ({ ...prev, section: '' }));
+      }
+    };
+
+    fetchSchoolSections();
+  }, [formData.schoolId]);
+
+  // Fetch school locations when school is selected
+  useEffect(() => {
+    const fetchSchoolLocations = async () => {
+      if (formData.schoolId) {
+        setLoadingLocations(true);
+        try {
+          const response = await fetch(`/api/admin/schools/locations?schoolId=${formData.schoolId}`);
+          const data = await response.json();
+          setLocations(data || []);
+        } catch (error) {
+          console.error('Error fetching school locations:', error);
+          setLocations([]);
+          toast({ title: "Error", description: "Failed to load school locations", variant: "destructive" });
+        } finally {
+          setLoadingLocations(false);
+        }
+      } else {
+        setLocations([]);
+        setFormData(prev => ({ ...prev, locationId: '' }));
+      }
+    };
+
+    fetchSchoolLocations();
+  }, [formData.schoolId]);
 
   // Set schoolId when user changes (for regular admins)
   useEffect(() => {
@@ -182,11 +254,16 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
     else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
       newErrors.password = 'Password must contain uppercase, lowercase, and number';
     }
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
+    // Enhanced email validation
+    if (formData.email && formData.email.trim()) {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email address (e.g., user@domain.com)';
+      }
     }
     if (!formData.grade) newErrors.grade = 'Grade is required';
     if (!formData.section) newErrors.section = 'Section is required';
+    if (!formData.locationId) newErrors.locationId = 'Location is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -227,11 +304,23 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
       if (data.success) {
         onSuccess();
       } else {
-        setSubmitError(data.message || 'Failed to create student');
+        // Handle Zod validation errors specifically
+        if (data.error === 'Valid email required') {
+          setSubmitError('Please enter a valid email address (e.g., user@domain.com)');
+        } else if (data.error && data.error.includes('email')) {
+          setSubmitError('Please enter a valid email address');
+        } else {
+          setSubmitError(data.error || data.message || 'Failed to create student');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating student:', error);
-      setSubmitError('Failed to create student');
+      // Handle specific error messages
+      if (error?.error?.includes('email') || error?.error?.includes('Valid email required')) {
+        setSubmitError('Please enter a valid email address');
+      } else {
+        setSubmitError('Failed to create student. Please check your information and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -263,16 +352,17 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
               {user?.role?.name === 'SUPERADMIN' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    School ID *
+                    School *
                   </label>
-                  <Input
-                    type="text"
-                    value={formData.schoolId}
-                    onChange={(e) => handleInputChange('schoolId', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.schoolId ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter school ID"
+                  <SchoolSearch
+                    onSchoolSelect={(school: any) => {
+                      if (school) {
+                        handleInputChange('schoolId', school.id);
+                      } else {
+                        handleInputChange('schoolId', '');
+                      }
+                    }}
+                    placeholder="Search for a school..."
                   />
                   {errors.schoolId && (
                     <p className="mt-1 text-sm text-red-600">{errors.schoolId}</p>
@@ -401,7 +491,7 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                   <p className="mt-1 text-sm text-red-600">{errors.grade}</p>
                 )}
               </div>
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Section *
                 </label>
@@ -417,9 +507,104 @@ export function AddStudentModal({ onClose, onSuccess, schools, classes, onClasse
                 {errors.section && (
                   <p className="mt-1 text-sm text-red-600">{errors.section}</p>
                 )}
+              </div> */}
+          {/* School-related sections - Only show when school is selected */}
+          {formData.schoolId && (
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label>Section</Label>
+                <Popover open={isSectionPopoverOpen} onOpenChange={setIsSectionPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between hover:bg-gray-200" disabled={loadingSections}>
+                      <span className={formData.section ? "" : "text-muted-foreground"}>
+                        {loadingSections ? "Loading sections..." : (formData.section || "Select section...")}
+                      </span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-2 border bg-white shadow-xl rounded-[6px]" align="start">
+                    <div className="space-y-2">
+                      {sections.length > 0 ? (
+                        sections.map((section) => (
+                          <div key={section} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => { setFormData(prev => ({ ...prev, section })); setIsSectionPopoverOpen(false); }}>
+                            <div className={`h-4 w-4 border rounded-full flex items-center justify-center ${formData.section === section ? 'bg-primary border-primary' : 'border-input'}`}>
+                              {formData.section === section && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
+                            </div>
+                            <span className="text-sm">{section}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          No sections available for this school
+                        </div>
+                      )}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex gap-2">
+                          <Input placeholder="Add new section..." value={newSection} onChange={(e) => setNewSection(e.target.value)} className="h-8 text-sm" onClick={(e) => e.stopPropagation()} />
+                          <Button size="sm" className="h-8" onClick={async (e) => { 
+                            e.stopPropagation(); 
+                            if (newSection.trim() && !sections.includes(newSection.trim())) { 
+                              try {
+                                const response = await fetch(`/api/admin/schools/${formData.schoolId}/sections`, {
+                                  method: 'POST',
+                                  headers: { 
+                                    'Content-Type': 'application/json',
+                                    'x-user-id': user?.id || 'admin@calmpath.ai'
+                                  },
+                                  body: JSON.stringify({ name: newSection.trim() })
+                                });
+                                const result = await response.json();
+                                if (result.success) {
+                                  setSections(prev => [...prev, newSection.trim()]); 
+                                  toast({ title: "Section Added" }); 
+                                  setNewSection(""); 
+                                } else {
+                                  toast({ title: "Error", description: result.error || "Failed to create section", variant: "destructive" });
+                                }
+                              } catch (error) {
+                                toast({ title: "Error", description: "Failed to create section", variant: "destructive" });
+                              }
+                            } 
+                          }}><Plus className="h-4 w-4" /></Button>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Location Field */}
+              <div className="grid gap-2">
+                <Label>Location</Label>
+                <select
+                  value={formData.locationId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, locationId: e.target.value }))}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.locationId ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  disabled={loadingLocations}
+                >
+                  <option value="">
+                    {loadingLocations ? "Loading locations..." : "Select location..."}
+                  </option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.locationId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.locationId}</p>
+                )}
+                {locations.length === 0 && !loadingLocations && formData.schoolId && (
+                  <p className="text-sm text-gray-500">No locations available for this school</p>
+                )}
               </div>
             </div>
+          )}
+            </div>
           </div>
+
 
           {/* Actions */}
           <div className="flex items-center justify-end space-x-3 pt-6 border-t">

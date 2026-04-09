@@ -84,14 +84,14 @@ const DEFAULT_QUICK_REPLIES = [
 function ChatMessage({ 
   message, 
   onImportLastConversation,
-  lastSummary,
+  lastSession,
   showSummaryImport,
   isImportingFromReflections,
   onDismissSummary
 }: { 
   message: ChatMessageData; 
   onImportLastConversation?: (topic?: string) => void;
-  lastSummary?: { mainTopic: string; id: string };
+  lastSession?: { mainTopic: string; id: string };
   showSummaryImport?: boolean;
   isImportingFromReflections?: boolean;
   onDismissSummary?: () => void;
@@ -142,36 +142,38 @@ function ChatMessage({
           
           {/* Message Bubble */}
           <div
-            className={`px-3 py-2 sm:px-4 sm:py-3 rounded-[24px] bg-[#F2F8FD] text-gray-800 rounded-tl-sm`}
+            className={`px-3 py-2 sm:px-4 sm:py-3 rounded-[24px] bg-[#F2F8FD] text-gray-800 rounded-tl-sm relative`}
           >
-            <div className="text-[13px] sm:text-[15px] leading-relaxed break-words">
-              {/* Custom parser for bullet points */}
-              <div 
-                dangerouslySetInnerHTML={{
-                  __html: message.content
-                    .replace(/\n/g, '<br>')
-                    .replace(/• (.*?)(<br>|$)/g, '<li class="mb-2 block">• $1</li><br>')
-                    .replace(/<li.*?<br>/g, '<ul class="mb-3 last:mb-0 ml-6 list-disc pl-6"><li')
-                    .replace(/<\/li><br>/g, '</li></ul><br>')
-                }}
-              />
-            </div>
+            {/* The "Friend" Accent - a soft blue line on the left */}
             
-            {/* Legacy Import Suggestion UI (for backward compatibility) */}
-            {message.importSuggestion?.show && (
-              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-gray-700 mb-2">
-                  I see we talked about {message.importSuggestion.lastTopic} in our last session on {new Date(message.importSuggestion.lastDate || '').toLocaleDateString()}. Would you like to continue that conversation?
-                </p>
-                <button
-                  onClick={handleImportClick}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
-                >
-                  Continue Previous Conversation
-                </button>
-              </div>
-            )}
+            
+            <div className="text-gray-800 ml-2">
+              <ReactMarkdown
+                components={{
+                  // Custom paragraph styling without typography plugin
+                  p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed text-[13px] sm:text-[15px]">{children}</p>,
+                  br: () => <br className="block h-4" />, // Add space between paragraphs
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
           </div>
+          
+          {/* Legacy Import Suggestion UI (for backward compatibility) */}
+          {message.importSuggestion?.show && (
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-gray-700 mb-2">
+                I see we talked about {message.importSuggestion.lastTopic} in our last session on {new Date(message.importSuggestion.lastDate || '').toLocaleDateString()}. Would you like to continue that conversation?
+              </p>
+              <button
+                onClick={handleImportClick}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
+              >
+                Continue Previous Conversation
+              </button>
+            </div>
+          )}
           
           {/* Timestamp */}
           <span className="text-[10px] sm:text-[11px] text-gray-400 mt-1 px-1 block">
@@ -179,10 +181,10 @@ function ChatMessage({
           </span>
           
           {/* Import Suggestion UI for opening messages - Outside bubble */}
-          {message.type === 'opening' && lastSummary && showSummaryImport && !isImportingFromReflections && (
+          {message.type === 'opening' && lastSession && showSummaryImport && !isImportingFromReflections && (
             <div className="mt-2">
               <LastSummaryImport
-                mainTopic={lastSummary.mainTopic}
+                mainTopic={lastSession.mainTopic}
                 onImport={() => onImportLastConversation?.()}
                 onDismiss={onDismissSummary || (() => {})}
               />
@@ -396,7 +398,7 @@ function LastSummaryImport({
   onDismiss 
 }: { 
   mainTopic: string; 
-  onImport: () => void;
+  onImport: () => void; 
   onDismiss: () => void;
 }) {
   return (
@@ -564,7 +566,7 @@ export default function ChatInterface({
   });
 
   const {
-    messages: hookMessages,
+    messages,
     input: hookInput,
     isLoading: hookIsLoading,
     sessionId: hookSessionId,
@@ -573,11 +575,12 @@ export default function ChatInterface({
     setInput,
     initializeChat,
     endChat,
+    importConversation,
   } = chatHookResult;
 
   // Only call summary hook when user is available
   const summaryHookResult = useChatSummary({ studentId: user?.studentId || user?.id || "" });
-  const { lastSummary, importLastSummary } = summaryHookResult;
+  const { lastSession, importLastSession, getLastSessionMessages } = summaryHookResult;
 
   // Event handlers
   const handleQuickReply = useCallback((reply: string) => {
@@ -585,11 +588,39 @@ export default function ChatInterface({
   }, [setInput]);
 
   const handleImportLastConversation = useCallback((topic?: string) => {
-    const importedText = topic 
-      ? `I'd like to continue our conversation about ${topic} from our last session.`
-      : importLastSummary() || ''
-    setInput(importedText)
-  }, [setInput, importLastSummary])
+    console.log('Import clicked - lastSession:', lastSession)
+    console.log('Import clicked - messages available:', lastSession?.messages?.length || 0)
+    
+    if (lastSession?.messages && lastSession.messages.length > 0) {
+      // Import the full conversation history
+      const previousMessages = getLastSessionMessages()
+      console.log('Previous messages to import:', previousMessages)
+      
+      // Load previous conversation using the new importConversation method
+      if (previousMessages.length > 0) {
+        const sessionStartTime = new Date(lastSession.sessionStartedAt).getTime()
+        importConversation(previousMessages, lastSession.sessionId, sessionStartTime)
+        console.log('Imported conversation with session ID:', lastSession.sessionId, 'start time:', lastSession.sessionStartedAt)
+        
+        // Hide the import suggestion
+        setShowSummaryImport(false)
+        
+        // Set a continuation message in the input
+        const continuationText = topic 
+          ? `I'd like to continue our conversation about ${topic} from our last session.`
+          : `I'd like to continue our conversation from where we left off.`
+        setInput(continuationText)
+        console.log('Set continuation text:', continuationText)
+      }
+    } else {
+      // Fallback to text-only import if no messages are available
+      console.log('No messages found, falling back to text import')
+      const importedText = topic 
+        ? `I'd like to continue our conversation about ${topic} from our last session.`
+        : importLastSession() || ''
+      setInput(importedText)
+    }
+  }, [lastSession, getLastSessionMessages, importLastSession, setInput, importConversation])
 
   const handleDismissSummary = useCallback(() => {
     setShowSummaryImport(false);
@@ -624,17 +655,17 @@ export default function ChatInterface({
       mood: mood || accessMood,
       triggers: triggers || accessTriggers,
       notes: notes || accessNotes,
-      hookMessages: hookMessages.length,
+      messages: messages.length,
       hookSessionId,
       hookIsLoading
     });
 
     // If we have a user but no messages and no session ID, try to initialize
-    if (user && hookMessages.length === 0 && !hookSessionId && !hookIsLoading) {
+    if (user && messages.length === 0 && !hookSessionId && !hookIsLoading) {
       console.log('Manually triggering chat initialization');
       initializeChat(mood || accessMood, triggers || accessTriggers, notes || accessNotes);
     }
-  }, [user, mood, accessMood, triggers, accessTriggers, notes, accessNotes, hookMessages, hookSessionId, hookIsLoading, initializeChat]);
+  }, [messages, mood, accessMood, triggers, accessTriggers, notes, accessNotes, hookIsLoading, hookSessionId, initializeChat]);
 
   // State to track if last message was from user
   const [lastMessageWasFromUser, setLastMessageWasFromUser] = useState(false);
@@ -650,12 +681,12 @@ export default function ChatInterface({
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
       setLastMessageWasFromUser(false);
     }
-  }, [hookMessages, lastMessageWasFromUser]);
+  }, [messages, lastMessageWasFromUser]);
 
   // Track when user sends messages and count them
   React.useEffect(() => {
-    if (hookMessages.length > 0) {
-      const lastMessage = hookMessages[hookMessages.length - 1];
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
       if (lastMessage.sender === 'student') {
         setLastMessageWasFromUser(true);
         setStudentMessageCount(prev => {
@@ -668,7 +699,7 @@ export default function ChatInterface({
         });
       }
     }
-  }, [hookMessages]);
+  }, [messages]);
 
   // Fetch exercise suggestions
   const fetchExerciseSuggestions = async () => {
@@ -728,7 +759,7 @@ export default function ChatInterface({
           url: '/students/selfhelptools/journaling',
           icon: '📝'
         }
-      ].slice(0, 4); // Limit to 4 suggestions
+      ].slice(0, 5); // Limit to 4 suggestions
 
       setExerciseSuggestions(suggestions);
       setShowExerciseSuggestions(true);
@@ -819,7 +850,7 @@ export default function ChatInterface({
   return (
     <div className="max-h-screen bg-[#F8F9FA]">
       {/* Back Button */}
-      <div className="max-w-6xl mx-auto pt-3 sm:pt-5 px-3 sm:px-4 lg:px-4">
+      <div className="max-w-6xl mx-auto pt-6 sm:pt-5 px-3 sm:px-4 lg:px-4">
         <BackToDashboard />
       </div>
 
@@ -844,7 +875,7 @@ export default function ChatInterface({
            
               
 
-            {hookMessages.length === 0 && (
+            {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#1B9EE0] to-[#4FC3F7] flex items-center justify-center mb-3 sm:mb-4">
                   <svg width="28" height="28" className="sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
@@ -859,7 +890,7 @@ export default function ChatInterface({
               </div>
             )}
 
-            {hookMessages.map((message) => (
+            {messages.map((message: Message) => (
               <ChatMessage 
                 key={message.id} 
                 message={{
@@ -871,12 +902,15 @@ export default function ChatInterface({
                   importSuggestion: message.importSuggestion,
                 }} 
                 onImportLastConversation={handleImportLastConversation}
-                lastSummary={lastSummary || undefined}
+                lastSession={lastSession || undefined}
                 showSummaryImport={showSummaryImport}
                 isImportingFromReflections={isImportingFromReflections}
                 onDismissSummary={handleDismissSummary}
               />
             ))}
+
+            {/* Typing Indicator */}
+            {isLoading && <TypingIndicator />}
 
             {/* Exercise Suggestions */}
             {showExerciseSuggestions && (
@@ -886,8 +920,6 @@ export default function ChatInterface({
                 onDismiss={dismissSuggestions}
               />
             )}
-
-            {isLoading && <TypingIndicator />}
 
           </div>
 

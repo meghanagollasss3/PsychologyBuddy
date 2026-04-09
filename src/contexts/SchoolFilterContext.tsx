@@ -66,8 +66,7 @@ export function SchoolFilterProvider({ children }: { children: ReactNode }) {
           // Check for various possible super admin role names
           const isSuper = userRole === 'SUPERADMIN' || 
                          userRole === 'SUPER_ADMIN' || 
-                         userRole === 'SUPER-ADMIN' ||
-                         userRole?.toLowerCase().includes('super');
+                         userRole === 'SUPER-ADMIN';
           
           setIsSuperAdmin(isSuper);
           
@@ -93,7 +92,7 @@ export function SchoolFilterProvider({ children }: { children: ReactNode }) {
               setSchools(schoolsList);
               
               // For super admins, ensure selectedSchoolId is 'all' if not already set to a specific school
-              if (isSuper && selectedSchoolId === 'all') {
+              if (isSuper && (!selectedSchoolId || selectedSchoolId === 'all')) {
                 setSelectedSchoolId('all');
               }
             } else {

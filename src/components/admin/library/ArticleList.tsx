@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSchoolFilter } from '@/src/contexts/SchoolFilterContext';
+import { useTimeFilter } from '@/src/contexts/TimeFilterContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Edit, Eye, Trash2, FileText, Upload, Clock, BookOpen, X, Check, ChevronDown, MoreVertical, Search, CheckCircle2, Edit2 } from 'lucide-react';
@@ -127,6 +128,7 @@ export function ArticleList() {
   const mountedRef = useRef(false);
   const { toast } = useToast();
   const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } = useSchoolFilter();
+  const { timeFilter, dateRange } = useTimeFilter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   // const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -174,6 +176,9 @@ export function ArticleList() {
         params.append('schoolId', selectedSchoolId);
       }
       
+      // Add time filter
+      params.append('timeRange', timeFilter);
+      
       const url = `/api/articles${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url, { headers });
       
@@ -197,7 +202,7 @@ export function ArticleList() {
         setLoading(false);
       }
     }
-  }, [selectedSchoolId, isSuperAdmin]);
+  }, [selectedSchoolId, isSuperAdmin, timeFilter]);
 
   const fetchLabels = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -250,7 +255,7 @@ export function ArticleList() {
     return () => {
       mountedRef.current = false;
     };
-  }, [fetchArticles, fetchLabels]);
+  }, [fetchArticles, fetchLabels, timeFilter]);
 
   const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -480,7 +485,7 @@ export function ArticleList() {
     <AdminHeader 
         title="Psychoeducation Library" 
         subtitle="Manage educational content and resources"
-        showTimeFilter={false}
+        showTimeFilter={true}
         showSchoolFilter={isSuperAdmin}
         schoolFilterValue={selectedSchoolId}
         schools={schools}

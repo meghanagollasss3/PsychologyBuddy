@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -22,10 +22,12 @@ import {
   LogOut,
   Building2,
   User,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 // Simple cn utility function
 function cn(...classes: (string | undefined | null | false)[]): string {
@@ -42,13 +44,66 @@ interface NavItem {
   children?: { label: string; href: string; icon: React.ElementType; permission?: string; role?: string[] }[];
 }
 
+interface AdminProfile {
+  firstName: string;
+  lastName: string;
+  adminProfile?: {
+    profileImageUrl?: string;
+  };
+}
+
 export function AdminSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<AdminProfile | null>(null);
+  const [profileMenuHeight, setProfileMenuHeight] = useState(0);
+  const profileMenuRef = React.useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
   const permissions = usePermissions();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    // Calculate the height of the profile menu when it's open
+    if (profileMenuRef.current && isProfileOpen) {
+      setProfileMenuHeight(profileMenuRef.current.scrollHeight);
+    }
+  }, [isProfileOpen]);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch('/api/admin/profile');
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Profile fetch failed:', response.status, errorText);
+        return;
+      }
+      
+      const text = await response.text();
+      if (!text) {
+        console.error('Profile fetch returned empty response');
+        return;
+      }
+      
+      const result = JSON.parse(text);
+      
+      if (result.success) {
+        setProfile(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin profile:', error);
+    }
+  };
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  };
 
   const navItems: NavItem[] = [
     {
@@ -71,6 +126,13 @@ export function AdminSidebar() {
       role: ['SUPERADMIN'],
     },
     {
+      label: "School Locations",
+      icon: Building2,
+      href: "/admin/locations",
+      permission: 'organizations.update',
+      role: ['SCHOOL_SUPERADMIN'],
+    },
+    {
       label: "Content Management",
       icon: BookOpen,
       children: [
@@ -88,8 +150,8 @@ export function AdminSidebar() {
       label: "User Management",
       icon: Users,
       children: [
-        { label: "Students", href: "/admin/users/students", icon: Users, permission: 'users.view', role: ['ADMIN','SUPERADMIN'] },
-        { label: "Admins", href: "/admin/users/admins", icon: Shield, permission: 'users.view', role: ['SUPERADMIN'] },
+        { label: "Students", href: "/admin/users/students", icon: Users, permission: 'users.view', role: ['ADMIN','SUPERADMIN','SCHOOL_SUPERADMIN'] },
+        { label: "Admins", href: "/admin/users/admins", icon: Shield, permission: 'users.view', role: ['SUPERADMIN','SCHOOL_SUPERADMIN'] },
       ],
     },
     {
@@ -111,17 +173,6 @@ export function AdminSidebar() {
     //   href: "/admin/profile",
     //   permission: 'settings.view',
     // },
-    {
-      label: "Settings",
-      icon: Settings,
-      href: "/admin/settings",
-      permission: 'settings.view',
-    },
-    {
-      label: "Logout",
-      icon: LogOut,
-      href: "/login",
-    },
   ];
 
   // Filter navigation items based on permissions
@@ -254,13 +305,7 @@ export function AdminSidebar() {
               ) : (
                 <Link
                   href={item.href!}
-                  onClick={() => {
-                    if (item.label === "Logout") {
-                      handleLogout();
-                    } else {
-                      setSidebarOpen(false);
-                    }
-                  }}
+                  onClick={() => setSidebarOpen(false)}
                   className={cn(
                     "flex items-center text-[#65758b] justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive(item.href!)
@@ -284,15 +329,99 @@ export function AdminSidebar() {
         </ul>
       </nav>
 
-      {/* User Info & Logout */}
-      {/* <div className="p-4 border-t">
-        <div className="mb-3">
-          <p className="text-sm font-medium text-gray-900">
-            {user?.firstName} {user?.lastName}
-          </p>
-          <p className="text-xs text-gray-500">{user?.email}</p>
+      {/* Bottom Section - Profile */}
+      <div className="border-t border-sidebar-border mt-auto">
+        {/* Expandable menu - expands upward */}
+        <div
+          ref={profileMenuRef}
+          className="overflow-hidden transition-all duration-300 ease-in-out"
+          style={{
+            maxHeight: isProfileOpen ? `${profileMenuHeight}px` : "0px",
+            opacity: isProfileOpen ? 1 : 0,
+          }}
+        >
+          <div className="px-3 pt-2 space-y-1">
+            {permissions.hasPermission('settings.view') && (
+              <Link
+                href="/admin/settings"
+                onClick={() => { setSidebarOpen(false); setIsProfileOpen(false); }}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  pathname === "/admin/settings"
+                    ? "bg-[#3c83f6] text-white"
+                    : "text-[#65758b] hover:bg-gray-100 hover:text-gray-900"
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </Link>
+            )}
+            <button
+              onClick={() => { 
+                handleLogout(); 
+                setIsProfileOpen(false); 
+              }}
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#65758b] hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
-      </div> */}
+
+        {/* Profile toggle trigger */}
+        <button
+          onClick={() => setIsProfileOpen(!isProfileOpen)}
+          className={cn(
+            "flex w-full items-center gap-3 px-4 py-3 transition-colors",
+            "hover:bg-gray-50 active:bg-gray-100",
+            isProfileOpen && "bg-gray-50"
+          )}
+        >
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push('/admin/profile/admin');
+              setSidebarOpen(false);
+            }}
+            className="cursor-pointer"
+          >
+            <Avatar className="h-9 w-9">
+              {profile?.adminProfile?.profileImageUrl ? (
+                <AvatarImage src={profile.adminProfile.profileImageUrl} />
+              ) : null}
+              <AvatarFallback className="text-xs">
+                {profile ? getInitials(profile.firstName, profile.lastName) : 'AD'}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/admin/profile/admin');
+                setSidebarOpen(false);
+              }}
+              className="hover:opacity-80 transition-opacity cursor-pointer"
+            >
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {profile?.firstName && profile?.lastName 
+                  ? `${profile.firstName} ${profile.lastName}` 
+                  : user?.email || 'User'}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {permissions.isSuperAdmin ? 'Super Admin' : 'Admin'}
+              </p>
+            </div>
+          </div>
+          <ChevronUp
+            className={cn(
+              "h-4 w-4 text-gray-400 transition-transform duration-300 ease-in-out shrink-0",
+              !isProfileOpen && "rotate-180"
+            )}
+          />
+        </button>
+      </div>
     </>
   );
 

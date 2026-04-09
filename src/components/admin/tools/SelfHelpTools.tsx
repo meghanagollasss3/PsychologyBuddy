@@ -185,9 +185,10 @@ export default function SelfHelpTools() {
               title="Self-help Tools" 
         subtitle="Manage interactive wellness tools for learners"
               showSchoolFilter={isSuperAdmin}
-              schoolFilterValue={selectedSchool}
+              schoolFilterValue={selectedSchool} 
               onSchoolFilterChange={setSelectedSchool}
               schools={schools}
+              showTimeFilter={false}
               actions={renderActions()}
             />
       <div className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">

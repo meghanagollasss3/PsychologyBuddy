@@ -16,6 +16,8 @@ export const GET = withPermission({
 
     if (user.role.name === 'ADMIN') {
       targetSchoolId = user.schoolId;
+    } else if (user.role.name === 'SCHOOL_SUPERADMIN') {
+      targetSchoolId = user.schoolId;
     } else if (user.role.name === 'SUPERADMIN') {
       if (schoolId && schoolId !== 'all') {
         targetSchoolId = schoolId;

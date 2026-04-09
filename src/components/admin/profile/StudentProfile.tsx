@@ -38,7 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AdminHeader } from "../layout/AdminHeader";
 import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
-import { usePermissions } from "@/src/hooks/usePermissions";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 // Mock student data - replace with actual API call
 const studentData = {
@@ -139,7 +139,7 @@ const studentData = {
     {
       id: "3",
       type: "session" as const,
-      message: "Attended session with Dr. Williams",
+      message: "Attended session with counselor",
       time: "2 days ago",
     },
     {
@@ -204,9 +204,9 @@ type SessionType = (typeof studentData.sessions)[0];
 
 export default function StudentProfile() {
   const router = useRouter();
+  const { user } = useAuth();
   const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } =
     useSchoolFilter();
-  const permissions = usePermissions();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [selectedSession, setSelectedSession] = useState<SessionType | null>(
@@ -472,6 +472,60 @@ export default function StudentProfile() {
   const getInitials = (firstName?: string, lastName?: string) => {
     if (!firstName && !lastName) return "ST";
     return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
+  };
+
+  // Create dynamic recent activity with admin name
+  const getRecentActivity = () => {
+    const baseActivity = [
+      {
+        id: "1",
+        type: "checkin" as const,
+        message: "Completed morning mood check-in",
+        time: "2 hours ago",
+      },
+      {
+        id: "2",
+        type: "badge" as const,
+        message: "Earned 'Consistency Champion' badge",
+        time: "1 day ago",
+      },
+      {
+        id: "4",
+        type: "content" as const,
+        message: "Completed 'Managing Exam Stress' article",
+        time: "3 days ago",
+      },
+      {
+        id: "5",
+        type: "checkin" as const,
+        message: "Completed evening reflection",
+        time: "4 days ago",
+      },
+      {
+        id: "6",
+        type: "alert" as const,
+        message: "Triggered wellness check due to low mood",
+        time: "5 days ago",
+      },
+    ];
+
+    // Insert the session activity with admin name
+    const sessionActivity = {
+      id: "3",
+      type: "session" as const,
+      message: user?.firstName && user?.lastName 
+        ? `Attended session with ${user.firstName} ${user.lastName}`
+        : user?.email 
+        ? `Attended session with ${user.email}`
+        : "Attended session with Admin",
+      time: "2 days ago",
+    };
+
+    return [
+      ...baseActivity.slice(0, 2),
+      sessionActivity,
+      ...baseActivity.slice(2)
+    ];
   };
 
   // Get moods for current page
@@ -843,7 +897,10 @@ export default function StudentProfile() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="font-semibold text-foreground text-sm">
-                            {session.doctor}
+                            {user?.firstName && user?.lastName 
+                              ? `${user.firstName} ${user.lastName}`
+                              : user?.email || 'Admin'
+                            }
                           </p>
                           <Badge className="bg-green-100 text-green-700 border-0 text-xs px-2 py-0.5 font-medium">
                             {session.status}
@@ -879,7 +936,7 @@ export default function StudentProfile() {
                   Activity
                 </h3>
                 <div className="space-y-3">
-                  {profileData.recentActivity?.map((activity: Activity) => {
+                  {getRecentActivity().map((activity: Activity) => {
                     const Icon = activityIconMap[activity.type];
                     return (
                       <div key={activity.id} className="flex items-start gap-3">
@@ -933,7 +990,7 @@ export default function StudentProfile() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-muted text-muted-foreground text-sm font-medium">
+                      <AvatarFallback className="bg-[#E2E8F0] text-[#64748B] text-sm font-medium">
                         {getInitials(profileData.emergencyContact?.name)}
                       </AvatarFallback>
                     </Avatar>

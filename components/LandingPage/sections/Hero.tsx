@@ -37,7 +37,7 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section className="relative w-full pt-20 pb-194 flex justify-center">
+    <section className="relative w-full pt-12 md:pt-20 pb-24 md:pb-194 flex justify-center">
       {/* Floating Questions */}
       {floatingQuestions.map((question, index) => (
         <div
@@ -85,45 +85,35 @@ const Hero: React.FC = () => {
       ))}
 
       {/* Hero Content */}
-      <div className="relative z-10 mt-40 text-center px-6 max-w-4xl mx-auto">
+      <div className="relative z-10 mt-10 md:mt-40 text-center px-4 sm:px-6 max-w-4xl mx-auto">
         <div>
           {/* Tag above heading */}
           <div
-            className="inline-flex items-center gap-2 p-2 rounded-full mb-4
-            bg-white/33 h-[27px]
+            className="inline-flex items-center gap-2 p-1 md:p-2 rounded-full mb-4 md:mb-6
+            bg-white/33 h-[20px] md:h-[27px]
             shadow-[0_8px_32px_rgba(0,0,0,0.08)]
             border-[0.4px] border-[#1CBBFF]"
           >
-            <Sparkles className="w-[10px] h-[9px] text-[#1D9FE1]" />
-            <span className="text-[10px] font-medium text-[#1D9FE1]">
+            <Sparkles className="w-[7px] md:w-[10px] h-[6px] md:h-[9px] text-[#1D9FE1]" />
+            <span className="text-[6px] md:text-[10px] font-medium text-[#1D9FE1]">
               Your Well-being Champion
             </span>
           </div>
 
-          <h1 className="text-[48px] font-bold text-[#2F3D43] mb-2 leading-[58px] drop-shadow-lg ">
+          <h1 className="text-[20px] sm:text-3xl md:text-4xl lg:text-[48px] font-bold text-[#2F3D43] mb-4 md:mb-6 leading-tight md:leading-[58px] drop-shadow-lg">
             Your Safe Space for Everyday <br /> Mental Wellness
           </h1>
         </div>
 
-        <p className="text-[16px] text-[#686D70] max-w-2xl mx-auto  mt-[-2px] mb-4">
+        <p className="text-[10px] sm:text-base md:text-[16px] text-[#686D70] max-w-2xl mx-auto md:mb-8 mb-34 px-2">
           Get personalized support, track your emotions, and build healthy
-          <br />
+          <br className="hidden sm:block" />
           habits all in one trusted space designed for students.
         </p>
 
         <Button
           onClick={handleExploreNow}
-          className="bg-gradient-to-b from-[#4FC1F9] to-[#1B9EE0] text-white font-medium hover:from-[#4FC1F9] hover:to-[#1B9EE0] transition-all duration-200 drop-shadow-xl hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 tracking-wider disabled:cursor-not-allowed mt-5 text-[16px]"
-          style={{
-            width: "158px",
-            height: "43px",
-            borderRadius: "24px",
-            paddingTop: "12.46px",
-            paddingRight: "5.19px",
-            paddingBottom: "12.46px",
-            paddingLeft: "5.19px",
-            gap: "8.31px",
-          }}
+          className="bg-gradient-to-b from-[#4FC1F9] to-[#1B9EE0] text-white font-medium hover:from-[#4FC1F9] hover:to-[#1B9EE0] transition-all duration-200 drop-shadow-xl hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 tracking-wider disabled:cursor-not-allowed text-[12px] sm:text-[16px] px-4 py-1 sm:px-6 sm:py-3 rounded-full "
         >
           Explore Now
         </Button>

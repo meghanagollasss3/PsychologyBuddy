@@ -169,7 +169,7 @@ export default function ArtGalleryPage() {
               </Link>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid h-[191px] grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+            <div className={viewMode === 'grid' ? 'grid h-[291px] grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
               {artJournals.map((journal) => (
                 <div 
                   key={journal.id} 

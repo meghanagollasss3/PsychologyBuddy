@@ -29,7 +29,7 @@ export default function JournalHeader({ activeTab = 'writing', onTabChange, view
             className={`flex items-center gap-2 text-[#73829A] hover:text-[#1a9bcc] transition-colors p-2`}
           >
             <ArrowLeft className="w-4 h-5" />
-            <span className="text-[13px] sm:text-[16px]">Back to Dashboard</span>
+            <span className="text-[13px] sm:text-[16px]">Back to SelfHelpTools</span>
           </button>
 
       {/* Header Content */}

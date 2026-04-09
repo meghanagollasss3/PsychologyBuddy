@@ -55,9 +55,7 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
         const mapped = sameCategory.map((m: any) => ({
           title: m.title,
           artist: m.artist,
-          duration: `${Math.floor(m.duration / 60)}:${String(
-            m.duration % 60
-          ).padStart(2, "0")}`,
+          duration: m.duration,
           url: m.url,
         }));
 
@@ -161,26 +159,26 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
       <audio ref={audioRef} src={tracks[activeTrack].url}></audio>
 
       {/* Modal Background */}
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[999] flex items-center justify-center p-6">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[999] flex items-center justify-center p-3 sm:p-4 md:p-6">
 
         {/* Modal Container */}
-        <div className="bg-white w-full max-w-6xl rounded-[32px] shadow-2xl flex overflow-hidden animate-fadeIn scale-100">
+        <div className="bg-white w-full max-w-6xl max-h-[90vh] rounded-[16px] sm:rounded-[24px] md:rounded-[32px] shadow-2xl overflow-hidden animate-fadeIn scale-100 flex flex-col md:flex-row">
 
           {/* LEFT — PLAYLIST */}
-          <div className="w-[360px] bg-[#F8FAFF] border-r flex flex-col">
-            <div className="p-6 border-b">
-              <h1 className="text-xl font-bold text-[#223344]">{card.title}</h1>
-              <p className="text-sm text-[#778395] mt-1">
+          <div className="w-full md:w-[360px] bg-[#F8FAFF] border-b md:border-b-0 md:border-r flex flex-col h-[40vh] md:h-auto">
+            <div className="p-4 sm:p-5 md:p-6 border-b">
+              <h1 className="text-lg sm:text-xl font-bold text-[#223344]">{card.title}</h1>
+              <p className="text-xs sm:text-sm text-[#778395] mt-1">
                 Gentle melodies to reduce stress and anxiety
               </p>
 
-              <p className="text-xs text-[#99A3B3] mt-4">
+              <p className="text-xs text-[#99A3B3] mt-3 sm:mt-4">
                 🎵 {tracks.length} Tracks
               </p>
             </div>
 
             {/* Track List */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-2">
               {tracks.map((t, i) => (
                 <div
                   key={i}
@@ -193,9 +191,9 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
                     }
                   `}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-blue-600 border 
+                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-blue-600 border 
                         ${
                           activeTrack === i
                             ? "bg-blue-600 text-white"
@@ -203,39 +201,39 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
                         }`}
                     >
                       {activeTrack === i ? (
-                        <Icons.Pause className="w-4 h-4" />
+                        <Icons.Pause className="w-3 h-3 sm:w-4 sm:h-4" />
                       ) : (
-                        <Icons.Play className="w-4 h-4 ml-[2px]" />
+                        <Icons.Play className="w-3 h-3 sm:w-4 sm:h-4 ml-[2px]" />
                       )}
                     </div>
 
-                    <div>
-                      <p className="font-semibold text-[#223344] text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[#223344] text-xs sm:text-sm truncate">
                         {t.title}
                       </p>
-                      <p className="text-xs text-[#8C97A8]">{t.artist}</p>
+                      <p className="text-xs text-[#8C97A8] truncate">{t.artist}</p>
                     </div>
                   </div>
 
-                  <span className="text-xs text-[#7D8899]">{t.duration}</span>
+                  <span className="text-xs text-[#7D8899] flex-shrink-0">{format(typeof t.duration === 'string' ? parseFloat(t.duration) : t.duration)}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* RIGHT — MAIN PLAYER */}
-          <div className="flex-1 p-8 relative flex flex-col">
+          <div className="flex-1 p-4 sm:p-6 md:p-8 relative flex flex-col min-h-0">
 
             {/* Close Button */}
             <button
               onClick={onClose}
-              className="absolute top-6 right-6 p-2 bg-white rounded-full shadow-md hover:bg-gray-100"
+              className="absolute top-3 sm:top-4 md:top-6 right-3 sm:right-4 md:right-6 p-1.5 sm:p-2 bg-white rounded-full shadow-md hover:bg-gray-100 z-10"
             >
-              <Icons.X className="w-5 h-5 text-gray-700" />
+              <Icons.X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
             </button>
 
             {/* Image */}
-            <div className="rounded-2xl overflow-hidden shadow-lg w-full max-h-[320px]">
+            <div className="rounded-xl sm:rounded-2xl overflow-hidden shadow-lg w-full max-h-[200px] sm:max-h-[250px] md:max-h-[320px]">
               <img
                 src={card.coverImage || card.thumbnailUrl}
                 className="w-full h-full object-cover"
@@ -244,29 +242,29 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
             </div>
 
             {/* Title/Description */}
-            <div className="mt-6">
-              <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-600 font-semibold">
+            <div className="mt-4 sm:mt-6">
+              <span className="text-xs px-2 sm:px-3 py-1 rounded-full bg-blue-100 text-blue-600 font-semibold">
                 Now Playing
               </span>
 
-              <h2 className="text-3xl font-bold text-[#222] mt-3">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#222] mt-2 sm:mt-3">
                 {tracks[activeTrack].title}
               </h2>
 
-              <p className="text-[#556070] mt-1 text-sm">
+              <p className="text-[#556070] mt-1 text-xs sm:text-sm">
                 Perfect for your meditation experience
               </p>
             </div>
 
             {/* Progress */}
-            <div className="mt-6">
+            <div className="mt-4 sm:mt-6">
               <div className="flex justify-between text-xs text-[#778395] mb-1">
                 <span>{format(currentTime)}</span>
-                <span>{tracks[activeTrack].duration}</span>
+                <span>{format(typeof tracks[activeTrack].duration === 'string' ? parseFloat(tracks[activeTrack].duration) : tracks[activeTrack].duration)}</span>
               </div>
 
               <div
-                className="w-full h-2 bg-gray-200 rounded-full cursor-pointer"
+                className="w-full h-1.5 sm:h-2 bg-gray-200 rounded-full cursor-pointer"
                 onClick={scrub}
               >
                 <div
@@ -277,31 +275,31 @@ export const PlayerModal = ({ card, onClose, categories }: PlayerModalProps) => 
             </div>
 
             {/* Controls */}
-            <div className="flex items-center justify-center gap-8 mt-10">
+            <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-8 mt-6 sm:mt-8 md:mt-10">
               <button
                 onClick={handlePrevTrack}
-                className="p-4 rounded-full bg-gray-100 hover:bg-gray-200"
+                className="p-3 sm:p-4 rounded-full bg-gray-100 hover:bg-gray-200"
               >
-                <Icons.SkipBack className="w-6 h-6 text-[#667085]" />
+                <Icons.SkipBack className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-[#667085]" />
               </button>
 
               {/* Play Button */}
               <button
                 onClick={togglePlayPause}
-                className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition"
+                className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-blue-600 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition"
               >
                 {isPlaying ? (
-                  <Icons.Pause className="w-8 h-8 text-white" />
+                  <Icons.Pause className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-white" />
                 ) : (
-                  <Icons.Play className="w-8 h-8 text-white ml-1" />
+                  <Icons.Play className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-white ml-1" />
                 )}
               </button>
 
               <button
                 onClick={handleNextTrack}
-                className="p-4 rounded-full bg-gray-100 hover:bg-gray-200"
+                className="p-3 sm:p-4 rounded-full bg-gray-100 hover:bg-gray-200"
               >
-                <Icons.SkipForward className="w-6 h-6 text-[#667085]" />
+                <Icons.SkipForward className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-[#667085]" />
               </button>
             </div>
           </div>

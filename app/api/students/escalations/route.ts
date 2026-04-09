@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/src/prisma";
 import { ContentEscalationDetector } from "@/src/services/escalations/content-escalation-detector";
 import { EscalationAlertService } from "@/src/services/escalations/escalation-alert-service";
+import { withPermission } from "@/src/middleware/permission.middleware";
 
 export async function POST(req: Request) {
   try {
@@ -109,7 +110,10 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
+export const GET = withPermission({
+  module: 'ESCALATIONS',
+  action: 'VIEW'
+})(async (req: Request, { user }: any) => {
   try {
     console.log('[EscalationAPI] Fetching escalation alerts...');
     
@@ -119,8 +123,12 @@ export async function GET(req: Request) {
     const offset = parseInt(searchParams.get('offset') || '0');
     const schoolId = searchParams.get('schoolId');
     const priority = searchParams.get('priority');
+    const timeFilter = searchParams.get('timeFilter');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
-    console.log('[EscalationAPI] Query params:', { status, limit, offset, schoolId, priority });
+    console.log('[EscalationAPI] Query params:', { status, limit, offset, schoolId, priority, timeFilter, startDate, endDate });
+    console.log('[EscalationAPI] User role:', user.role.name, 'User school:', user.schoolId);
 
     // Build where clause
     let whereClause: any = {};
@@ -133,10 +141,59 @@ export async function GET(req: Request) {
       whereClause.priority = priority;
     }
 
-    // Add school filter if provided
-    if (schoolId && schoolId !== 'all') {
+    // Add school filtering based on user role
+    let targetSchoolId: string | undefined;
+    if (user.role.name === 'ADMIN' || user.role.name === 'SCHOOL_SUPERADMIN') {
+      targetSchoolId = user.schoolId;
+    } else if (user.role.name === 'SUPERADMIN') {
+      if (schoolId && schoolId !== 'all') {
+        targetSchoolId = schoolId;
+      }
+    }
+
+    if (targetSchoolId) {
       whereClause.user = {
-        schoolId: schoolId
+        schoolId: targetSchoolId
+      };
+    }
+
+    // Add time filter
+    if (startDate && endDate) {
+      whereClause.createdAt = {
+        gte: new Date(startDate),
+        lt: new Date(endDate),
+      };
+    } else if (timeFilter) {
+      const now = new Date();
+      const start = new Date();
+      const end = new Date();
+
+      switch (timeFilter) {
+        case 'today':
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          break;
+        case 'week':
+          const dayOfWeek = now.getDay();
+          start.setDate(now.getDate() - dayOfWeek);
+          start.setHours(0, 0, 0, 0);
+          end.setDate(now.getDate() + (6 - dayOfWeek));
+          end.setHours(23, 59, 59, 999);
+          break;
+        case 'month':
+          start.setDate(1);
+          start.setHours(0, 0, 0, 0);
+          end.setMonth(now.getMonth() + 1, 0);
+          end.setHours(23, 59, 59, 999);
+          break;
+        default:
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+      }
+
+      whereClause.createdAt = {
+        gte: start,
+        lt: end,
       };
     }
 
@@ -230,11 +287,11 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+});
 
 export async function PATCH(req: Request) {
   try {
-    const { alertId, status, assignedTo, notes } = await req.json();
+    const { alertId, status, assignedTo, notes, recommendedResources } = await req.json();
 
     if (!alertId || !status) {
       return NextResponse.json(
@@ -251,7 +308,27 @@ export async function PATCH(req: Request) {
       );
     }
 
-    console.log('[EscalationAPI] Updating escalation alert:', { alertId, status, assignedTo });
+    console.log('[EscalationAPI] Updating escalation alert:', { alertId, status, assignedTo, recommendedResources });
+
+    // Combine notes and recommended resources into structured format
+    let finalNotes = notes || '';
+    if (recommendedResources && recommendedResources.length > 0) {
+      const resourcesData = {
+        recommendedResources: recommendedResources.map(r => ({
+          id: r.id,
+          name: r.name,
+          type: r.type,
+          duration: r.duration
+        }))
+      };
+      
+      // If there are existing notes, append resources as structured data
+      if (finalNotes) {
+        finalNotes += '\n\n--- RECOMMENDED RESOURCES ---\n' + JSON.stringify(resourcesData, null, 2);
+      } else {
+        finalNotes = '--- RECOMMENDED RESOURCES ---\n' + JSON.stringify(resourcesData, null, 2);
+      }
+    }
 
     // Update the alert
     const updatedAlert = await prisma.escalationAlert.update({
@@ -259,7 +336,7 @@ export async function PATCH(req: Request) {
       data: {
         status,
         assignedTo: assignedTo || null,
-        notes: notes || null,
+        notes: finalNotes || null,
         updatedAt: new Date()
       },
       include: {

@@ -44,21 +44,21 @@ const Features: React.FC = () => {
   ];
 
  return (
-    <div className="py-3 px-6 bg-gradient-to-r from-[#f8f8f8] via-[#f3f3f4]/10 to-[#f6f4f3]">
+    <div className="py-8 sm:py-12 md:py-16 px-4 sm:px-6 bg-gradient-to-r from-[#f8f8f8] via-[#f3f3f4]/10 to-[#f6f4f3]">
       {/* 1. Ensure the outer container is centered with mx-auto */}
       <div className="max-w-7xl mx-auto flex flex-col items-center">
         
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-[40px] font-semibold text-[#2F3D43] mb-4 tracking-normal">
+        <div className="text-center mb-8 sm:mb-12 md:mb-16">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-semibold text-[#2F3D43] mb-4 tracking-normal">
             Designed for Schools. Loved by Students.
           </h2>
-          <p className="text-[16px] text-[#686D70] max-w-3xl mx-auto mt-[-10px]">
+          <p className="text-sm sm:text-base md:text-[16px] text-[#686D70] max-w-3xl mx-auto mt-[-10px] px-4">
             Empowering institutions to care for every student's emotional health
           </p>
         </div>
         
         {/* 2. ADDED: justify-center and justify-items-center to ensure the cards stay in the middle */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 justify-center justify-items-center w-full">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 justify-center justify-items-center w-full">
           {features.map((feature, index) => (
             <FeatureCard
               key={index}

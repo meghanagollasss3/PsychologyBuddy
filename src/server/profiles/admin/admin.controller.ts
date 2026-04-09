@@ -5,7 +5,7 @@ import { handleError } from '@/src/utils/errors';
 import { CreateAdminSchema, UpdateAdminSchema, ResetAdminPasswordSchema, UpdateAdminStatusSchema } from './admin.validators';
 
 export class AdminController {
-  // POST /api/admins - Create admin (SuperAdmin only)
+  // POST /api/admins - Create admin (SuperAdmin and SchoolSuperAdmin only)
   static createAdmin = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'CREATE' 
@@ -23,16 +23,21 @@ export class AdminController {
     }
   });
 
-  // GET /api/admins - Get all admins (SuperAdmin only)
+  // GET /api/admins - Get all admins (SuperAdmin and SchoolSuperAdmin only)
   static getAdmins = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'VIEW' 
-  })(async (req: NextRequest) => {
+  })(async (req: NextRequest, ctx: any) => {
     try {
       const { searchParams } = new URL(req.url);
-      const schoolId = searchParams.get('schoolId');
+      const schoolId = searchParams.get('schoolId') || undefined;
+      const locationId = searchParams.get('locationId') || undefined;
       
-      const result = await AdminService.getAllAdmins(schoolId || undefined);
+      // For SCHOOL_SUPERADMIN, only show admins from their school (same as SUPERADMIN features)
+      // For SUPERADMIN, use the schoolId parameter (if provided)
+      const effectiveSchoolId = ctx.user.role.name === 'SCHOOL_SUPERADMIN' ? ctx.userSchoolId : (schoolId ?? undefined);
+      
+      const result = await AdminService.getAllAdmins(effectiveSchoolId, ctx.userSchoolId, locationId);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Get admins error:', error);
@@ -41,7 +46,7 @@ export class AdminController {
     }
   });
 
-  // GET /api/admins/:id - Get admin by ID (SuperAdmin only)
+  // GET /api/admins/:id - Get admin by ID (SuperAdmin and SchoolSuperAdmin only)
   static getAdminById = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'VIEW' 
@@ -57,7 +62,7 @@ export class AdminController {
     }
   });
 
-  // PUT /api/admins/:id - Update admin (SuperAdmin only)
+  // PUT /api/admins/:id - Update admin (SuperAdmin and SchoolSuperAdmin only)
   static updateAdmin = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'UPDATE' 
@@ -76,7 +81,7 @@ export class AdminController {
     }
   });
 
-  // POST /api/admins/:id/reset-password - Reset admin password (SuperAdmin only)
+  // POST /api/admins/:id/reset-password - Reset admin password (SuperAdmin and SchoolSuperAdmin only)
   static resetAdminPassword = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'UPDATE' 
@@ -95,17 +100,17 @@ export class AdminController {
     }
   });
 
-  // PATCH /api/admins/:id/status - Update admin status (SuperAdmin only)
+  // PATCH /api/admins/:id/status - Update admin status (SuperAdmin and SchoolSuperAdmin only)
   static updateAdminStatus = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'UPDATE' 
-  })(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  })(async (req: NextRequest, { params, user }: { params: Promise<{ id: string }>, user: any }) => {
     try {
       const { id } = await params;
       const body = await req.json();
       const validatedData = UpdateAdminStatusSchema.parse(body);
       
-      const result = await AdminService.updateAdminStatus(id, validatedData);
+      const result = await AdminService.updateAdminStatus(id, validatedData, user);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Update admin status error:', error);
@@ -114,14 +119,14 @@ export class AdminController {
     }
   });
 
-  // DELETE /api/admins/:id - Delete admin (SuperAdmin only)
+  // DELETE /api/admins/:id - Delete admin (SuperAdmin and SchoolSuperAdmin only)
   static deleteAdmin = withPermission({ 
     module: 'USER_MANAGEMENT', 
     action: 'DELETE' 
-  })(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  })(async (req: NextRequest, { params, user }: { params: Promise<{ id: string }>, user: any }) => {
     try {
       const { id } = await params;
-      const result = await AdminService.deleteAdmin(id);
+      const result = await AdminService.deleteAdmin(id, user);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Delete admin error:', error);

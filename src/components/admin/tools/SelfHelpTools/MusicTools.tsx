@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/src/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { 
   MusicResource, 
   ApiResponse, 
@@ -963,7 +963,7 @@ export default function MusicTools({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> Preview</DropdownMenuItem>
+                    {/* <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> Preview</DropdownMenuItem> */}
                     <DropdownMenuItem className="gap-2" onClick={() => editMusicResource(resource)}><Edit className="h-4 w-4" /> Edit</DropdownMenuItem>
                     <DropdownMenuItem 
                       className="gap-2 text-[#EF4444]" 
@@ -977,8 +977,8 @@ export default function MusicTools({
             </CardHeader>
             <CardContent>
               <div className="flex items-start gap-3">
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                  {resource.thumbnailUrl ? (
+                {/* <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0"> */}
+                  {/* {resource.thumbnailUrl ? (
                     <img src={resource.thumbnailUrl} alt={resource.title} className="w-full h-full object-cover" />
                   ) : resource.coverImage ? (
                     <img src={resource.coverImage} alt={resource.title} className="w-full h-full object-cover" />
@@ -986,16 +986,16 @@ export default function MusicTools({
                     <div className="w-full h-full flex items-center justify-center">
                       <Music className="h-6 w-6 text-[#3B82F6]" />
                     </div>
-                  )}
-                </div>
+                  )} */}
+                {/* </div> */}
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-foreground mb-1 truncate">{resource.title}</h4>
-                  <p className="text-sm text-muted-foreground mb-2 truncate">{resource.subtitle || "Music resource"}</p>
+                  {/* <h4 className="font-semibold text-foreground mb-1 truncate">{resource.title}</h4>
+                  <p className="text-sm text-muted-foreground mb-2 truncate">{resource.subtitle || "Music resource"}</p> */}
                   <div className="flex items-center gap-2 mb-3">
                     {resource.categories?.map((cat) => (
                       <Badge key={cat.category.name} variant="outline" className="text-xs">{cat.category.name}</Badge>
                     ))}
-                    {resource.duration && <span className="text-xs text-[#64748B]">{resource.duration}</span>}
+                    {resource.duration && <span className="text-xs text-[#64748B]">{formatDuration(resource.duration)}</span>}
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-[#64748B]">{resource.learnerCount || 0} learners</span>

@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SchoolSearch } from '@/src/components/admin/modals/SchoolSearch';
+import { LocationSearch } from '@/src/components/admin/modals/LocationSearch';
 
 interface AddAdminModalProps {
   onClose: () => void;
@@ -24,8 +26,9 @@ interface FormData {
   lastName: string;
   email: string;
   password: string;
-  role: 'ADMIN' | 'SUPERADMIN';
+  role: 'ADMIN' | 'SCHOOL_SUPERADMIN' | 'SUPERADMIN';
   schoolId: string;
+  locationId: string;
 }
 
 export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProps) {
@@ -36,7 +39,8 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
     email: '',
     password: '',
     role: 'ADMIN',
-    schoolId: ''
+    schoolId: '',
+    locationId: ''
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
   const [submitError, setSubmitError] = useState<string>('');
@@ -118,11 +122,22 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
         onSuccess();
         onClose();
       } else {
-        setSubmitError(data.message || 'Failed to create admin');
+        // Handle specific error messages from API response
+        if (data.error === 'A user with this email already exists') {
+          setSubmitError('This email is already in use. Please use a different email address.');
+        } else {
+          setSubmitError(typeof data.error === 'string' ? data.error : typeof data.message === 'string' ? data.message : 'Failed to create admin');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating admin:', error);
-      setSubmitError('Failed to create admin. Please try again.');
+      
+      // Handle specific error messages
+      if (error?.error === 'A user with this email already exists') {
+        setSubmitError('This email is already in use. Please use a different email address.');
+      } else {
+        setSubmitError('Failed to create admin. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -223,6 +238,7 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
                   }`}
                 >
                   <option value="ADMIN">Admin</option>
+                  <option value="SCHOOL_SUPERADMIN">School Superadmin</option>
                   <option value="SUPERADMIN">Super Admin</option>
                 </select>
                 {errors.role && (
@@ -230,23 +246,53 @@ export function AddAdminModal({ onClose, onSuccess, schools }: AddAdminModalProp
                 )}
               </div>
 
-              {/* School ID - Only show for ADMIN role */}
-              {formData.role === 'ADMIN' && (
-                <div>
+              {/* School Search - Only show for ADMIN and SCHOOL_SUPERADMIN roles */}
+              {(formData.role === 'ADMIN' || formData.role === 'SCHOOL_SUPERADMIN') && (
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    School ID *
+                    School *
                   </label>
-                  <Input
-                    type="text"
-                    value={formData.schoolId}
-                    onChange={(e) => handleInputChange('schoolId', e.target.value)}
-                    placeholder="Enter school ID"
+                  <SchoolSearch
+                    onSchoolSelect={(school: any) => {
+                      if (school) {
+                        handleInputChange('schoolId', school.id);
+                      } else {
+                        handleInputChange('schoolId', '');
+                      }
+                    }}
+                    placeholder="Search for a school..."
                   />
                   {errors.schoolId && (
                     <p className="mt-1 text-sm text-red-600">{errors.schoolId}</p>
                   )}
                   <p className="mt-1 text-xs text-gray-500">
-                    Note: One admin per school policy will be enforced
+                    Multiple admins can be assigned to the same school
+                  </p>
+                </div>
+              )}
+
+              {/* Location Assignment - Only show for ADMIN role */}
+              {formData.role === 'ADMIN' && formData.schoolId && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location Assignment *
+                  </label>
+                  <LocationSearch
+                    schoolId={formData.schoolId}
+                    onLocationSelect={(location: any) => {
+                      if (location) {
+                        handleInputChange('locationId', location.id);
+                      } else {
+                        handleInputChange('locationId', '');
+                      }
+                    }}
+                    placeholder="Search for a location..."
+                  />
+                  {errors.locationId && (
+                    <p className="mt-1 text-sm text-red-600">{errors.locationId}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Select the specific location this admin will manage
                   </p>
                 </div>
               )}

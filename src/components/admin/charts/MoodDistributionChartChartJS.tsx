@@ -22,12 +22,14 @@ interface MoodDistributionChartProps {
   data: MoodData[];
   totalCheckins: number;
   dominantMood: MoodData | null;
+  timeRange: string;
 }
 
 export function MoodDistributionChart({
   data,
   totalCheckins,
   dominantMood,
+  timeRange,
 }: MoodDistributionChartProps) {
   // Sanitize incoming data
   const cleaned = (data ?? []).map((item) => {
@@ -62,7 +64,7 @@ export function MoodDistributionChart({
         <div className="mb-4">
           <h3 className="text-base font-semibold text-foreground">Mood Distribution</h3>
           <p className="text-sm text-[#666666]">
-            Today's emotional breakdown
+            Overall mood distribution {timeRange === 'all' ? 'for all time' : `this ${timeRange}`}
           </p>
         </div>
         <div className="flex items-center justify-center h-71 text-center">
@@ -165,9 +167,8 @@ export function MoodDistributionChart({
       <div className="mb-4">
         <h3 className="text-base font-semibold text-foreground">Mood Distribution</h3>
         <p className="text-sm text-[#666666]">
-          Today's emotional breakdown
-          {/* {hasValid && totalCheckins > 0 ? ` (${totalCheckins} check-ins)` : ""}
-          {!hasValid && <span className="text-xs ml-2">(Sample data)</span>} */}
+          Overall mood distribution {timeRange === 'all' ? 'for all time' : `this ${timeRange}`}
+          {totalCheckins > 0 && ` (${totalCheckins} check-ins)`}
         </p>
       </div>
 

@@ -9,10 +9,10 @@ export interface ChatTerminationResult {
 
 export class AutomaticChatTermination {
   private static terminationCheckInterval = 3000; // Check every 3 seconds after 10 messages
-  private static minMessagesForAnalysis = 50; // Increased to prevent early termination
+  private static minMessagesForAnalysis = 5; // Increased to prevent early termination
   private static terminationThreshold = 70; // Production threshold
-  private static maxSessionDuration = Number(process.env.CHAT_SESSION_DURATION_MINUTES || 15) * 60 * 1000; // Configurable: default 15 minutes
-  private static warningTime = Number(process.env.CHAT_WARNING_TIME_MINUTES || 3) * 60 * 1000; // Configurable: default 3 minutes
+  private static maxSessionDuration = Number(process.env.CHAT_SESSION_DURATION_MINUTES || 720) * 60 * 1000; // Configurable: default 15 minutes
+  private static warningTime = Number(process.env.CHAT_WARNING_TIME_MINUTES || 1) * 60 * 1000; // Configurable: default 3 minutes
 
   /**
    * Configure session duration settings

@@ -51,12 +51,12 @@ const centerTextPlugin = {
     ctx.fillStyle = "#686D70"; // ⭐ NOW COLOR WORKS
 
     // Main value
-    ctx.font = "bold 20px Inter, sans-serif";
+    ctx.font = "bold 18px Inter, sans-serif";
     ctx.fillText(percentageText, centerX, centerY - 5);
 
     // Label name
-    ctx.font = "14px Inter, sans-serif";
-    ctx.fillText(labelText, centerX, centerY + 18);
+    ctx.font = "12px Inter, sans-serif";
+    ctx.fillText(labelText, centerX, centerY + 15);
 
     ctx.restore();
   },
@@ -109,13 +109,13 @@ export default function EmotionalPatterns() {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl p-5 border bg-white shadow-sm w-full animate-pulse h-[420px]" />
+      <div className="rounded-2xl p-4 sm:p-5 border bg-white shadow-sm w-full animate-pulse h-[380px] sm:h-[420px]" />
     );
   }
 
   if (isError || !data) {
     return (
-      <div className="rounded-2xl p-5 border bg-white shadow-sm">
+      <div className="rounded-2xl p-4 sm:p-5 border bg-white shadow-sm">
         <p className="text-sm text-gray-500">Failed to load emotional patterns.</p>
       </div>
     );
@@ -123,7 +123,7 @@ export default function EmotionalPatterns() {
 
   if (data.triggerPatterns.length === 0) {
     return (
-      <div className="rounded-2xl p-5 border bg-white shadow-sm">
+      <div className="rounded-2xl p-4 sm:p-5 border bg-white shadow-sm">
         <p className="text-sm text-gray-500 mb-3">No emotional trigger data.</p>
       </div>
     );
@@ -142,6 +142,9 @@ export default function EmotionalPatterns() {
           "#45CB88",
           "#FE9A35",
           "#ABABAB",
+          "#d75858ff",
+          "#adf451ff",
+          "#1d56a1ff",
         ],
         borderWidth: 2,
         borderColor: "#fff",
@@ -160,40 +163,40 @@ export default function EmotionalPatterns() {
   };
 
   return (
-    <div className="rounded-[16px] p-10 border-2 border-white bg-gradient-to-r from-[#FDFCFF] to-[#F6F1FF] shadow-sm w-full">
+    <div className="rounded-[12px] sm:rounded-[14px] md:rounded-[16px] p-6 sm:p-8 md:p-10 border-2 border-white bg-gradient-to-r from-[#FDFCFF] to-[#F6F1FF] shadow-sm w-full max-w-[600px] mx-auto md:max-w-full lg:max-w-full">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-9">
-        <Smile className="h-5 w-5 text-[#2F3D43]" />
-        <h3 className="text-[20px] font-semibold text-[#2F3D43]">
+      <div className="flex items-center gap-2 mb-6 sm:mb-7 md:mb-9">
+        <Smile className="h-4 w-4 sm:h-4.5 sm:w-4.5 md:h-5 md:w-5 text-[#2F3D43]" />
+        <h3 className="text-[16px] sm:text-[18px] md:text-[20px] font-semibold text-[#2F3D43]">
           Emotional Patterns
         </h3>
       </div>
 
       {/* PIE + LEGEND (SIDE BY SIDE) */}
-      <div className="flex items-center justify-between gap-8 mb-4">
+      <div className="flex items-center justify-between gap-4 sm:gap-6 md:gap-8 mb-6">
         {/* PIE CHART */}
-        <div className="h-[234px] w-[234px] ml-6">
+        <div className="h-[180px] w-[180px] sm:h-[200px] sm:w-[200px] md:h-[220px] md:w-[220px] lg:h-[234px] lg:w-[234px] flex-shrink-0">
           <Pie data={triggerChartData} options={triggerChartOptions} />
         </div>
 
         {/* CUSTOM LEGEND */}
-        <div className="flex flex-col gap-4 mr-13">
+        <div className="flex flex-col gap-2 sm:gap-3 flex-1 min-w-0">
           {data.triggerPatterns.map((item, i) => (
-            <div key={i} className="flex items-center gap-3">
+            <div key={i} className="flex items-center gap-2 sm:gap-3">
               {/* Color dot */}
               <div
-                className="w-[12px] h-[12px] rounded-full"
+                className="w-[10px] h-[10px] sm:w-[12px] sm:h-[12px] rounded-full flex-shrink-0"
                 style={{
                   backgroundColor:
                     triggerChartData.datasets[0].backgroundColor[i],
                 }}
               ></div>
 
-              <span className="text-[16px] text-[#686D70] w-[80px]">
+              <span className="text-[13px] sm:text-[14px] md:text-[15px] text-[#686D70] flex-1 min-w-0 truncate">
                 {item.trigger}
               </span>
 
-              <span className="text-[16px] text-[#686D70]">
+              <span className="text-[13px] sm:text-[14px] md:text-[15px] text-[#686D70] font-medium flex-shrink-0">
                 {item.percentage}%
               </span>
             </div>
@@ -202,33 +205,33 @@ export default function EmotionalPatterns() {
       </div>
 
       {/* INSIGHTS */}
-      <div className="rounded-[12px] p-5 border-1 border-[#B3EEC0] shadow-sm bg-gradient-to-l from-[#EAFFF2] to-[#DCFFE9]">
+      <div className="rounded-[10px] sm:rounded-[12px] p-3 sm:p-4 border border-[#B3EEC0] shadow-sm bg-gradient-to-l from-[#EAFFF2] to-[#DCFFE9]">
         <div className="flex items-center gap-2 mb-2">
-          <Lightbulb className="h-5 w-5 text-[#3A3A3A]" />
-          <h3 className="text-[16px] font-semibold text-[#3A3A3A]">Monthly Insight</h3>
+          <Lightbulb className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-[#3A3A3A]" />
+          <h3 className="text-[13px] sm:text-[14px] md:text-[16px] font-semibold text-[#3A3A3A]">Monthly Insight</h3>
         </div>
 
-        <p className="text-sm text-gray-700 leading-relaxed">
+        <p className="text-[11px] sm:text-xs md:text-sm text-gray-700 leading-relaxed">
           {data.insights.primary}
         </p>
 
         {data.insights.secondary && (
-          <p className="text-sm text-gray-700 leading-relaxed mt-1">
+          <p className="text-[11px] sm:text-xs md:text-sm text-gray-700 leading-relaxed mt-1">
             {data.insights.secondary}
           </p>
         )}
 
         <div className="mt-3 border-t border-green-200 pt-2">
           <div className="flex items-start gap-2">
-            <TrendingUp className="h-4 w-4 text-green-600 mt-0.5" />
-            <p className="text-sm text-gray-700 leading-relaxed">
+            <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-green-600 mt-0.5" />
+            <p className="text-[11px] sm:text-xs md:text-sm text-gray-700 leading-relaxed">
               <span className="font-medium">Recommendation:</span>{" "}
               {data.insights.recommendation}
             </p>
           </div>
         </div>
 
-        <p className="text-xs text-gray-500 mt-3">
+        <p className="text-[9px] sm:text-xs text-gray-500 mt-2">
           Based on your monthly check-ins
         </p>
       </div>

@@ -9,9 +9,11 @@ export default function LoginPage() {
     loading,
     error,
     success,
+    showPassword,
     handleChange,
     handleSubmit,
     handleGoogleSignIn,
+    togglePassword,
   } = useAdminLogin();
 
   return (
@@ -30,13 +32,13 @@ export default function LoginPage() {
 
           <LoginForm
             formData={formData}
-            showPassword={false}
+            showPassword={showPassword}
             loading={loading}
             error={error}
             success={success}
             isGoogleLoading={false}
             onChange={handleChange}
-            onTogglePassword={() => {}} // Not needed for admin login
+            onTogglePassword={togglePassword}
             onSubmit={handleSubmit}
             onGoogleSignIn={handleGoogleSignIn}
           />

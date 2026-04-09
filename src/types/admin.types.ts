@@ -20,16 +20,24 @@ export interface Admin {
     name: string;
     address: string;
   };
+  assignedLocations?: Array<{
+    id: string;
+    name: string;
+    address?: string;
+    city?: string;
+  }>;
   adminProfile?: {
     department?: string;
     lastActive?: string;
     status?: string;
     profileImageUrl?: string;
+    isPrimaryAdmin?: boolean;
     adminPermissions?: {
       permission: {
         name: string;
       };
     }[];
+    locationAssignments?: any[];
   };
   createdAt: string;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';

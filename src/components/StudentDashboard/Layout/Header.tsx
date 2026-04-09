@@ -2,20 +2,35 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut, Trophy, User, ChevronDown } from "lucide-react";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useState, useEffect, useRef } from "react";
 
 export default function Header() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  // const { logout, isLoading } = useLogout();
 
   const getUserInitials = () => {
     if (!user) return "U";
     return `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase();
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      setIsDropdownOpen(false);
+      router.push('/student-login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   // Close dropdown when clicking outside
@@ -100,15 +115,14 @@ export default function Header() {
                 
                 <div className="border-t border-gray-200 mt-2 pt-2">
                   <Button
-                    // onClick={logout}
+                    onClick={handleLogout}
                     variant="ghost"
                     size="sm"
-                    // disabled={isLoading}
+                    disabled={isLoggingOut}
                     className="w-full justify-start px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
-                    {/* {isLoading ? 'Logging out...' : 'Logout'} */}
-                    Logout
+                    {isLoggingOut ? 'Logging out...' : 'Logout'}
                   </Button>
                 </div>
               </div>

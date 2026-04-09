@@ -31,6 +31,7 @@ import {
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
 import { cn } from "@/lib/utils";
 import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
+import { useTimeFilter } from "@/src/contexts/TimeFilterContext";
 import React from "react";
 
 // --------------------------
@@ -212,11 +213,11 @@ export default function ActivitiesPage() {
   const router = useRouter();
   const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } =
     useSchoolFilter();
+  const { timeFilter, dateRange } = useTimeFilter();
 
   // Filters
   const [typeFilter, setTypeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
   const [search, setSearch] = useState("");
 
   // Debounced search
@@ -246,10 +247,12 @@ export default function ActivitiesPage() {
       search,
       type: typeFilter,
       classId: classFilter,
-      dateRange: dateFilter,
+      timeFilter: timeFilter,
+      startDate: dateRange.start.toISOString(),
+      endDate: dateRange.end.toISOString(),
       schoolId: selectedSchoolId,
     }),
-    [search, typeFilter, classFilter, dateFilter, selectedSchoolId]
+    [search, typeFilter, classFilter, timeFilter, dateRange, selectedSchoolId]
   );
 
   // Infinite Query
@@ -300,6 +303,7 @@ export default function ActivitiesPage() {
         schoolFilterValue={selectedSchoolId}
         onSchoolFilterChange={setSelectedSchoolId}
         schools={schools}
+        showTimeFilter={true}
       />
 
       <div className="p-6 flex-1 overflow-auto animate-fade-in">
@@ -317,20 +321,6 @@ export default function ActivitiesPage() {
                 onChange={(e) => debouncedSearch(e.target.value)}
               />
             </div>
-
-            {/* Date */}
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
 
             {/* Class */}
             <Select value={classFilter} onValueChange={setClassFilter}>

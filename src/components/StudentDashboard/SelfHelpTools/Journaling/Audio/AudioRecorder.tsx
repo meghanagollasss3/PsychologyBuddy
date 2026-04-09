@@ -2,12 +2,14 @@
 
 import React, { useState, useRef } from 'react';
 import { Mic, Square, Play, Pause, Lock, Trash, Trash2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number, title?: string) => void;
 }
 
 export default function AudioRecorder({ onRecordingComplete }: AudioRecorderProps) {
+  const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -152,6 +154,19 @@ export default function AudioRecorder({ onRecordingComplete }: AudioRecorderProp
     if (recordedBlob && duration >= 2) {
       onRecordingComplete(recordedBlob, duration, title.trim() || undefined);
       resetRecording();
+      
+      // Show success toast
+      toast({
+        title: "Audio recording saved successfully!",
+        description: "Your voice journal has been safely recorded."
+      });
+    } else {
+      // Show error toast if recording is too short
+      toast({
+        title: "Recording too short",
+        description: "Please record for at least 2 seconds before saving.",
+        variant: "destructive"
+      });
     }
   };
 

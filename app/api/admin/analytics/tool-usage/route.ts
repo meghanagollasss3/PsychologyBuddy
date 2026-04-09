@@ -7,10 +7,23 @@ import { handleError } from '@/src/utils/errors';
 export const GET = withPermission({
   module: 'ANALYTICS',
   action: 'VIEW'
-})(async (req: NextRequest) => {
+})(async (req: NextRequest, { user }: any) => {
   try {
     const url = new URL(req.url);
     const months = parseInt(url.searchParams.get('months') || '6');
+    const schoolId = url.searchParams.get('schoolId');
+
+    let targetSchoolId: string | undefined;
+
+    if (user.role.name === 'ADMIN' || user.role.name === 'SCHOOL_SUPERADMIN') {
+      targetSchoolId = user.schoolId;
+    } else if (user.role.name === 'SUPERADMIN') {
+      if (schoolId && schoolId !== 'all') {
+        targetSchoolId = schoolId;
+      }
+    }
+
+    console.log('Tool usage - User role:', user.role.name, 'Target school:', targetSchoolId);
 
     // Calculate date range
     const endDate = new Date();
@@ -32,7 +45,12 @@ export const GET = withPermission({
         createdAt: {
           gte: startDate,
           lte: endDate
-        }
+        },
+        ...(targetSchoolId && {
+          user: {
+            schoolId: targetSchoolId
+          }
+        })
       },
       _count: {
         id: true
@@ -49,7 +67,12 @@ export const GET = withPermission({
         createdAt: {
           gte: startDate,
           lte: endDate
-        }
+        },
+        ...(targetSchoolId && {
+          user: {
+            schoolId: targetSchoolId
+          }
+        })
       },
       _count: {
         id: true
@@ -66,7 +89,12 @@ export const GET = withPermission({
         createdAt: {
           gte: startDate,
           lte: endDate
-        }
+        },
+        ...(targetSchoolId && {
+          user: {
+            schoolId: targetSchoolId
+          }
+        })
       },
       _count: {
         id: true

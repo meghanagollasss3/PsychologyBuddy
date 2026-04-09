@@ -15,7 +15,7 @@ import {
   PlayIcon,
   ArrowLeft,
 } from "lucide-react";
-import { useToast } from "@/src/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 import SearchHeader from "@/src/components/StudentDashboard/SelfHelpTools/MusicTherapy/SearchHeader";
 import FilterTabs from "@/src/components/StudentDashboard/SelfHelpTools/MusicTherapy/FilterTabs";
@@ -143,35 +143,35 @@ export default function OptimizedMusicPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <StudentLayout>
-        <div className="container mx-auto px-3 sm:px-2 md:px-6 lg:px-8 py-4 sm:py-5 max-w-7xl">
-          <div className="max-w-7xl my-[2px] mb-4 mx-[-10px] pt-2 sm:pt-3 lg:pt-5 sm:px-3 lg:px-4">
+        <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5 max-w-7xl">
+          <div className="max-w-7xl my-[2px] mb-3 sm:mb-4 mx-[-10px] pt-2 sm:pt-3 lg:pt-5 sm:px-3 lg:px-4">
             <button
               onClick={() => router.push("/students/selfhelptools")}
               className="flex items-center gap-2 text-[#73829A] hover:text-[#1a9bcc] transition-colors p-2"
             >
-              <ArrowLeft className="w-4 h-5" />
-              <span className="text-[13px] sm:text-[16px]">
+              <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
+              <span className="text-[11px] sm:text-[13px] md:text-[16px]">
                 Back to SelfHelpTools
               </span>
             </button>
           </div>
 
           {/* HEADER ROW */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 lg:gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 sm:gap-4 lg:gap-6">
             {/* TITLE */}
-            <div className="flex items-start gap-3 w-full sm:w-[510px] mb-[15px] sm:mb-[20px]">
+            <div className="flex items-start gap-2 sm:gap-3 w-full mb-3 sm:mb-4">
               <Image
                 src="/selfhelptools/music/Music.svg"
                 alt="Music Logo"
                 width={63}
                 height={63}
-                className="w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] lg:w-[63px] lg:h-[63px]"
+                className="w-[30px] h-[30px] sm:w-[40px] sm:h-[40px] md:w-[50px] md:h-[50px] lg:w-[63px] lg:h-[63px]"
               />
-              <div className="ml-2 flex-1">
-                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-[32px] font-bold text-slate-900">
+              <div className="ml-1 sm:ml-2 flex-1">
+                <h1 className="text-lg sm:text-xl md:text-2xl lg:text-[32px] font-bold text-slate-900">
                   Music Therapy
                 </h1>
-                <p className="text-[#686D70] text-sm sm:text-base">
+                <p className="text-[#686D70] text-xs sm:text-sm md:text-base mt-1">
                   Curated playlists designed to support your emotional
                   wellbeing.
                 </p>
@@ -179,24 +179,26 @@ export default function OptimizedMusicPage() {
             </div>
 
             {/* SEARCH + SHOW SAVED TOGGLE */}
-            <div className="flex flex-col gap-3 w-full lg:w-auto mb-[20px]">
-              <div className="flex flex-col sm:flex-row gap-3 w-full">
-                <SearchHeader
-                  searchQuery={searchTerm}
-                  onSearchChange={setSearchTerm}
-                />
+            <div className="flex flex-col gap-2 sm:gap-3 w-full lg:w-auto mb-3 sm:mb-4">
+              <div className="flex items-center gap-2 sm:gap-3 w-full">
+                <div className="flex-1 min-w-0">
+                  <SearchHeader
+                    searchQuery={searchTerm}
+                    onSearchChange={setSearchTerm}
+                  />
+                </div>
 
                 {/* ⭐ NEW SHOW SAVED ONLY BUTTON */}
                 <button
                   onClick={() => setShowSavedOnly(!showSavedOnly)}
-                  className={`h-10 sm:h-[47px] px-4 sm:px-6 rounded-full border transition-colors flex items-center gap-2 whitespace-nowrap text-sm sm:text-base 
+                  className={`h-9 sm:h-10 md:h-[47px] px-3 sm:px-4 md:px-6 rounded-full border transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-xs sm:text-sm md:text-base flex-shrink-0
                     ${
                       showSavedOnly
                         ? "border-red-400 bg-red-50 text-red-500"
                         : "border-[#A5C3FF] bg-[#A5C3FF]/10 text-[#5982D4] hover:bg-blue-100"
                     }`}
                 >
-                  <Heart className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <Heart className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4" />
                   {showSavedOnly
                     ? "Show All"
                     : `Saved Items (${savedItems.size})`}
@@ -207,10 +209,10 @@ export default function OptimizedMusicPage() {
         </div>
 
         {/* MAIN PAGE CONTENT */}
-        <main className="max-w-7xl mx-auto px-4 py-8">
+        <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
           {/* TABS */}
           {!showSavedOnly && (
-            <div className="mb-8 sm:-mt-6">
+            <div className="mb-6 sm:mb-8 -mt-2 sm:-mt-6">
               <FilterTabs
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
@@ -227,7 +229,7 @@ export default function OptimizedMusicPage() {
             </div>
           ) : filteredMusicResources.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {filteredMusicResources.map((music: any) => (
                   <MusicCard
                     key={music.id}
@@ -292,52 +294,52 @@ function MusicCard({ music, isSaved, onSave, onPlay }: any) {
   return (
     <div
       onClick={onPlay}
-      className="group w-auto sm:w-[399px] bg-white rounded-[14px] hover:shadow-xl hover:shadow-[#15A0EA33]/20 transition-all duration-300 flex flex-col h-full cursor-pointer"
+      className="group w-full bg-white rounded-[10px] sm:rounded-[12px] md:rounded-[14px] hover:shadow-xl hover:shadow-[#15A0EA33]/20 transition-all duration-300 flex flex-col h-full cursor-pointer"
     >
-      <div className="relative aspect-square h-[149px]">
+      <div className="relative aspect-square h-[120px] sm:h-[140px] md:h-[149px]">
         {music.coverImage ? (
           <img
             src={music.coverImage}
-            className="w-full h-full object-cover opacity-90 rounded-tl-[13px] rounded-tr-[14px]"
+            className="w-full h-full object-cover opacity-90 rounded-tl-[10px] sm:rounded-tl-[12px] md:rounded-tl-[13px] rounded-tr-[10px] sm:rounded-tr-[12px] md:rounded-tr-[14px]"
             alt=""
           />
         ) : music.thumbnailUrl ? (
           <img
             src={music.thumbnailUrl}
-            className="w-full h-full object-cover opacity-90 rounded-tl-[14px] rounded-tr-[14px]"
+            className="w-full h-full object-cover opacity-90 rounded-tl-[10px] sm:rounded-tl-[12px] md:rounded-tl-[14px] rounded-tr-[10px] sm:rounded-tr-[12px] md:rounded-tr-[14px]"
             alt=""
           />
         ) : (
           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-            <Music className="w-16 h-16 text-gray-400" />
+            <Music className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-gray-400" />
           </div>
         )}
       </div>
 
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-bold text-gray-900 text-[20px] truncate flex-1">
+      <div className="p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+          <h3 className="font-bold text-gray-900 text-base sm:text-lg md:text-[20px] truncate flex-1">
             {music.title}
           </h3>
           <button
             onClick={onSave}
-            className={`p-2 rounded-full w-[36px] h-[35px] border border-[#D4D4D4] ${
+            className={`p-1.5 sm:p-2 rounded-full w-[30px] h-[30px] sm:w-[36px] sm:h-[35px] border border-[#D4D4D4] ${
               isSaved ? "bg-red-50 text-red-500" : "bg-gray-50 text-[#666666]"
             }`}
           >
             <Heart
-              className={`w-[18px] h-[18px] ${isSaved ? "fill-current" : ""}`}
+              className={`w-3.5 h-3.5 sm:w-[18px] sm:h-[18px] ${isSaved ? "fill-current" : ""}`}
             />
           </button>
         </div>
 
-        <p className="text-sm text-gray-600 mb-2">
-          {music.artist || "Therapeutic Artist"}
+        <p className="text-xs sm:text-sm text-gray-600 mb-1.5 sm:mb-2">
+          {music.description || "Therapeutic Artist"}
         </p>
 
-        <div className="flex items-center gap-2 mb-3">
-          <Clock className="w-[14px] h-[14px] text-[#686D70]" />
-          <span className="text-[13px] text-[#686D70]">
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+          <Clock className="w-3 h-3 sm:w-[14px] sm:h-[14px] text-[#686D70]" />
+          <span className="text-xs sm:text-[13px] text-[#686D70]">
             {Math.max(
               1,
               Math.floor(
@@ -356,11 +358,11 @@ function MusicCard({ music, isSaved, onSave, onPlay }: any) {
             e.stopPropagation();
             onPlay();
           }}
-          className="group w-full h-[52px] border-2 border-[#1C76DC] bg-white 
+          className="group w-full h-10 sm:h-[52px] border-2 border-[#1C76DC] bg-white 
             group-hover:bg-[#1C76DC] rounded-full flex items-center justify-center transition-colors"
         >
-          <PlayIcon className="w-[16px] h-[17px] text-[#1C76DC] group-hover:text-white transition-colors" />
-          <span className="text-[#1C76DC] group-hover:text-white ml-2 font-medium text-[16px]">
+          <PlayIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-[16px] md:h-[17px] text-[#1C76DC] group-hover:text-white transition-colors" />
+          <span className="text-[#1C76DC] group-hover:text-white ml-1.5 sm:ml-2 font-medium text-sm sm:text-base md:text-[16px]">
             Play
           </span>
         </button>

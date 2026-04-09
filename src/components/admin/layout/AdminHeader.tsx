@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -11,8 +10,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Bell, Settings, Building2, X } from 'lucide-react';
+import { Bell, Settings, Building2, X, MapPin } from 'lucide-react';
 import { useAdminNotifications } from '@/src/hooks/use-admin-notifications';
+import { useTimeFilter } from '@/src/contexts/TimeFilterContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,15 +28,11 @@ interface AdminHeaderProps {
   schoolFilterValue?: string;
   onSchoolFilterChange?: (value: string) => void;
   schools?: Array<{ id: string; name: string }>;
+  showLocationFilter?: boolean;
+  locationFilterValue?: string;
+  onLocationFilterChange?: (value: string) => void;
+  locations?: Array<{ id: string; name: string }>;
   actions?: React.ReactNode;
-}
-
-interface AdminProfile {
-  firstName: string;
-  lastName: string;
-  adminProfile?: {
-    profileImageUrl?: string;
-  };
 }
 
 export function AdminHeader({ 
@@ -47,11 +43,15 @@ export function AdminHeader({
   schoolFilterValue,
   onSchoolFilterChange,
   schools,
+  showLocationFilter = false,
+  locationFilterValue,
+  onLocationFilterChange,
+  locations,
   actions 
 }: AdminHeaderProps) {
   const router = useRouter();
-  const [profile, setProfile] = useState<AdminProfile | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const { timeFilter, setTimeFilter } = useTimeFilter();
   
   const { 
     notifications, 
@@ -59,27 +59,6 @@ export function AdminHeader({
     markAsRead, 
     clearAll 
   } = useAdminNotifications();
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      const response = await fetch('/api/admin/profile');
-      const result = await response.json();
-      
-      if (result.success) {
-        setProfile(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch admin profile for header:', error);
-    }
-  };
-
-  const getInitials = (firstName?: string, lastName?: string) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
-  };
 
   const handleNotificationClick = (notification: any) => {
     if (notification.actionUrl) {
@@ -117,16 +96,35 @@ export function AdminHeader({
             </Select>
           )}
 
+          {showLocationFilter && (
+            <Select value={locationFilterValue} onValueChange={onLocationFilterChange}>
+              <SelectTrigger className="w-44 h-9 bg-white focus:ring-2 focus:ring-[#3c83f6] ">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-[#65758b] text-muted-foreground " />
+                  <SelectValue placeholder="Select Location" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className='bg-white'>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations && locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           {showTimeFilter && (
-            <Select defaultValue="week">
+            <Select value={timeFilter} onValueChange={setTimeFilter}>
               <SelectTrigger className="w-32 h-9 bg-white focus:ring-2 focus:ring-[#3c83f6] ">
                 <SelectValue placeholder="Time range" />
               </SelectTrigger>
               <SelectContent className='bg-white'>
+                <SelectItem value="all">All Time</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
                 <SelectItem value="week">This Week</SelectItem>
                 <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -222,20 +220,6 @@ export function AdminHeader({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <button
-            onClick={() => router.push('/admin/profile/admin')}
-            className="rounded-full ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
-              {profile?.adminProfile?.profileImageUrl ? (
-                <AvatarImage src={profile.adminProfile.profileImageUrl} />
-              ) : null}
-              <AvatarFallback className="text-sm">
-                {profile ? getInitials(profile.firstName, profile.lastName) : 'AD'}
-              </AvatarFallback>
-            </Avatar>
-          </button>
         </div>
       </div>
     </header>

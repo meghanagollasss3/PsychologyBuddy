@@ -21,35 +21,17 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '9', 10);
     
-    // Get user details to determine schoolId
-    const userResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/me`, {
-      headers: { cookie: req.headers.get('cookie') || '' }
-    });
-    const userData = await userResponse.json();
-    
-    // Use the student's schoolId to filter articles
-    const userSchoolId = userData.data?.user?.schoolId;
-    
-    // Get articles filtered by student's school with pagination
-    const result = await LibraryService.getAllArticles(userSchoolId, page, limit);
+    // For now, get all articles without school filtering to test
+    const result = await LibraryService.getAllArticles(undefined, undefined, page, limit);
     
     // Filter only published articles for students
     const publishedArticles = result.data.filter((article: any) => article.status === 'PUBLISHED');
-    
-    // Calculate pagination info for published articles only
-    const publishedCount = publishedArticles.length;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + publishedCount;
-    const totalPublished = result.pagination.totalCount; // This would need to be adjusted for accurate published count
     
     return NextResponse.json({
       success: true,
       message: 'Published articles retrieved successfully',
       data: publishedArticles,
-      pagination: {
-        ...result.pagination,
-        totalCount: totalPublished, // This is approximate - would need separate count query for accuracy
-      }
+      pagination: result.pagination
     });
   } catch (error) {
     console.error('Get student articles error:', error);

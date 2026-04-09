@@ -92,9 +92,10 @@ export class StudentService {
   }
 
   // Get students by school (Admin only - school-scoped)
-  static async getStudentsBySchool(schoolId?: string, filters?: { search?: string; status?: string; classId?: string }) {
+  static async getStudentsBySchool(schoolId?: string, filters?: { search?: string; status?: string; classId?: string; locationId?: string; page?: number; limit?: number }) {
     try {
-      const students = await StudentRepository.getStudentsBySchool(schoolId, filters);
+      const result = await StudentRepository.getStudentsBySchool(schoolId, filters);
+      const { students, pagination } = result;
 
       // Define mood scores for calculations
       const moodScores: Record<string, number> = {
@@ -156,7 +157,10 @@ export class StudentService {
         return studentWithoutPassword;
       });
 
-      return ApiResponse.success(studentsWithoutPasswords, 'Students retrieved successfully');
+      return ApiResponse.success({
+        students: studentsWithoutPasswords,
+        pagination
+      }, 'Students retrieved successfully');
     } catch (error) {
       throw error;
     }
@@ -407,7 +411,7 @@ export class StudentService {
     }
   }
 
-  // Delete student (Admin only)
+  // Delete student (Admin only - hard delete)
   static async deleteStudent(id: string) {
     try {
       // Check if student exists
@@ -416,13 +420,13 @@ export class StudentService {
         throw AuthError.notFound('Student not found');
       }
 
-      // Soft delete by setting status to INACTIVE
+      // Hard delete - completely remove from database
       const deletedStudent = await StudentRepository.deleteStudent(id);
 
       // Remove password from response
       const { password, ...studentWithoutPassword } = deletedStudent;
 
-      return ApiResponse.success(studentWithoutPassword, 'Student deleted successfully');
+      return ApiResponse.success(studentWithoutPassword, 'Student deleted permanently from the system');
     } catch (error) {
       throw error;
     }

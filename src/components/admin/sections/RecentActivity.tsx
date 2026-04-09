@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useTimeFilter, type TimeFilter, type DateRange } from "@/src/contexts/TimeFilterContext";
 
 // ------------------------------
 // Activity Type Interface
@@ -28,15 +29,35 @@ interface Activity {
 // ------------------------------
 // API Fetching Function
 // ------------------------------
-async function fetchActivities({ pageParam = 0 }) {
+async function fetchActivities({ pageParam = 0, timeFilter, dateRange }: { 
+  pageParam?: number; 
+  timeFilter: TimeFilter; 
+  dateRange: DateRange 
+}) {
   const limit = 5;
   const params = new URLSearchParams({
     limit: limit.toString(),
     offset: pageParam.toString(),
   });
 
+  // Add time filter parameters
+  if (timeFilter) {
+    params.append('timeFilter', timeFilter);
+    console.log('RecentActivities: Adding timeFilter', timeFilter);
+  }
+  
+  if (dateRange) {
+    params.append('startDate', dateRange.start.toISOString());
+    params.append('endDate', dateRange.end.toISOString());
+    console.log('RecentActivities: Adding dateRange', dateRange);
+  }
+
+  console.log('RecentActivities: Fetching with params', params.toString());
+
   const response = await fetch(`/api/admin/activities?${params}`);
   const result = await response.json();
+
+  console.log('RecentActivities: API response', result);
 
   if (!result.success) {
     throw new Error("Failed to load recent activities");
@@ -147,6 +168,10 @@ ActivityRow.displayName = "ActivityRow";
 // ------------------------------
 export function RecentActivity() {
   const router = useRouter();
+  const { timeFilter, dateRange } = useTimeFilter();
+
+  console.log('RecentActivity Component: timeFilter', timeFilter);
+  console.log('RecentActivity Component: dateRange', dateRange);
 
   const {
     data,
@@ -156,8 +181,8 @@ export function RecentActivity() {
     isFetchingNextPage,
     error,
   } = useInfiniteQuery({
-    queryKey: ["recent-activities"],
-    queryFn: fetchActivities,
+    queryKey: ["recent-activities", timeFilter, dateRange],
+    queryFn: ({ pageParam }) => fetchActivities({ pageParam, timeFilter, dateRange }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset,
     staleTime: 30_000,

@@ -13,6 +13,24 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Fetch the chat session to get start time
+    const chatSession = await prisma.chatSession.findUnique({
+      where: {
+        id: sessionId,
+      },
+      select: {
+        id: true,
+        startedAt: true,
+      },
+    });
+
+    if (!chatSession) {
+      return NextResponse.json(
+        { error: 'Session not found' },
+        { status: 404 }
+      );
+    }
+
     // Fetch all messages for this session
     const messages = await prisma.chatMessage.findMany({
       where: {
@@ -40,6 +58,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       messages: formattedMessages,
+      session: {
+        id: chatSession.id,
+        startedAt: chatSession.startedAt.toISOString(),
+      },
     });
 
   } catch (error) {

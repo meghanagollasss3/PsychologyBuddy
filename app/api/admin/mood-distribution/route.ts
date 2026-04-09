@@ -11,10 +11,13 @@ export const GET = withPermission({
   try {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get('schoolId');
+    const timeRange = searchParams.get('timeRange') || 'all';
 
     let targetSchoolId: string | undefined;
 
     if (user.role.name === 'ADMIN') {
+      targetSchoolId = user.schoolId;
+    } else if (user.role.name === 'SCHOOL_SUPERADMIN') {
       targetSchoolId = user.schoolId;
     } else if (user.role.name === 'SUPERADMIN') {
       if (schoolId && schoolId !== 'all') {
@@ -22,17 +25,34 @@ export const GET = withPermission({
       }
     }
 
-    // Get today's mood check-ins
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Calculate date range based on time filter
+    const now = new Date();
+    let startDate = new Date();
+
+    switch (timeRange) {
+      case 'all':
+        // For 'all', show lifetime data from the beginning
+        startDate.setFullYear(2000, 0, 1); // January 1, 2000
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      default:
+        startDate.setHours(0, 0, 0, 0);
+    }
 
     const moodCheckins = await prisma.moodCheckin.findMany({
       where: {
         createdAt: {
-          gte: today,
-          lt: tomorrow
+          gte: startDate,
+          lte: now
         },
         user: {
           role: { name: 'STUDENT' },
@@ -82,7 +102,8 @@ export const GET = withPermission({
       moodCounts,
       chartData,
       totalCheckins,
-      dominantMood: chartData.length > 0 ? chartData[0] : null
+      dominantMood: chartData.length > 0 ? chartData[0] : null,
+      timeRange
     });
 
     return Response.json({
@@ -90,7 +111,8 @@ export const GET = withPermission({
       data: {
         chartData,
         totalCheckins,
-        dominantMood: chartData.length > 0 ? chartData[0] : null
+        dominantMood: chartData.length > 0 ? chartData[0] : null,
+        timeRange
       }
     });
 

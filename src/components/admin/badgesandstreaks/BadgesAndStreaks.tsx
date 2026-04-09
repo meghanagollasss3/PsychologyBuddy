@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/src/contexts/AuthContext";
 import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
 
 // Emoji mappings for different badge types
@@ -154,6 +155,7 @@ interface CreateBadgeData {
 
 export default function BadgesAndStreaks() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { selectedSchoolId, setSelectedSchoolId, schools, setSchools, isSuperAdmin } = useSchoolFilter();
   
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -368,7 +370,7 @@ export default function BadgesAndStreaks() {
         title="Badges & Streaks" 
         subtitle="Manage achievement badges and track student engagement"
         showTimeFilter={false}
-        showSchoolFilter={true} // Show for any admin to test functionality
+        showSchoolFilter={user?.role?.name === "SUPERADMIN"}
         schoolFilterValue={selectedSchoolId}
         onSchoolFilterChange={setSelectedSchoolId}
         schools={schools}
@@ -424,7 +426,7 @@ export default function BadgesAndStreaks() {
         <Tabs defaultValue="badges" className="space-y-4">
           <TabsList>
             <TabsTrigger value="badges">Badge Library</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="badges" className="space-y-4">

@@ -11,11 +11,13 @@ export const GET = withPermission({
   try {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get('schoolId');
-    const timeRange = searchParams.get('timeRange') || 'week';
+    const timeRange = searchParams.get('timeRange') || 'all';
 
     let targetSchoolId: string | undefined;
 
     if (user.role.name === 'ADMIN') {
+      targetSchoolId = user.schoolId;
+    } else if (user.role.name === 'SCHOOL_SUPERADMIN') {
       targetSchoolId = user.schoolId;
     } else if (user.role.name === 'SUPERADMIN') {
       if (schoolId && schoolId !== 'all') {
@@ -28,6 +30,11 @@ export const GET = withPermission({
     let startDate = new Date();
 
     switch (timeRange) {
+      case 'all':
+        // For 'all', show lifetime data from the beginning
+        startDate.setFullYear(2000, 0, 1); // January 1, 2000
+        startDate.setHours(0, 0, 0, 0);
+        break;
       case 'today':
         startDate.setHours(0, 0, 0, 0);
         break;

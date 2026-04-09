@@ -77,7 +77,7 @@ export default function WritingPrompts({ onPromptSelect }: WritingPromptsProps) 
 <img src="/selfhelptools/journaling/Prompt.svg" alt="Editor" className="w-[45px] h-[45px] sm:w-[63px] sm:h-[63px]" />        </div>
         <h3 className="font-bold text-slate-900 text-base sm:text-[24px]">Writing Prompts</h3>
       </div>
-      <p className="text-slate-500 text-[12px] sm:text-[16px] mb-4 sm:mb-6 pl-8 sm:pl-12">
+      <p className="text-[#686D70] text-[12px] sm:text-[16px] mb-4 sm:mb-6 pl-8 sm:pl-3">
         Not sure what to write? Try one of these:
       </p>
       <div className="space-y-2 sm:space-y-3 overflow-y-auto max-h-[300px] sm:max-h-[500px] pr-2 custom-scrollbar">

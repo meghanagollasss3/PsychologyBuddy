@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/src/prisma";
-import Groq from "groq-sdk";
+import OpenAI from "openai";
 import { OPENING_MESSAGE_PROMPTS } from "@/src/lib/ai/prompts/system-prompt";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY!,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
 });
 
 export async function POST(req: Request) {
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
       isActive: session.isActive 
     });
 
-    // Generate Opening Message using Groq with retry logic
+    // Generate Opening Message using OpenAI with retry logic
     let prompt = "";
     
     if (hasPreviousConversations && lastSummary && !skipImportSuggestion) {
@@ -97,8 +97,8 @@ export async function POST(req: Request) {
     
     while (retryCount < maxRetries) {
       try {
-        const response = await groq.chat.completions.create({
-          model: "llama-3.1-8b-instant",
+        const response = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
           messages: [
             {
               role: "user",
@@ -129,9 +129,9 @@ export async function POST(req: Request) {
       }
     }
     if (!openingMessage) {
-      // Use a fallback message when Groq is unavailable
+      // Use a fallback message when OpenAI is unavailable
       openingMessage = "Hi there! I'm Psychology Buddy, your supportive AI companion. Sometimes the AI service might be busy, but I'm here to help you work through whatever's on your mind. How are you feeling right now?";
-      console.log("Using fallback message due to Groq service unavailability");
+      console.log("Using fallback message due to OpenAI service unavailability");
     }
 
     // Save bot opening message

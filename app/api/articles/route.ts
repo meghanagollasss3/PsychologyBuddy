@@ -25,11 +25,13 @@ export async function GET(req: NextRequest) {
     const user = userData.data?.user;
     
     let schoolId = undefined;
+    let timeRange = undefined;
     
     if (user?.role?.name === 'SUPERADMIN') {
       // For super admins, check if a specific school is selected
       const { searchParams } = new URL(req.url);
       const schoolFilter = searchParams.get('schoolId');
+      timeRange = searchParams.get('timeRange') || 'all';
       
       if (schoolFilter && schoolFilter !== 'all') {
         schoolId = schoolFilter;
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest) {
       schoolId = user?.schoolId;
     }
     
-    const result = await LibraryService.getAllArticles(schoolId);
+    const result = await LibraryService.getAllArticles(schoolId, timeRange);
     
     return NextResponse.json(result);
   } catch (error) {

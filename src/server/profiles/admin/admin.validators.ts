@@ -8,19 +8,26 @@ export const CreateAdminSchema = z.object({
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain uppercase, lowercase, and number'),
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
-  role: z.enum(['ADMIN', 'SUPERADMIN']),
+  role: z.enum(['ADMIN', 'SCHOOL_SUPERADMIN', 'SUPERADMIN']),
   schoolId: z.string().optional(),
+  locationId: z.string().optional(),
   phone: z.string().optional(),
   department: z.string().optional(),
+  createdBy: z.string().optional(),
 }).refine((data) => {
-  // If role is ADMIN, schoolId is required
+  // If role is ADMIN, schoolId and locationId are required
   if (data.role === 'ADMIN') {
+    return data.schoolId && data.schoolId.trim().length > 0 && 
+           data.locationId && data.locationId.trim().length > 0;
+  }
+  // If role is SCHOOL_SUPERADMIN, schoolId is required but locationId is not
+  if (data.role === 'SCHOOL_SUPERADMIN') {
     return data.schoolId && data.schoolId.trim().length > 0;
   }
   // If role is SUPERADMIN, schoolId is not required
   return true;
 }, {
-  message: 'School ID is required for ADMIN role',
+  message: 'School ID is required for ADMIN and SCHOOL_SUPERADMIN roles, Location ID is required for ADMIN role',
   path: ['schoolId']
 });
 
@@ -32,6 +39,7 @@ export const UpdateAdminSchema = z.object({
   department: z.string().optional(),
   profileImage: z.string().url().optional(),
   schoolId: z.string().optional(),
+  locationId: z.string().optional(),
 });
 
 // Admin password reset validator

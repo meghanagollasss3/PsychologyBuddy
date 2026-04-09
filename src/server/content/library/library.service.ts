@@ -131,7 +131,7 @@ export class LibraryService {
   }
 
   // Get all articles with pagination
-  static async getAllArticles(userSchoolId?: string, page: number = 1, limit: number = 9) {
+  static async getAllArticles(userSchoolId?: string, timeRange?: string, page: number = 1, limit: number = 9) {
     try {
       const skip = (page - 1) * limit;
       
@@ -145,6 +145,36 @@ export class LibraryService {
             { schoolId: userSchoolId },  // Articles from their school
             { schoolId: null }           // Superadmin articles
           ]
+        };
+      }
+      
+      // Add date filtering based on timeRange
+      if (timeRange) {
+        const now = new Date();
+        let startDate = new Date();
+        
+        switch (timeRange) {
+          case 'all':
+            // For 'all', show lifetime data from the beginning
+            startDate.setFullYear(2000, 0, 1); // January 1, 2000
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'today':
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'week':
+            startDate.setDate(now.getDate() - 7);
+            break;
+          case 'month':
+            startDate.setDate(now.getDate() - 30);
+            break;
+          default:
+            startDate.setHours(0, 0, 0, 0);
+        }
+        
+        whereClause.createdAt = {
+          gte: startDate,
+          lte: now
         };
       }
       

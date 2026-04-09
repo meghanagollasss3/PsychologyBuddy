@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
 
@@ -31,10 +31,17 @@ interface OrganizationData {
   timezone: string;
 }
 
+interface AdminLocation {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+}
+
 export default function SettingsSection() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { schools, isSuperAdmin } = useSchoolFilter();
+  const { schools, isSuperAdmin, selectedSchoolId, setSelectedSchoolId } = useSchoolFilter();
   
   const [organizationData, setOrganizationData] = useState<OrganizationData>({
     id: '',
@@ -45,7 +52,9 @@ export default function SettingsSection() {
     timezone: 'est',
   });
   
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
+  const [adminLocations, setAdminLocations] = useState<AdminLocation[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -63,12 +72,62 @@ export default function SettingsSection() {
       });
       // Fetch full school details if needed
       fetchSchoolDetails(user.school.id);
+    } else if (isSuperAdmin && selectedSchoolId === 'all' && schools.length > 0) {
+      setSelectedSchoolId(schools[0].id);
+    }
+  }, [user, isSuperAdmin, schools, selectedSchoolId]);
+
+  // Fetch school details when selectedSchoolId changes
+  useEffect(() => {
+    if (selectedSchoolId && selectedSchoolId !== 'all') {
+      setOrganizationData(prev => ({ ...prev, id: selectedSchoolId }));
+      fetchSchoolDetails(selectedSchoolId);
+    }
+  }, [selectedSchoolId]);
+
+  // Fetch admin locations for ADMIN users
+  useEffect(() => {
+    if (user?.role?.name === 'ADMIN' && user?.school?.id) {
+      fetchAdminLocations();
     }
   }, [user]);
 
+  // Fetch admin locations from API
+  const fetchAdminLocations = async () => {
+    if (!user?.school?.id) return;
+    
+    try {
+      setLoadingLocations(true);
+      console.log('Fetching admin assigned locations...');
+      
+      // Get only the locations assigned to this admin
+      const adminLocationResponse = await fetch(`/api/admin/locations/assigned`, { credentials: 'include' });
+      const adminLocationData = await adminLocationResponse.json();
+      
+      console.log('Admin locations response:', adminLocationData);
+      
+      if (adminLocationData.success && adminLocationData.data) {
+        setAdminLocations(adminLocationData.data.map((loc: any) => ({
+          id: loc.locationId,
+          name: loc.name,
+          address: loc.address,
+          city: loc.city
+        })));
+      } else {
+        console.log('No admin locations found or API error:', adminLocationData);
+        setAdminLocations([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin locations:', error);
+      setAdminLocations([]);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
   // Fetch school details from API
   const fetchSchoolDetails = async (schoolId: string) => {
-    if (!schoolId) return;
+    if (!schoolId || schoolId === 'all') return;
     
     try {
       setLoading(true);
@@ -148,48 +207,49 @@ export default function SettingsSection() {
         title="Settings" 
         subtitle="Manage platform configuration and preferences"
         showTimeFilter={false}
+        showSchoolFilter={isSuperAdmin}
+        schoolFilterValue={selectedSchoolId}
+        onSchoolFilterChange={setSelectedSchoolId}
+        schools={schools}
       />
       
       <div className="flex-1 overflow-auto p-6 animate-fade-in">
-        <Tabs defaultValue="notifications" className="space-y-6">
-          <TabsList className={`grid ${isSuperAdmin ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'} w-full lg:w-auto bg-[#edf0f3]`}>
-            {!isSuperAdmin && (
-              <TabsTrigger value="organization" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
-                <Building2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Organization</span>
-              </TabsTrigger>
-            )}
+        <Tabs defaultValue="organization" className="space-y-6">
+          <TabsList className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 w-full lg:w-auto bg-[#edf0f3]`}>
+            <TabsTrigger value="organization" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
+              <Building2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Organization</span>
+            </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Notifications</span>
             </TabsTrigger>
-            <TabsTrigger value="permissions" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
+            {/* <TabsTrigger value="permissions" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
               <Shield className="h-4 w-4" />
               <span className="hidden sm:inline">Permissions</span>
-            </TabsTrigger>
-            <TabsTrigger value="appearance" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
+            </TabsTrigger> */}
+            {/* <TabsTrigger value="appearance" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
               <Palette className="h-4 w-4" />
               <span className="hidden sm:inline">Appearance</span>
-            </TabsTrigger>
-            <TabsTrigger value="data" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
+            </TabsTrigger> */}
+            {/* <TabsTrigger value="data" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
               <Database className="h-4 w-4" />
               <span className="hidden sm:inline">Data</span>
-            </TabsTrigger>
+            </TabsTrigger> */}
             <TabsTrigger value="security" className="gap-2 data-[state=active]:bg-[#f9fafb] text-[#65758b] hover:text-gray-900 data-[state=active]:text-black">
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">Security</span>
             </TabsTrigger>
           </TabsList>
 
-          {!isSuperAdmin && (
-            <TabsContent value="organization">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Organization Profile</CardTitle>
-                  <CardDescription>Manage your school's information</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
+          <TabsContent value="organization">
+            <Card>
+              <CardHeader>
+                <CardTitle>Organization Profile</CardTitle>
+                <CardDescription>Manage your school's information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="schoolName">School Name</Label>
                       <Input 
@@ -201,37 +261,63 @@ export default function SettingsSection() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="adminEmail">Admin Email</Label>
+                      <Label htmlFor="adminEmail">
+                        {user?.role?.name === 'ADMIN' ? 'Your Email' : 'Admin Email'}
+                      </Label>
                       <Input 
                         id="adminEmail" 
                         type="email" 
-                        value={organizationData.email}
+                        value={user?.role?.name === 'ADMIN' ? user?.email || '' : organizationData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         placeholder="admin@school.edu"
-                        disabled={loading || saving}
+                        disabled={loading || saving || user?.role?.name === 'ADMIN'} // ADMIN users can't change their email here
                       />
                     </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea 
-                      id="address" 
-                      value={organizationData.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      placeholder="School address"
-                      rows={2} 
-                      disabled={loading || saving}
-                    />
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  {user?.role?.name === 'ADMIN' ? (
                     <div className="grid gap-2">
-                      <Label htmlFor="phone">Phone</Label>
+                      <Label htmlFor="address">Assigned Locations</Label>
+                      <div className="space-y-2">
+                        {loadingLocations ? (
+                          <div className="text-sm text-muted-foreground">Loading assigned locations...</div>
+                        ) : adminLocations.length > 0 ? (
+                          adminLocations.map((location) => (
+                            <div key={location.id} className="p-3 border rounded-md bg-gray-50">
+                              <div className="font-medium text-sm">{location.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {location.address}, {location.city}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No locations assigned</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : user?.role?.name === 'SUPERADMIN' || user?.role?.name === 'SCHOOL_SUPERADMIN' ? null : (
+                    <div className="grid gap-2">
+                      <Label htmlFor="address">Address</Label>
+                      <Textarea 
+                        id="address" 
+                        value={organizationData.address}
+                        onChange={(e) => handleInputChange('address', e.target.value)}
+                        placeholder="School address"
+                        rows={2} 
+                        disabled={loading || saving}
+                      />
+                    </div>
+                  )}
+                  {/* <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="phone">
+                        {user?.role?.name === 'ADMIN' ? 'Your Phone' : 'Phone'}
+                      </Label>
                       <Input 
                         id="phone" 
-                        value={organizationData.phone}
+                        value={user?.role?.name === 'ADMIN' ? user?.phone || '' : organizationData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         placeholder="+1 (555) 123-4567"
-                        disabled={loading || saving}
+                        disabled={loading || saving || user?.role?.name === 'ADMIN'} // ADMIN users can't change their phone here
                       />
                     </div>
                     <div className="grid gap-2">
@@ -252,7 +338,7 @@ export default function SettingsSection() {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
+                  </div> */}
                   <Separator />
                   <Button 
                     onClick={handleSaveOrganization} 
@@ -263,7 +349,6 @@ export default function SettingsSection() {
                 </CardContent>
               </Card>
             </TabsContent>
-          )}
 
           <TabsContent value="notifications">
             <Card>

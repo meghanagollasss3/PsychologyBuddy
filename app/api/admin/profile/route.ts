@@ -10,11 +10,20 @@ export const GET = withPermission({
   action: 'VIEW' 
 })(async (req: NextRequest, { user }: any) => {
   try {
+    console.log('Profile endpoint called for user:', {
+      userId: user.id,
+      userRole: user.role.name,
+      userSchoolId: user.schoolId
+    });
+    
     const result = await AdminService.getAdminById(user.id);
+    console.log('Profile service result:', result);
+    
     return NextResponse.json(result);
   } catch (error) {
     console.error('Get admin profile error:', error);
     const errorResponse = handleError(error);
+    console.error('Error response:', errorResponse);
     return NextResponse.json(errorResponse, { status: errorResponse.error?.code || 500 });
   }
 });

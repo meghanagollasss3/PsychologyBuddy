@@ -43,7 +43,7 @@ function StatsCards({ stats, loading, permissions }: StatsCardsProps) {
     { title: "Total Students", value: stats.totalStudents, icon: "users", permission: "users.view", color: "bg-[#3B82F6]/10 text-[#3B82F6]" },
     { title: "Today's Check-ins", value: stats.checkinsToday, icon: "checkins", permission: "analytics.view", color: "bg-[#10B981]/10 text-[#10B981]" },
     { title: "Counselling Sessions", value: stats.activeSessions, icon: "sessions", permission: "analytics.view", color: "bg-[#E2E8F0] text-[#64748B]" },
-    { title: "High-Risk Alerts", value: stats.highRiskAlerts, icon: "alerts", permission: "analytics.view", color: "bg-[#EF4444]/10 text-[#EF4444]" },
+    { title: "High & Critical Alerts", value: stats.highRiskAlerts, icon: "alerts", permission: "analytics.view", color: "bg-[#EF4444]/10 text-[#EF4444]" },
     { title: "Resources Published", value: stats.totalResources, icon: "articles", permission: "psycho.education.view", color: "bg-[#E2E8F0] text-[#64748B]" },
   ];
 

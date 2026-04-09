@@ -2,6 +2,7 @@ import prisma from '@/src/prisma';
 import { PasswordUtil } from '@/src/utils/password.util';
 import { ApiResponse } from '@/src/utils/api-response';
 import { AuthError } from '@/src/utils/errors';
+import crypto from 'crypto';
 
 export class UserService {
   // ============================================
@@ -97,9 +98,9 @@ export class UserService {
   // Create school
   static async createSchool(data: {
     name: string;
-    address?: string;
     phone?: string;
     email?: string;
+    primaryAdminId?: string;
   }) {
     try {
       // Check if school with same email already exists
@@ -124,9 +125,19 @@ export class UserService {
         data: {
           id: userFriendlyId,
           name: data.name,
-          address: data.address,
           phone: data.phone,
           email: data.email?.toLowerCase().trim(), // Store email in lowercase
+          primaryAdminId: data.primaryAdminId,
+        },
+        include: {
+          primaryAdmin: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            }
+          }
         },
       });
 
@@ -139,7 +150,6 @@ export class UserService {
   // Update school
   static async updateSchool(schoolId: string, data: {
     name?: string;
-    address?: string;
     phone?: string;
     email?: string;
   }) {
@@ -190,6 +200,9 @@ export class UserService {
     try {
       const schools = await prisma.school.findMany({
         include: {
+          locations: {
+            select: { id: true }
+          },
           _count: {
             select: {
               users: {
@@ -200,6 +213,7 @@ export class UserService {
                 }
               },
               classes: true,
+              locations: true,
             },
           },
         },
@@ -216,16 +230,28 @@ export class UserService {
       const schoolsWithMetrics = await Promise.all(
         schools.map(async (school) => {
           const [alertCount, checkInsToday] = await Promise.all([
-            // Count unresolved alerts for students in this school
-            prisma.highRiskAlert.count({
+            // Count CRITICAL unresolved alerts for students in this school
+            prisma.escalationAlert.count({
               where: {
-                user: {
-                  schoolId: school.id,
-                  role: {
-                    name: 'STUDENT'
-                  }
+                studentId: {
+                  in: (
+                    await prisma.user.findMany({
+                      where: {
+                        schoolId: school.id,
+                        role: {
+                          name: 'STUDENT'
+                        }
+                      },
+                      select: { id: true }
+                    })
+                  ).map(user => user.id)
                 },
-                resolved: false
+                status: 'open',
+                OR: [
+                  { priority: 'critical' },
+                  { priority: 'high' },
+                  { requiresImmediateAction: true }
+                ]
               }
             }),
             // Count check-ins today for students in this school
@@ -247,6 +273,8 @@ export class UserService {
 
           return {
             ...school,
+            studentCount: school._count.users,
+            locationsCount: school._count.locations,
             alertCount,
             checkInsToday
           };
@@ -342,18 +370,198 @@ export class UserService {
   }
 
   // ============================================
+  // LOCATION ADMIN MANAGEMENT
+  // ============================================
+
+  // Assign admin to location
+  static async assignAdminToLocation(data: {
+    locationId: string;
+    adminId: string;
+    assignedBy: string;
+  }) {
+    try {
+      // Check if assignment already exists
+      const existingAssignment = await prisma.locationAdminAssignment.findUnique({
+        where: {
+          locationId_adminId: {
+            locationId: data.locationId,
+            adminId: data.adminId,
+          }
+        }
+      });
+
+      if (existingAssignment) {
+        throw new AuthError('Admin is already assigned to this location', 409);
+      }
+
+      // Verify location exists
+      const location = await prisma.schoolLocation.findUnique({
+        where: { id: data.locationId },
+        include: { school: true }
+      });
+
+      if (!location) {
+        throw AuthError.notFound('Location not found');
+      }
+
+      // Verify admin exists and is an ADMIN role
+      const admin = await prisma.user.findUnique({
+        where: { id: data.adminId },
+        include: { role: true }
+      });
+
+      if (!admin || admin.role.name !== 'ADMIN') {
+        throw AuthError.notFound('Admin not found or invalid role');
+      }
+
+      // Create assignment
+      const assignment = await prisma.locationAdminAssignment.create({
+        data: {
+          locationId: data.locationId,
+          adminId: data.adminId,
+          assignedBy: data.assignedBy,
+        },
+        include: {
+          location: {
+            select: {
+              id: true,
+              name: true,
+              school: {
+                select: {
+                  id: true,
+                  name: true,
+                }
+              }
+            }
+          },
+          admin: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            }
+          }
+        }
+      });
+
+      return ApiResponse.success(assignment, 'Admin assigned to location successfully');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Remove admin from location
+  static async removeAdminFromLocation(locationId: string, adminId: string) {
+    try {
+      const assignment = await prisma.locationAdminAssignment.findUnique({
+        where: {
+          locationId_adminId: {
+            locationId,
+            adminId,
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw AuthError.notFound('Admin assignment not found');
+      }
+
+      await prisma.locationAdminAssignment.delete({
+        where: {
+          locationId_adminId: {
+            locationId,
+            adminId,
+          }
+        }
+      });
+
+      return ApiResponse.success(null, 'Admin removed from location successfully');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get admins assigned to a location
+  static async getLocationAdmins(locationId: string) {
+    try {
+      const assignments = await prisma.locationAdminAssignment.findMany({
+        where: { locationId },
+        include: {
+          admin: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              createdAt: true,
+            }
+          },
+          assigner: {
+            select: {
+              firstName: true,
+              lastName: true,
+            }
+          }
+        },
+        orderBy: { assignedAt: 'desc' }
+      });
+
+      return ApiResponse.success(assignments, 'Location admins retrieved successfully');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get locations assigned to an admin
+  static async getAdminLocations(adminId: string) {
+    try {
+      const assignments = await prisma.locationAdminAssignment.findMany({
+        where: { adminId },
+        include: {
+          location: {
+            include: {
+              school: {
+                select: {
+                  id: true,
+                  name: true,
+                }
+              }
+            }
+          },
+          assigner: {
+            select: {
+              firstName: true,
+              lastName: true,
+            }
+          }
+        },
+        orderBy: { assignedAt: 'desc' }
+      });
+
+      return ApiResponse.success(assignments, 'Admin locations retrieved successfully');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ============================================
   // SUPERADMIN: ADMIN MANAGEMENT
   // ============================================
 
   // Create admin
   static async createAdmin(data: {
     email: string;
-    password: string;
+    password?: string;
     firstName: string;
     lastName: string;
     phone?: string;
-    schoolId: string;
+    schoolId?: string;
     department?: string;
+    isPrimaryAdmin?: boolean;
+    locationId?: string;
+    role?: string;
   }) {
     try {
       // Check if admin with this email already exists
@@ -365,29 +573,26 @@ export class UserService {
         throw AuthError.conflict('Admin with this email already exists');
       }
 
-      // Check if school already has an admin assigned
-      const existingSchoolAdmin = await prisma.user.findFirst({
-        where: {
-          schoolId: data.schoolId,
-          role: { name: 'ADMIN' },
-        },
-      });
-
-      if (existingSchoolAdmin) {
-        throw AuthError.conflict('School already has an admin assigned');
+      // Get admin role - support for multiple admin roles
+      let adminRole;
+      if (data.role === 'SCHOOL_SUPERADMIN') {
+        adminRole = await prisma.role.findUnique({
+          where: { name: 'SCHOOL_SUPERADMIN' },
+        });
+      } else {
+        // Default to ADMIN role for location-specific admins
+        adminRole = await prisma.role.findUnique({
+          where: { name: 'ADMIN' },
+        });
       }
-
-      // Get admin role
-      const adminRole = await prisma.role.findUnique({
-        where: { name: 'ADMIN' },
-      });
 
       if (!adminRole) {
         throw new Error('Admin role not found');
       }
 
-      // Hash password
-      const hashedPassword = await PasswordUtil.hash(data.password);
+      // Hash password - generate random password if not provided
+      const password = data.password || crypto.randomBytes(6).toString('hex');
+      const hashedPassword = await PasswordUtil.hash(password);
 
       // Create user
       const admin = await prisma.user.create({
@@ -918,6 +1123,79 @@ export class UserService {
       return ApiResponse.success(studentWithoutPassword, 'Student profile updated successfully');
     } catch (error) {
       throw error;
+    }
+  }
+
+  // ============================================
+  // SCHOOL SECTIONS APIS
+  // ============================================
+
+  // Get sections for a specific school
+  static async getSchoolSections(schoolId: string) {
+    try {
+      // Fetch unique sections from existing classes for this school
+      const classes = await prisma.class.findMany({
+        where: { 
+          schoolId: schoolId,
+          section: { not: null }
+        },
+        select: {
+          section: true
+        },
+        distinct: ['section'],
+        orderBy: { section: 'asc' }
+      });
+
+      // Extract unique section names
+      const sections = classes
+        .map(cls => cls.section)
+        .filter(section => section && section.trim() !== '');
+
+      return ApiResponse.success(sections, 'School sections fetched successfully');
+    } catch (error) {
+      console.error('Get school sections error:', error);
+      return ApiResponse.error('Failed to fetch school sections');
+    }
+  }
+
+  // Create a new section for a school
+  static async createSchoolSection(schoolId: string, name: string) {
+    try {
+      // Check if section already exists for this school
+      const existingClass = await prisma.class.findFirst({
+        where: {
+          schoolId: schoolId,
+          section: name,
+        }
+      });
+
+      if (existingClass) {
+        return ApiResponse.error('Section already exists for this school');
+      }
+
+      // Create a sample class with the new section to establish it
+      // This creates a placeholder class that can be updated later
+      const newClass = await prisma.class.create({
+        data: {
+          name: `Class Placeholder - ${name}`,
+          grade: 10, // Default grade
+          section: name,
+          schoolId: schoolId,
+        },
+        select: {
+          id: true,
+          name: true,
+          grade: true,
+          section: true,
+          schoolId: true,
+          createdAt: true,
+        }
+      });
+
+      return ApiResponse.success(newClass, 'School section created successfully');
+    } catch (error) {
+      console.error('Create school section error:', error);
+      return ApiResponse.error('Failed to create school section');
     }
   }
 }

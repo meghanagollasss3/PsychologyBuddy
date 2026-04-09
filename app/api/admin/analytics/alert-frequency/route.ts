@@ -7,11 +7,23 @@ import { handleError } from '@/src/utils/errors';
 export const GET = withPermission({
   module: 'ANALYTICS',
   action: 'VIEW'
-})(async (req: NextRequest) => {
+})(async (req: NextRequest, { user }: any) => {
   try {
     const url = new URL(req.url);
     const weeks = parseInt(url.searchParams.get('weeks') || '4');
     const schoolId = url.searchParams.get('schoolId');
+
+    let targetSchoolId: string | undefined;
+
+    if (user.role.name === 'ADMIN' || user.role.name === 'SCHOOL_SUPERADMIN') {
+      targetSchoolId = user.schoolId;
+    } else if (user.role.name === 'SUPERADMIN') {
+      if (schoolId && schoolId !== 'all') {
+        targetSchoolId = schoolId;
+      }
+    }
+
+    console.log('Alert frequency - User role:', user.role.name, 'Target school:', targetSchoolId);
 
     // Calculate date range
     const endDate = new Date();
@@ -27,9 +39,9 @@ export const GET = withPermission({
     }
 
     // Build where clause for school filtering
-    const schoolFilter = schoolId && schoolId !== 'all' ? {
+    const schoolFilter = targetSchoolId ? {
       user: {
-        schoolId: schoolId
+        schoolId: targetSchoolId
       }
     } : {};
 
@@ -39,7 +51,7 @@ export const GET = withPermission({
         role: {
           name: 'STUDENT'
         },
-        ...(schoolId && schoolId !== 'all' ? { schoolId: schoolId } : {})
+        ...(targetSchoolId ? { schoolId: targetSchoolId } : {})
       }
     });
 

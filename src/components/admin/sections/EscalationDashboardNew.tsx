@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Search, 
   AlertTriangle, 
@@ -48,6 +48,14 @@ import { cn } from "@/src/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
 import { usePermissions } from "@/src/hooks/usePermissions";
+import { useTimeFilter } from "@/src/contexts/TimeFilterContext";
+
+interface Resource {
+  id?: string;
+  name: string;
+  type: string;
+  duration?: string;
+}
 
 interface EscalationAlert {
   id: string
@@ -97,45 +105,16 @@ const resourceIcons = {
 };
 
 const resourceTypes = [
-  { id: "articles", label: "Articles", icon: BookOpen },
+  { id: "articles", label: "Psycho Education Articles", icon: BookOpen },
   { id: "meditation", label: "Meditation", icon: Heart },
   { id: "music", label: "Music Therapy", icon: Music },
-  { id: "exercises", label: "Exercises", icon: Dumbbell },
 ];
-
-// Mock resource data - in production this would come from the database
-const availableResourcesByType: Record<string, { id: string; name: string; duration: string }[]> = {
-  articles: [
-    { id: "a1", name: "Understanding Anxiety", duration: "5 min read" },
-    { id: "a2", name: "Breathing Techniques for Calm", duration: "3 min read" },
-    { id: "a3", name: "Managing Exam Stress", duration: "7 min read" },
-    { id: "a4", name: "Building Resilience", duration: "6 min read" },
-    { id: "a5", name: "Mindfulness Basics", duration: "4 min read" },
-  ],
-  meditation: [
-    { id: "m1", name: "5-Minute Breathing Exercise", duration: "5 min" },
-    { id: "m2", name: "Body Scan Meditation", duration: "10 min" },
-    { id: "m3", name: "Guided Relaxation", duration: "15 min" },
-    { id: "m4", name: "Morning Calm", duration: "8 min" },
-  ],
-  music: [
-    { id: "mu1", name: "Calm Piano Collection", duration: "30 min" },
-    { id: "mu2", name: "Nature Sounds", duration: "20 min" },
-    { id: "mu3", name: "Sleep Therapy Mix", duration: "45 min" },
-  ],
-  exercises: [
-    { id: "e1", name: "Box Breathing Practice", duration: "5 min" },
-    { id: "e2", name: "Grounding Techniques", duration: "10 min" },
-    { id: "e3", name: "Progressive Muscle Relaxation", duration: "15 min" },
-    { id: "e4", name: "Journaling Prompts", duration: "10 min" },
-  ],
-};
 
 interface AlertDetailModalProps {
   alert: EscalationAlert | null
   isOpen: boolean
   onClose: () => void
-  onUpdateStatus: (alertId: string, status: string, notes?: string) => void
+  onUpdateStatus: (alertId: string, status: string, notes?: string, selectedResources?: any[]) => void
 }
 
 function AlertDetailModal({ alert, isOpen, onClose, onUpdateStatus }: AlertDetailModalProps) {
@@ -143,8 +122,134 @@ function AlertDetailModal({ alert, isOpen, onClose, onUpdateStatus }: AlertDetai
   const [selectedResourceType, setSelectedResourceType] = useState<string>("");
   const [resourceSearchQuery, setResourceSearchQuery] = useState("");
   const [selectedResources, setSelectedResources] = useState<{ id: string; name: string; type: string; duration: string }[]>([]);
+  const [availableResources, setAvailableResources] = useState<Record<string, { id: string; name: string; duration: string }[]>>({});
+  const [loadingResources, setLoadingResources] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [updating, setUpdating] = useState(false);
+
+  // Parse recommended resources from notes
+  const [parsedNotes, recommendedResources] = useMemo((): [string, Resource[]] => {
+    if (!alert?.notes) return ['', []];
+    
+    const resourcesIndex = alert.notes.indexOf('--- RECOMMENDED RESOURCES ---');
+    if (resourcesIndex === -1) return [alert.notes, []];
+    
+    const notesPart = alert.notes.substring(0, resourcesIndex).trim();
+    const resourcesPart = alert.notes.substring(resourcesIndex + '--- RECOMMENDED RESOURCES ---'.length).trim();
+    
+    let parsedResources: Resource[] = [];
+    try {
+      const resourcesData = JSON.parse(resourcesPart);
+      parsedResources = resourcesData.recommendedResources || [];
+    } catch (error) {
+      console.error('Error parsing recommended resources:', error);
+    }
+    
+    return [notesPart, parsedResources];
+  }, [alert?.notes]);
+
+  // Update resolutionNotes with parsed notes when alert changes
+  useEffect(() => {
+    setResolutionNotes(parsedNotes);
+  }, [parsedNotes]);
+
+  const fetchResources = async () => {
+    try {
+      setLoadingResources(true);
+      
+      console.log('Fetching resources...');
+      
+      // Fetch resources individually to handle errors separately
+      const [articlesResponse, meditationResponse, musicResponse] = await Promise.allSettled([
+        fetch('/api/admin/articles?limit=20'),
+        fetch('/api/meditation/resources?limit=20&status=PUBLISHED'),
+        fetch('/api/admin/music/resources?limit=20&status=PUBLISHED')
+      ]);
+      
+      // Extract responses and handle errors
+      const articlesOk = articlesResponse.status === 'fulfilled' ? articlesResponse.value : null;
+      const meditationOk = meditationResponse.status === 'fulfilled' ? meditationResponse.value : null;
+      const musicOk = musicResponse.status === 'fulfilled' ? musicResponse.value : null;
+      
+      console.log('API Response statuses:', {
+        articles: articlesOk?.status || 'failed',
+        meditation: meditationOk?.status || 'failed',
+        music: musicOk?.status || 'failed'
+      });
+      
+      // Parse JSON responses individually
+      const [articlesData, meditationData, musicData] = await Promise.all([
+        articlesOk?.json().catch(() => ({ success: false, data: [] })) || { success: false, data: [] },
+        meditationOk?.json().catch(() => ({ success: false, data: [] })) || { success: false, data: [] },
+        musicOk?.json().catch(() => ({ success: false, data: { resources: [] } })) || { success: false, data: { resources: [] } }
+      ]);
+      
+      console.log('API Responses:', {
+        articles: articlesData,
+        meditation: meditationData,
+        music: musicData
+      });
+      
+      const resourcesByType: Record<string, { id: string; name: string; duration: string }[]> = {
+        articles: [],
+        meditation: [],
+        music: []
+      };
+      
+      // Process articles - articles are directly in data array, not data.articles
+      if (articlesData.success && articlesData.data) {
+        resourcesByType.articles = articlesData.data.map((article: any) => ({
+          id: article.id,
+          name: article.title,
+          duration: article.readTime ? `${article.readTime} min read` : 'Read time varies'
+        }));
+      }
+      
+      // Process meditation resources - data is directly in data field, not data.resources
+      if (meditationData.success && meditationData.data) {
+        console.log('Meditation raw data:', meditationData.data);
+        resourcesByType.meditation = meditationData.data.map((resource: any) => {
+          console.log('Processing meditation resource:', resource);
+          const processedResource = {
+            id: resource.id,
+            name: resource.title,
+            duration: resource.format || 'Meditation'
+          };
+          console.log('Processed meditation resource:', processedResource);
+          return processedResource;
+        });
+      }
+      
+      // Process music resources
+      if (musicData.success && musicData.data?.resources) {
+        resourcesByType.music = musicData.data.resources.map((resource: any) => ({
+          id: resource.id,
+          name: resource.title,
+          duration: resource.duration ? `${Math.ceil(resource.duration / 60)} min` : 'Duration varies'
+        }));
+      }
+      
+      console.log('Final resources by type:', resourcesByType);
+      setAvailableResources(resourcesByType);
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+      // Set empty arrays on error
+      setAvailableResources({
+        articles: [],
+        meditation: [],
+        music: []
+      });
+    } finally {
+      setLoadingResources(false);
+    }
+  };
+
+  // Fetch real resources from the API when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchResources();
+    }
+  }, [isOpen]);
 
   if (!isOpen || !alert) return null;
 
@@ -183,7 +288,9 @@ function AlertDetailModal({ alert, isOpen, onClose, onUpdateStatus }: AlertDetai
 
   const confirmCloseAlert = async () => {
     setUpdating(true);
-    await onUpdateStatus(alert.id, 'resolved', resolutionNotes);
+    
+    // Pass selected resources separately
+    await onUpdateStatus(alert.id, 'resolved', resolutionNotes, selectedResources);
     setUpdating(false);
     setShowConfirmation(false);
     onClose();
@@ -276,7 +383,7 @@ function AlertDetailModal({ alert, isOpen, onClose, onUpdateStatus }: AlertDetai
             </div>
 
             {/* Detection Details */}
-            <div>
+            {/* <div>
               <p className="text-sm font-medium text-[#64748B] mb-2">Detection Details</p>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -304,7 +411,7 @@ function AlertDetailModal({ alert, isOpen, onClose, onUpdateStatus }: AlertDetai
                   </div>
                 )}
               </div>
-            </div>
+            </div> */}
 
             {/* Original Message */}
             <div>
@@ -369,36 +476,42 @@ function AlertDetailModal({ alert, isOpen, onClose, onUpdateStatus }: AlertDetai
                         className="text-sm"
                       />
                       <div className="max-h-32 overflow-y-auto border rounded-lg divide-y">
-                        {availableResourcesByType[selectedResourceType]
-                          ?.filter(r => r.name.toLowerCase().includes(resourceSearchQuery.toLowerCase()))
-                          .map((resource) => {
-                            const isAlreadySelected = selectedResources.some(sr => sr.id === resource.id);
-                            return (
-                              <div
-                                key={resource.id}
-                                className={cn(
-                                  "flex items-center justify-between px-3 py-2 text-sm cursor-pointer transition-colors",
-                                  isAlreadySelected 
-                                    ? "bg-[#E2E8F0]/50 text-[#64748B]" 
-                                    : "hover:bg-[#E2E8F0]/30"
-                                )}
-                                onClick={() => {
-                                  if (!isAlreadySelected) {
-                                    const typeLabel = resourceTypes.find(t => t.id === selectedResourceType)?.label || selectedResourceType;
-                                    setSelectedResources([...selectedResources, {
-                                      id: resource.id,
-                                      name: resource.name,
-                                      type: typeLabel,
-                                      duration: resource.duration
-                                    }]);
-                                  }
-                                }}
-                              >
-                                <span>{resource.name}</span>
-                                <span className="text-xs text-[#64748B]">{resource.duration}</span>
-                              </div>
-                            );
-                          })}
+                        {loadingResources ? (
+                          <div className="px-3 py-2 text-sm text-[#64748B]">
+                            Loading resources...
+                          </div>
+                        ) : (
+                          availableResources[selectedResourceType]
+                            ?.filter((r: any) => r.name.toLowerCase().includes(resourceSearchQuery.toLowerCase()))
+                            .map((resource: any) => {
+                              const isAlreadySelected = selectedResources.some(sr => sr.id === resource.id);
+                              return (
+                                <div
+                                  key={resource.id}
+                                  className={cn(
+                                    "flex items-center justify-between px-3 py-2 text-sm cursor-pointer transition-colors",
+                                    isAlreadySelected 
+                                      ? "bg-[#E2E8F0]/50 text-[#64748B]" 
+                                      : "hover:bg-[#E2E8F0]/30"
+                                  )}
+                                  onClick={() => {
+                                    if (!isAlreadySelected) {
+                                      const typeLabel = resourceTypes.find(t => t.id === selectedResourceType)?.label || selectedResourceType;
+                                      setSelectedResources([...selectedResources, {
+                                        id: resource.id,
+                                        name: resource.name,
+                                        type: typeLabel,
+                                        duration: resource.duration
+                                      }]);
+                                    }
+                                  }}
+                                >
+                                  <span>{resource.name}</span>
+                                  <span className="text-xs text-[#64748B]">{resource.duration}</span>
+                                </div>
+                              );
+                            })
+                        )}
                       </div>
                     </div>
                   )}
@@ -445,12 +558,37 @@ function AlertDetailModal({ alert, isOpen, onClose, onUpdateStatus }: AlertDetai
             )}
 
             {/* Resolution Info (for resolved alerts) */}
-            {alert.status !== 'open' && alert.notes && (
+            {alert.status !== 'open' && (parsedNotes || recommendedResources.length > 0) && (
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Resolution Notes</p>
-                <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-                  <p className="text-sm text-foreground leading-relaxed">{alert.notes}</p>
-                </div>
+                {/* Resolution Notes */}
+                {parsedNotes && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Resolution Notes</p>
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                      <p className="text-sm text-foreground leading-relaxed">{parsedNotes}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Recommended Resources */}
+                {recommendedResources.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Recommended Resources</p>
+                    <div className="space-y-2">
+                      {recommendedResources.map((resource, index) => (
+                        <div
+                          key={resource.id || index}
+                          className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-3 py-2"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{resource.name}</p>
+                            <p className="text-xs text-[#64748B]">{resource.type} {resource.duration && `(${resource.duration})`}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -496,6 +634,7 @@ export function EscalationDashboardNew() {
   const [isMonitoring, setIsMonitoring] = useState(false)
   
   const { isSuperAdmin, userSchoolId } = usePermissions()
+  const { timeFilter, dateRange } = useTimeFilter()
 
   // Set initial school based on permissions
   useEffect(() => {
@@ -516,7 +655,7 @@ export function EscalationDashboardNew() {
   // Fetch alerts and schools
   useEffect(() => {
     fetchAlerts()
-  }, [selectedSchool, statusFilter])
+  }, [selectedSchool, statusFilter, timeFilter, dateRange])
 
   const fetchSchools = async () => {
     try {
@@ -555,6 +694,16 @@ export function EscalationDashboardNew() {
         params.append('schoolId', selectedSchool)
       }
 
+      // Add time filter parameters
+      if (timeFilter) {
+        params.append('timeFilter', timeFilter)
+      }
+      
+      if (dateRange) {
+        params.append('startDate', dateRange.start.toISOString())
+        params.append('endDate', dateRange.end.toISOString())
+      }
+
       const response = await fetch(`/api/students/escalations?${params.toString()}`)
       if (!response.ok) {
         throw new Error('Failed to fetch alerts')
@@ -589,10 +738,10 @@ export function EscalationDashboardNew() {
 
   useEffect(() => {
     fetchAlerts()
-  }, [statusFilter, priorityFilter, searchTerm, selectedSchool])
+  }, [statusFilter, priorityFilter, searchTerm, selectedSchool, timeFilter, dateRange])
 
   // Update alert status using real API
-  const updateAlertStatus = async (alertId: string, status: string, notes?: string) => {
+  const updateAlertStatus = async (alertId: string, status: string, notes?: string, selectedResources?: any[]) => {
     try {
       const response = await fetch('/api/students/escalations', {
         method: 'PATCH',
@@ -602,7 +751,8 @@ export function EscalationDashboardNew() {
         body: JSON.stringify({
           alertId,
           status,
-          notes: notes || ''
+          notes: notes || '',
+          recommendedResources: selectedResources || []
         })
       })
 
@@ -730,7 +880,7 @@ export function EscalationDashboardNew() {
       <AdminHeader 
         title="Escalation & Alerts"
         subtitle={`${openCount} open alerts, ${highCount + criticalCount} high priority`}
-        showTimeFilter={false}
+        showTimeFilter={true}
         showSchoolFilter={isSuperAdmin}
         schoolFilterValue={selectedSchool}
         onSchoolFilterChange={setSelectedSchool}

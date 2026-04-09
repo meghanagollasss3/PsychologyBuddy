@@ -20,7 +20,7 @@ export function Protected({
   requireAuth = true,
 }: ProtectedProps) {
   const { loading: permsLoading, can } = useUserPermissions();
-  const { loading: roleLoading, isSuperAdmin, isAdmin, isStudent } = useRole();
+  const { loading: roleLoading, isSuperAdmin, isAdmin, isSchoolSuperAdmin, isStudent } = useRole();
 
   // Show loading state
   if (permsLoading || roleLoading) {
@@ -28,13 +28,13 @@ export function Protected({
   }
 
   // Check authentication requirement
-  if (requireAuth && (!isSuperAdmin && !isAdmin && !isStudent)) {
+  if (requireAuth && (!isSuperAdmin && !isAdmin && !isSchoolSuperAdmin && !isStudent)) {
     return fallback;
   }
 
   // Check role-based access
   if (role && role.length > 0) {
-    const userRole = isSuperAdmin ? 'SUPERADMIN' : isAdmin ? 'ADMIN' : isStudent ? 'STUDENT' : null;
+    const userRole = isSuperAdmin ? 'SUPERADMIN' : isAdmin ? 'ADMIN' : isSchoolSuperAdmin ? 'SCHOOL_SUPERADMIN' : isStudent ? 'STUDENT' : null;
     if (!userRole || !role.includes(userRole)) {
       return fallback;
     }
@@ -62,7 +62,7 @@ export function SuperAdminOnly({ children, fallback }: { children: React.ReactNo
 
 export function AdminOnly({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
   return (
-    <Protected role={["SUPERADMIN", "ADMIN"]} fallback={fallback}>
+    <Protected role={["SUPERADMIN", "ADMIN", "SCHOOL_SUPERADMIN"]} fallback={fallback}>
       {children}
     </Protected>
   );

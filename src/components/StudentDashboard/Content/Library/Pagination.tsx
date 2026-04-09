@@ -62,32 +62,32 @@ export default function Pagination({
   const visiblePages = getVisiblePages();
 
   return (
-    <div className="flex items-center justify-center gap-2 mt-8 mb-4">
+    <div className="flex items-center justify-center gap-1 sm:gap-2 mt-6 sm:mt-8 mb-3 sm:mb-4">
       {/* Previous Button */}
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={!hasPreviousPage}
-        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${
           hasPreviousPage
             ? 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:shadow-md'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         }`}
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
       </button>
 
       {/* Page Numbers */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 sm:gap-1">
         {visiblePages.map((page, index) => (
           <React.Fragment key={index}>
             {page === -1 ? (
               // Ellipsis
-              <span className="px-2 text-gray-500">...</span>
+              <span className="px-1 sm:px-2 text-gray-500 text-xs sm:text-sm">...</span>
             ) : (
               // Page number
               <button
                 onClick={() => onPageChange(page)}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                className={`w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all text-xs sm:text-sm ${
                   currentPage === page
                     ? 'bg-[#1C76DC] text-white shadow-md'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -104,13 +104,13 @@ export default function Pagination({
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={!hasNextPage}
-        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${
           hasNextPage
             ? 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:shadow-md'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         }`}
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
       </button>
     </div>
   );

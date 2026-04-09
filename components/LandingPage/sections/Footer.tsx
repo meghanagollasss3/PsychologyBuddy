@@ -98,7 +98,7 @@ const Footer = () => {
     </h3>
     <ul className="space-y-3 text-sm sm:text-base lg:text-[16px] text-[#EFEFEF]/70">
       <li>
-        <Link href="#" className="hover:text-white transition-colors">
+        <Link href="/termsandconditions" className="hover:text-white transition-colors">
           Terms & Conditions
         </Link>
       </li>
@@ -108,7 +108,7 @@ const Footer = () => {
         </Link>
       </li>
       <li>
-        <Link href="#" className="hover:text-white transition-colors">
+        <Link href="/contact" className="hover:text-white transition-colors">
           Contact
         </Link>
       </li>

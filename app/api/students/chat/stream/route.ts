@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import prisma from "@/src/prisma";
-import Groq from "groq-sdk";
+import OpenAI from "openai";
 import { PSYCHOLOGY_BUDDY_SYSTEM_PROMPT } from "@/src/lib/ai/prompts/system-prompt";
 import { ContentEscalationDetector } from "@/src/services/escalations/content-escalation-detector";
 import { EscalationAlertService } from "@/src/services/escalations/escalation-alert-service";
 
-// Initialize Groq with error handling
-let groq: Groq;
+// Initialize OpenAI with error handling
+let openai: OpenAI;
 try {
-  groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY!,
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY!,
   });
-  console.log('Groq client initialized successfully');
+  console.log('OpenAI client initialized successfully');
 } catch (error) {
-  console.error('Failed to initialize Groq client:', error);
-  groq = null as any;
+  console.error('Failed to initialize OpenAI client:', error);
+  openai = null as any;
 }
 
 export async function POST(req: Request) {
@@ -57,17 +57,33 @@ export async function POST(req: Request) {
 
     if (!session) {
       // Try to find any session for this student to help debug
-      const allStudentSessions = await prisma.chatSession.findMany({
-        where: { userId: user.id },
-        select: { id: true, isActive: true, startedAt: true }
+      const anySession = await prisma.chatSession.findFirst({
+        where: {
+          user: {
+            studentId: studentId
+          }
+        }
       });
-      console.log('All student sessions:', allStudentSessions);
+      console.log('Any session found for student:', anySession?.id);
       
       return NextResponse.json(
-        { error: "Chat session not found or inactive" },
+        { error: "Chat session not found" },
         { status: 404 }
       );
     }
+
+    // Get conversation history for context (last 10 messages to stay within token limits)
+    const conversationHistory = await prisma.chatMessage.findMany({
+      where: {
+        sessionId: sessionId
+      },
+      orderBy: {
+        createdAt: 'asc'
+      },
+      take: 10, // Limit to last 10 messages for context
+    });
+
+    console.log('Conversation history loaded:', conversationHistory.length, 'messages');
 
     // Save student message
     console.log('Saving student message for session:', sessionId);
@@ -174,26 +190,37 @@ export async function POST(req: Request) {
     }
 
     // Try to get AI response with retry logic
-    let botReply = "";
     let retryCount = 0;
     const maxRetries = 3;
     
     while (retryCount < maxRetries) {
       try {
-        const stream = await groq.chat.completions.create({
-          model: "llama-3.1-8b-instant",
-          messages: [
-            {
-              role: "system",
-              content: PSYCHOLOGY_BUDDY_SYSTEM_PROMPT
-            },
-            {
-              role: "user",
-              content: message
-            }
-          ],
-          max_tokens: 500,
-          temperature: 0.7,
+        // Build conversation context for AI
+        const messagesForAI: any[] = [
+          {
+            role: "system",
+            content: PSYCHOLOGY_BUDDY_SYSTEM_PROMPT
+          },
+          // Add conversation history (excluding the current message that was already saved)
+          ...conversationHistory.map(msg => ({
+            role: msg.senderType === "STUDENT" ? "user" : "assistant",
+            content: msg.content
+          })),
+          // Add current message
+          {
+            role: "user",
+            content: message
+          }
+        ];
+
+        console.log('Sending to AI with context:', messagesForAI.length, 'messages');
+
+        const stream = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: messagesForAI,
+          max_tokens: 150,  // Prevents long-winded "AI monologues" 
+          temperature: 0.7,  // Keeps it creative but grounded
+          frequency_penalty: 0.5,  // Reduces repetition
           stream: true,
         });
 
@@ -281,14 +308,14 @@ export async function POST(req: Request) {
     
     if (err instanceof Error && err.message.includes('API key')) {
       return NextResponse.json(
-        { error: "Groq service configuration error. Please contact support." },
+        { error: "OpenAI service configuration error. Please contact support." },
         { status: 500 }
       );
     }
     
     if (err instanceof Error && err.message.includes('insufficient_quota')) {
       return NextResponse.json(
-        { error: "Groq quota exceeded. Please check your billing details." },
+        { error: "OpenAI quota exceeded. Please check your billing details." },
         { status: 429 }
       );
     }

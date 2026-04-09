@@ -56,7 +56,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/src/contexts/AuthContext";
 import {
   MeditationResource,
@@ -1070,9 +1070,9 @@ export default function MeditationTools({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem className="gap-2">
+                    {/* <DropdownMenuItem className="gap-2">
                       <Eye className="h-4 w-4" /> Preview
-                    </DropdownMenuItem>
+                    </DropdownMenuItem> */}
                     <DropdownMenuItem
                       className="gap-2"
                       onClick={() => editMeditationResource(resource)}

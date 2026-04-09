@@ -82,7 +82,7 @@ export default function DashboardPage() {
   return (
     <StudentLayout>
       <div className="w-full flex justify-center">
-        <div className="w-full max-w-[1312px] p-6 space-y-8">
+        <div className="w-full max-w-[1312px] p-4 sm:p-5 md:p-6 lg:p-8 space-y-4 sm:space-y-6 lg:space-y-8">
 
           {/* Greeting */}
           <HeaderGreeting />
@@ -96,10 +96,10 @@ export default function DashboardPage() {
           <ExploreSpace />
 
           {/* Grid Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6 lg:gap-8">
 
             {/* LEFT COLUMN */}
-            <div className="space-y-6 mt-5">
+            <div className="space-y-4 sm:space-y-5 md:space-y-6 lg:space-y-8">
               <DailyMotivation />
 
               <Suspense fallback={<div className="h-[120px] bg-gray-100 rounded-xl animate-pulse" />}>

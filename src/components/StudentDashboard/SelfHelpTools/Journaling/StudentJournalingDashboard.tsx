@@ -21,6 +21,7 @@ interface JournalingConfig {
   enableUndo?: boolean;
   enableRedo?: boolean;
   enableClearCanvas?: boolean;
+  enableColorPalette?: boolean;
 }
 
 export default function StudentJournalingDashboard() {
@@ -63,6 +64,7 @@ export default function StudentJournalingDashboard() {
           enableUndo: data.data.enableUndo,
           enableRedo: data.data.enableRedo,
           enableClearCanvas: data.data.enableClearCanvas,
+          enableColorPalette: data.data.enableColorPalette,
         };
         
         console.log('Setting config to:', newConfig);

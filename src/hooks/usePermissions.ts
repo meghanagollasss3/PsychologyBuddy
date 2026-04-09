@@ -27,14 +27,16 @@ export function usePermissions() {
   const userRole = user.role.name;
   const rolePermissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS] || [];
   
-  // For ADMIN users, use individual admin permissions as additional features
+  // For ADMIN and SCHOOL_SUPERADMIN users, combine individual permissions with role permissions
+  // Individual permissions are used for default features, role permissions for management functions
   let userPermissions = [...rolePermissions];
-  if (userRole === 'ADMIN' && user.adminProfile?.adminPermissions) {
+  if ((userRole === 'ADMIN' || userRole === 'SCHOOL_SUPERADMIN') && user.adminProfile?.adminPermissions) {
     const adminPermissions = user.adminProfile.adminPermissions.map((ap: any) => ap.permission?.name).filter(Boolean);
-    // Add individual permissions to role permissions
-    userPermissions = [...new Set([...rolePermissions, ...adminPermissions])];
-  } else if (userRole === 'ADMIN') {
-    console.log('ADMIN user - no individual permissions found, using role permissions');
+    // Combine individual permissions with role permissions
+    // Individual permissions control default features, role permissions provide management capabilities
+    userPermissions = [...new Set([...adminPermissions, ...rolePermissions])];
+  } else if (userRole === 'ADMIN' || userRole === 'SCHOOL_SUPERADMIN') {
+    console.log(`${userRole} user - no individual permissions found, using role permissions`);
   }
   
   const userSchoolId = user.school?.id || null;
@@ -63,8 +65,22 @@ export function usePermissions() {
     canViewUsers: hasPermission('users.view'),
     
     // Student Management (for admins and superadmins)
-    canManageStudents: hasPermission('users.create') && (userRole === 'ADMIN' || userRole === 'SUPERADMIN'),
-    canViewStudents: hasPermission('users.view') && (userRole === 'ADMIN' || userRole === 'SUPERADMIN'),
+    canManageStudents: (() => {
+      const hasCreatePerm = hasPermission('users.create');
+      const roleCheck = userRole === 'ADMIN' || userRole === 'SUPERADMIN' || userRole === 'SCHOOL_SUPERADMIN';
+      const result = hasCreatePerm && roleCheck;
+      
+      console.log('usePermissions - Student Management Debug:');
+      console.log('- userRole:', userRole);
+      console.log('- hasPermission(users.create):', hasCreatePerm);
+      console.log('- roleCheck (ADMIN || SUPERADMIN || SCHOOL_SUPERADMIN):', roleCheck);
+      console.log('- final canManageStudents:', result);
+      console.log('- userPermissions:', userPermissions);
+      console.log('- rolePermissions:', rolePermissions);
+      
+      return result;
+    })(),
+    canViewStudents: hasPermission('users.view') && (userRole === 'ADMIN' || userRole === 'SUPERADMIN' || userRole === 'SCHOOL_SUPERADMIN'),
     
     // Organization permissions (SuperAdmin only)
     canManageOrgs: hasPermission('organizations.create'),

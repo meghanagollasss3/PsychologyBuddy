@@ -46,6 +46,7 @@ export interface UseChatOptions {
   onError?: (error: Error) => void
   onEscalation?: (escalation: ChatState['escalationAlert']) => void
   importData?: { mainTopic?: string; sessionId?: string }
+  importMessages?: Message[] // New: Support importing full conversation
 }
 
 export function useChat({
@@ -74,6 +75,11 @@ export function useChat({
   const sessionStartTimeRef = useRef<number | null>(null)
   const terminationCleanupRef = useRef<(() => void) | null>(null)
   const isTerminatingRef = useRef(false)
+
+  // Function to update input value
+  const setInput = useCallback((value: string) => {
+    setState(prev => ({ ...prev, input: value }))
+  }, [])
 
   // Auto scroll when messages update
   useEffect(() => {
@@ -288,8 +294,13 @@ export function useChat({
     // Clean up any existing termination check
     if (terminationCleanupRef.current) {
       console.log(`[AutoTermination] Cleaning up previous interval before setting up new one`);
-      terminationCleanupRef.current();
-      terminationCleanupRef.current = null;
+      try {
+        const cleanup = terminationCleanupRef.current;
+        terminationCleanupRef.current = null;
+        cleanup();
+      } catch (error) {
+        console.error('[AutoTermination] Error during initial cleanup:', error);
+      }
     }
 
     console.log(`[AutoTermination] Starting termination monitoring for ${messageCount} messages (time-based checks enabled)`);
@@ -307,11 +318,16 @@ export function useChat({
     return () => {
       if (terminationCleanupRef.current) {
         console.log(`[AutoTermination] Effect cleanup - cleaning up termination monitoring`);
-        terminationCleanupRef.current();
-        terminationCleanupRef.current = null;
+        try {
+          const cleanup = terminationCleanupRef.current;
+          terminationCleanupRef.current = null;
+          cleanup();
+        } catch (error) {
+          console.error('[AutoTermination] Error during cleanup:', error);
+        }
       }
     };
-  }, [state.sessionId, state.sessionStartTime]); // Only depend on session changes, not messages or callback
+  }, [state.sessionId, state.sessionStartTime, handleAutomaticTermination]); // Include handleAutomaticTermination in dependencies
 
   // Send message with streaming
   const sendMessage = useCallback(async (messageText: string) => {
@@ -470,8 +486,20 @@ export function useChat({
 
     try {
       // Validate required fields before sending request
+      console.log(`[SendMessage] Debug - sessionIdRef.current: ${sessionIdRef.current}, state.sessionId: ${state.sessionId}, isInitialized: ${isInitialized.current}`)
+      
       if (!sessionIdRef.current) {
-        throw new Error('No active session found')
+        // Try to create a new session if none exists
+        if (!isInitialized.current && studentId) {
+          console.log('[SendMessage] No session found, creating new session...')
+          const tempSessionId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          sessionIdRef.current = tempSessionId
+          setState(prev => ({ ...prev, sessionId: tempSessionId }))
+          isInitialized.current = true
+          console.log('[SendMessage] Created emergency session:', tempSessionId)
+        } else {
+          throw new Error(`No active session found. Session state: ref=${sessionIdRef.current}, state=${state.sessionId}, initialized=${isInitialized.current}`)
+        }
       }
       
       if (!studentId) {
@@ -601,79 +629,139 @@ export function useChat({
   // Fetch existing messages for a session
   const fetchExistingMessages = useCallback(async (sessionId: string) => {
     try {
-      console.log(`[AutoTermination] Fetching existing messages for session: ${sessionId}`);
-      const response = await fetch(`/api/students/chat/messages?sessionId=${sessionId}`, {
-        headers: {
-          'x-user-id': studentId
+      console.log(`[AutoTermination] Fetching existing messages for session: ${sessionId}`)
+      
+      const response = await fetch(`/api/students/chat/messages?sessionId=${sessionId}`)
+      const data = await response.json()
+      
+      if (data.success && data.messages) {
+        const formattedMessages: Message[] = data.messages.map((msg: any) => ({
+          id: msg.id,
+          sender: msg.role === 'user' ? 'student' : 'bot',
+          content: msg.content,
+          timestamp: msg.timestamp,
+          type: 'normal'
+        }))
+        
+        setState(prev => ({ ...prev, messages: formattedMessages }))
+        
+        // Set session start time from actual session data
+        if (data.session?.startedAt && (!sessionStartTimeRef.current || !state.sessionStartTime)) {
+          const actualStartTime = new Date(data.session.startedAt).getTime()
+          sessionStartTimeRef.current = actualStartTime
+          setState(prev => ({ ...prev, sessionStartTime: actualStartTime }))
+          console.log(`[AutoTermination] Session start time set from database: ${new Date(actualStartTime).toISOString()}`)
+        } else if (!sessionStartTimeRef.current && !state.sessionStartTime) {
+          // Fallback: Use current time minus 1 minute if no session data
+          const startTime = Date.now() - (1 * 60 * 1000)
+          sessionStartTimeRef.current = startTime
+          setState(prev => ({ ...prev, sessionStartTime: startTime }))
+          console.log(`[AutoTermination] Session start time set to fallback: ${new Date(startTime).toISOString()}`)
         }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.messages) {
-          const formattedMessages: Message[] = data.messages.map((msg: any) => ({
-            id: msg.id,
-            sender: msg.role === 'user' ? 'student' : 'bot',
-            content: msg.content,
-            timestamp: msg.timestamp,
-            type: 'normal'
-          }))
-          
-          setState(prev => ({ ...prev, messages: formattedMessages }))
-          
-          // Set session start time for existing sessions (use current time minus 1 minute)
-          if (!sessionStartTimeRef.current && !state.sessionStartTime) {
-            const startTime = Date.now() - (1 * 60 * 1000); // Assume session started 1 minute ago
-            sessionStartTimeRef.current = startTime
-            setState(prev => ({ ...prev, sessionStartTime: startTime }))
-            console.log(`[AutoTermination] Session start time set for existing session: ${new Date(startTime).toISOString()}`);
-          }
-        }
+        
+        return data // Return the data so caller can check message count
       }
+      
+      return null
     } catch (error) {
       console.error('Failed to fetch existing messages:', error)
+      return null
     }
   }, [studentId, state.sessionStartTime])
 
   // Initialize chat on mount
   useEffect(() => {
-    if (!isInitialized.current && studentId) {
-      // Check for existing session
-      const savedSessionId = sessionStorage.getItem("chatSessionId")
-      
-      if (savedSessionId && !savedSessionId.startsWith('temp_')) {
-        // Continue existing session
-        sessionIdRef.current = savedSessionId
-        setState(prev => ({ ...prev, sessionId: savedSessionId }))
-        isInitialized.current = true
-        console.log('Continuing existing chat session:', savedSessionId)
-        
-        // Set session start time for existing session (use current time minus 1 minute)
-        const startTime = Date.now() - (1 * 60 * 1000); // Assume session started 1 minute ago
-        sessionStartTimeRef.current = startTime
-        setState(prev => ({ ...prev, sessionStartTime: startTime }))
-        console.log(`[AutoTermination] Session start time set for existing session: ${new Date(startTime).toISOString()}`);
-        
-        // Fetch existing messages for this session
-        fetchExistingMessages(savedSessionId)
-      } else {
-        // Create new temporary session (no database record yet)
-        console.log('No existing session, creating temporary one');
-        initializeChat(mood, triggers, notes, false, importData)
+    const initializeChat = async () => {
+      if (!isInitialized.current && studentId) {
+        try {
+          // Check for existing session
+          const savedSessionId = sessionStorage.getItem("chatSessionId")
+          
+          if (savedSessionId && !savedSessionId.startsWith('temp_')) {
+            // Continue existing session
+            sessionIdRef.current = savedSessionId
+            setState(prev => ({ ...prev, sessionId: savedSessionId }))
+            isInitialized.current = true
+            console.log('Continuing existing chat session:', savedSessionId)
+            
+            // Fetch existing messages for this session (will also set session start time)
+            const messageData = await fetchExistingMessages(savedSessionId)
+            
+            // If no messages exist, add a welcome message
+            if (!messageData || messageData.messages.length === 0) {
+              const welcomeMessage: Message = {
+                id: crypto.randomUUID(),
+                sender: 'bot',
+                content: "Hello! I'm here to listen and support you. How are you feeling today?",
+                timestamp: new Date().toISOString(),
+                type: 'opening'
+              }
+              setState(prev => ({ ...prev, messages: [welcomeMessage] }))
+              console.log('Added welcome message to existing session')
+            }
+          } else {
+            // Create new temporary session (no database record yet)
+            console.log('Creating new temporary session')
+            const tempSessionId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            sessionIdRef.current = tempSessionId
+            setState(prev => ({ ...prev, sessionId: tempSessionId }))
+            isInitialized.current = true
+            console.log('Created new temporary session:', tempSessionId)
+            
+            // Add welcome message for new temporary session
+            const welcomeMessage: Message = {
+              id: crypto.randomUUID(),
+              sender: 'bot',
+              content: "Hello! I'm here to listen and support you. How are you feeling today?",
+              timestamp: new Date().toISOString(),
+              type: 'opening'
+            }
+            setState(prev => ({ ...prev, messages: [welcomeMessage] }))
+            console.log('Added welcome message to new temporary session')
+          }
+        } catch (error) {
+          console.error('Failed to initialize chat:', error)
+          onError?.(error as Error)
+        }
       }
     }
-  }, [studentId, mood, triggers, notes, fetchExistingMessages, initializeChat, importData])
 
-  const setInput = useCallback((newInput: string) => {
-    setState(prev => ({ ...prev, input: newInput }))
+    initializeChat()
+  }, [studentId, onError]) // Removed fetchExistingMessages to prevent infinite re-renders
+
+  // Import conversation messages from a previous session
+  const importConversation = useCallback((messages: Message[], sessionId: string, sessionStartTime?: number) => {
+    console.log(`[ImportConversation] Importing ${messages.length} messages for session ${sessionId}`)
+    
+    setState(prev => ({
+      ...prev,
+      messages: messages, // Replace messages, not append
+      sessionId: sessionId,
+      isLoading: false
+    }))
+    
+    // Update refs
+    sessionIdRef.current = sessionId
+    isInitialized.current = true
+    
+    // Set session start time for imported session
+    // Use provided session start time, or current time if not provided
+    const startTime = sessionStartTime || Date.now()
+    sessionStartTimeRef.current = startTime
+    setState(prev => ({ ...prev, sessionStartTime: startTime }))
+    
+    console.log(`[ImportConversation] Session imported successfully with start time: ${new Date(startTime).toISOString()}`)
   }, [])
 
+  // Return the hook's public interface
   return {
     ...state,
+    input: state.input,
     chatRef,
     sendMessage,
     setInput,
     initializeChat,
     endChat,
+    importConversation,
   }
 }

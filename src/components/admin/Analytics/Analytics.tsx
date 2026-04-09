@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Download } from "lucide-react";
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/src/hooks/use-toast";
 import { useAuth } from "@/src/contexts/AuthContext";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 // -------------------- Chart.js Setup --------------------
 import {
@@ -48,9 +50,11 @@ const DoughnutChart = dynamic(() => import("react-chartjs-2").then((m) => m.Doug
 export default function Analytics() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const analyticsRef = useRef<HTMLDivElement>(null);
 
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Schools dropdown
   const [schools, setSchools] = useState<Array<{ id: string; name: string }>>([]);
@@ -85,7 +89,7 @@ export default function Analytics() {
       setLoading(true);
 
       const schoolId =
-        user?.role?.name === "ADMIN"
+        user?.role?.name === "ADMIN" || user?.role?.name === "SCHOOL_SUPERADMIN"
           ? user.school?.id
           : selectedSchool !== "all"
           ? selectedSchool
@@ -125,7 +129,18 @@ export default function Analytics() {
   // -------------------- Fetch Tool Usage --------------------
   const fetchToolUsage = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/analytics/tool-usage?months=6");
+      const schoolId =
+        user?.role?.name === "ADMIN" || user?.role?.name === "SCHOOL_SUPERADMIN"
+          ? user.school?.id
+          : selectedSchool !== "all"
+          ? selectedSchool
+          : undefined;
+
+      const url = schoolId
+        ? `/api/admin/analytics/tool-usage?months=6&schoolId=${schoolId}`
+        : `/api/admin/analytics/tool-usage?months=6`;
+
+      const res = await fetch(url);
       const data = await res.json();
 
       if (data.success && data.data.toolUsage) {
@@ -135,13 +150,13 @@ export default function Analytics() {
       // Keep existing data or set to empty
       setToolUsageData([]);
     }
-  }, []);
+  }, [selectedSchool, user]);
 
   // -------------------- Fetch Badges & Streaks --------------------
   const fetchBadgesStreaks = useCallback(async () => {
     try {
       const schoolId =
-        user?.role?.name === "ADMIN"
+        user?.role?.name === "ADMIN" || user?.role?.name === "SCHOOL_SUPERADMIN"
           ? user.school?.id
           : selectedSchool !== "all"
           ? selectedSchool
@@ -167,7 +182,7 @@ export default function Analytics() {
   const fetchSessionEngagement = useCallback(async () => {
     try {
       const schoolId =
-        user?.role?.name === "ADMIN"
+        user?.role?.name === "ADMIN" || user?.role?.name === "SCHOOL_SUPERADMIN"
           ? user.school?.id
           : selectedSchool !== "all"
           ? selectedSchool
@@ -193,7 +208,7 @@ export default function Analytics() {
   const fetchAlertFrequency = useCallback(async () => {
     try {
       const schoolId =
-        user?.role?.name === "ADMIN"
+        user?.role?.name === "ADMIN" || user?.role?.name === "SCHOOL_SUPERADMIN"
           ? user.school?.id
           : selectedSchool !== "all"
           ? selectedSchool
@@ -214,6 +229,82 @@ export default function Analytics() {
       setAlertFrequencyData([]);
     }
   }, [selectedSchool, user]);
+
+  // -------------------- Export Function --------------------
+  const handleExport = async () => {
+    if (!analyticsRef.current) {
+      toast({
+        title: "Error",
+        description: "Unable to export analytics. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      
+      // Capture the analytics content
+      const canvas = await html2canvas(analyticsRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+
+      // Create PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Add title
+      pdf.setFontSize(20);
+      pdf.text('Analytics & Reports', 20, 20);
+      
+      // Add subtitle with date
+      pdf.setFontSize(12);
+      const currentDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      pdf.text(`Generated on ${currentDate}`, 20, 30);
+      
+      // Add school filter info if applicable
+      if (selectedSchool !== 'all' && schools.length > 0) {
+        const schoolName = schools.find(s => s.id === selectedSchool)?.name || selectedSchool;
+        pdf.text(`School: ${schoolName}`, 20, 40);
+      }
+
+      // Calculate image dimensions to fit PDF
+      const pdfWidth = pdf.internal.pageSize.getWidth() - 40; // 20mm margin on each side
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      // Add image to PDF
+      pdf.addImage(imgData, 'PNG', 20, 50, pdfWidth, pdfHeight);
+      
+      // Save the PDF
+      const fileName = `analytics-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+      toast({
+        title: "Success",
+        description: "Analytics report exported successfully!",
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export analytics report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // -------------------- Fetch Once --------------------
   useEffect(() => {
@@ -320,17 +411,23 @@ export default function Analytics() {
         subtitle="Wellness insights and trends"
         showSchoolFilter={user?.role?.name === "SUPERADMIN"}
         schoolFilterValue={selectedSchool}
+        showTimeFilter={true}
         onSchoolFilterChange={setSelectedSchool}
         schools={schools}
         actions={
-          <Button variant="outline" className="gap-2">
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={handleExport}
+            disabled={isExporting || loading}
+          >
             <Download className="h-4 w-4" />
-            Export
+            {isExporting ? "Exporting..." : "Export"}
           </Button>
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">
+      <div ref={analyticsRef} className="flex-1 overflow-auto p-6 space-y-6 animate-fade-in">
 
         {/* Mood Distribution */}
         <Card>

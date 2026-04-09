@@ -48,7 +48,7 @@ function ActivitySection({ activities }: { activities: ActivityItem[] }) {
   const getIcon = (type: string) => {
     const iconWrapper = (icon: React.ReactNode, bg: string) => (
       <div
-        className={`w-10 h-10 flex items-center justify-center rounded-xl ${bg}`}
+        className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 flex items-center justify-center rounded-lg sm:rounded-xl ${bg}`}
       >
         {icon}
       </div>
@@ -56,43 +56,43 @@ function ActivitySection({ activities }: { activities: ActivityItem[] }) {
 
     if (type === "journaling")
       return iconWrapper(
-        <PenLine className="w-5 h-5 text-[#3164CA]" />,
+        <PenLine className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 text-[#3164CA]" />,
         "bg-[#EDF3FF]",
       );
 
     if (type === "exercise")
       return iconWrapper(
-        <Wind className="w-5 h-5 text-[#B65CF4]" />,
+        <Wind className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 text-[#B65CF4]" />,
         "bg-[#F7ECFF]",
       );
 
     if (type === "tool")
       return iconWrapper(
-        <Award className="w-5 h-5 text-[#e1ad01]" />,
+        <Award className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 text-[#e1ad01]" />,
         "bg-[#FFF7EE]",
       );
 
     if (type === "checkin")
       return iconWrapper(
-        <Heart className="w-5 h-5 text-[#E10157]" />,
+        <Heart className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 text-[#E10157]" />,
         "bg-[#FFE9F2]",
       );
 
     if (type === "reading")
       return iconWrapper(
-        <BookOpen className="w-5 h-5 text-[#23910D]" />,
+        <BookOpen className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 text-[#23910D]" />,
         "bg-[#EBFFEF]",
       );
 
     if (type === "meditation")
       return iconWrapper(
-        <Headphones className="w-5 h-5 text-[#5ED7AC]" />,
+        <Headphones className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 text-[#5ED7AC]" />,
         "bg-[#E3FFF5]",
       );
 
     // Default
     return iconWrapper(
-      <Activity className="w-5 h-5 text-blue-500" />,
+      <Activity className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 text-blue-500" />,
       "bg-blue-100",
     );
   };
@@ -104,17 +104,17 @@ function ActivitySection({ activities }: { activities: ActivityItem[] }) {
   );
 
   return (
-    <div className="bg-white rounded-[16px] drop-shadow-sm p-6 border border-white ">
+    <div className="bg-white rounded-[12px] sm:rounded-[14px] md:rounded-[16px] drop-shadow-sm p-4 sm:p-5 md:p-6 border border-white">
       <div className="flex items-center">
-        <Activity className="w-[20px] h-[20px] text-[#3164CA]" />
-        <h2 className="text-[20px] font-semibold text-[#3164CA] ml-2">
+        <Activity className="w-[16px] h-[16px] sm:w-[18px] sm:h-[18px] md:w-[20px] md:h-[20px] text-[#3164CA]" />
+        <h2 className="text-[16px] sm:text-[18px] md:text-[20px] font-semibold text-[#3164CA] ml-2">
           Recent Activity
         </h2>
       </div>
 
       {sortedActivities.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          <Activity className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+        <div className="text-center py-6 sm:py-8 text-gray-500">
+          <Activity className="w-10 h-10 sm:w-12 sm:h-12 md:w-12 md:h-12 mx-auto mb-4 text-gray-300" />
           <p>No activities yet</p>
           <p className="text-sm text-gray-400 mt-2">
             Start using journaling, exercises, or self-help tools to see your
@@ -122,18 +122,18 @@ function ActivitySection({ activities }: { activities: ActivityItem[] }) {
           </p>
         </div>
       ) : (
-        <div className="mt-4 max-h-96 overflow-y-auto space-y-4 border-l-2 border-gray-200 pl-4">
+        <div className="mt-3 sm:mt-4 max-h-80 sm:max-h-96 overflow-y-auto space-y-3 sm:space-y-4 border-l-2 border-gray-200 pl-3 sm:pl-4">
           {sortedActivities.map((activity: ActivityItem) => (
-            <div key={activity.id} className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+            <div key={activity.id} className="flex items-start gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center">
                 {getIcon(activity.type)}
               </div>
 
               <div className="flex-1">
-                <p className="font-medium text-gray-800">{activity.title}</p>
-                <p className="text-sm text-gray-500">{activity.time}</p>
+                <p className="font-medium text-sm sm:text-base text-gray-800">{activity.title}</p>
+                <p className="text-xs sm:text-sm text-gray-500">{activity.time}</p>
                 {activity.details && (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
                     {activity.details}
                   </p>
                 )}
@@ -145,10 +145,10 @@ function ActivitySection({ activities }: { activities: ActivityItem[] }) {
 
       {/* View More Button */}
       {activities.length > 6 && (
-        <div className="mt-4 text-center">
+        <div className="mt-3 sm:mt-4 text-center">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium"
           >
             {showAll ? 'View Less' : `View More (${activities.length - 6} more)`}
           </button>
@@ -175,18 +175,18 @@ export default function RecentActivity() {
     return (
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800">
             Recent Activity
           </h2>
-          <div className="w-20 h-8 bg-gray-200 rounded animate-pulse"></div>
+          <div className="w-16 sm:w-20 h-6 sm:h-8 bg-gray-200 rounded animate-pulse"></div>
         </div>
         <div className="space-y-4 border-l-2 border-gray-200 pl-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div key={i} className="flex items-start gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-gray-200 rounded-lg animate-pulse"></div>
               <div className="flex-1">
-                <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded animate-pulse w-20"></div>
+                <div className="h-3 sm:h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-2 sm:h-3 bg-gray-200 rounded animate-pulse w-16 sm:w-20"></div>
               </div>
             </div>
           ))}
@@ -197,12 +197,12 @@ export default function RecentActivity() {
 
   if (isError || !profileData) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
+      <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-4 sm:p-5 md:p-6 border border-gray-200">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">
           Recent Activity
         </h2>
-        <div className="flex items-center justify-center h-32">
-          <p className="text-sm text-gray-500">
+        <div className="flex items-center justify-center h-24 sm:h-32">
+          <p className="text-xs sm:text-sm text-gray-500">
             Failed to load recent activity
           </p>
         </div>

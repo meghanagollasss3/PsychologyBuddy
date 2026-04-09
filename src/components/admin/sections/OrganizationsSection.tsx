@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 import {
   Search,
@@ -12,6 +13,8 @@ import {
   CheckCircle2,
   Plus,
   Eye,
+  MapPin,
+  Trash2,
 } from "lucide-react";
 
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
@@ -22,6 +25,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/use-toast";
 
 import {
   Table,
@@ -47,6 +61,7 @@ interface School {
   address?: string;
   phone?: string;
   email?: string;
+  locationsCount?: number;
 }
 
 interface SchoolsResponse {
@@ -87,16 +102,48 @@ async function fetchSchools({
 
   console.log('OrganizationsSection - Fetching schools with params:', params.toString());
 
-  const res = await fetch(`/api/schools?${params.toString()}`, {
+  const res = await fetch(`/api/admin/schools?${params.toString()}`, {
     credentials: "include",
   });
 
-  const json = await res.json();
-  console.log('OrganizationsSection - Schools API response:', json);
+  const schools = await res.json();
+  console.log('OrganizationsSection - Schools API response:', schools);
   
-  if (!json.success) throw new Error("Failed to load organizations");
+  if (!Array.isArray(schools)) throw new Error("Failed to load organizations");
 
-  return json;
+  // Transform the response to match expected format
+  const filteredSchools = schools.filter((school: any) => {
+    if (!search) return true;
+    const searchLower = search.toLowerCase();
+    return (
+      school.name.toLowerCase().includes(searchLower) ||
+      school.email?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const paginatedSchools = filteredSchools.slice(
+    (page - 1) * limit,
+    page * limit
+  );
+
+  return {
+    data: paginatedSchools.map((school: any) => ({
+      ...school,
+      locationsCount: school.locations?.length || 0,
+    })),
+    pagination: {
+      total: filteredSchools.length,
+      totalPages: Math.ceil(filteredSchools.length / limit),
+      page,
+      limit,
+    },
+    metrics: {
+      totalSchools: schools.length,
+      totalStudents: schools.reduce((sum: number, school: any) => sum + (school._count?.users || 0), 0),
+      activeAlerts: schools.reduce((sum: number, school: any) => sum + (school.alertCount || 0), 0),
+      checkinsToday: schools.reduce((sum: number, school: any) => sum + (school.checkInsToday || 0), 0),
+    },
+  };
 }
 
 // ---------------------------
@@ -106,6 +153,8 @@ export default function OrganizationsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const permissions = usePermissions();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const {
     selectedSchoolId,
@@ -122,6 +171,9 @@ export default function OrganizationsPage() {
 
   // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [organizationToDelete, setOrganizationToDelete] = useState<School | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Memoized search (debounce unnecessary because server handles it)
   const search = useMemo(() => searchInput.trim(), [searchInput]);
@@ -160,6 +212,53 @@ export default function OrganizationsPage() {
     queryClient.invalidateQueries({ queryKey: ["organizations"] });
   };
 
+  const handleDeleteOrganization = (school: School) => {
+    setOrganizationToDelete(school);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!organizationToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/schools/${organizationToDelete.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({
+          title: "Organization deleted successfully",
+          description: `${organizationToDelete.name} has been deleted.`
+        });
+        
+        // Refresh the organizations list
+        queryClient.invalidateQueries({ queryKey: ["organizations"] });
+        
+        setShowDeleteDialog(false);
+        setOrganizationToDelete(null);
+      } else {
+        toast({
+          title: "Failed to delete organization",
+          description: data.message || "An error occurred while deleting the organization.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Delete organization error:', error);
+      toast({
+        title: "Failed to delete organization",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Access Control
   if (!permissions.canManageOrgs) {
     return (
@@ -182,9 +281,10 @@ export default function OrganizationsPage() {
       <AdminHeader
         title="Organizations"
         subtitle="Manage all schools in the system"
-        showSchoolFilter={isSuperAdmin}
+        showSchoolFilter={user?.role?.name === 'SUPERADMIN'}
         schoolFilterValue={selectedSchoolId}
         onSchoolFilterChange={setSelectedSchoolId}
+        showTimeFilter={false}
         schools={schools}
         actions={
           permissions.canManageOrgs && (
@@ -288,27 +388,28 @@ export default function OrganizationsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>School Name</TableHead>
-                  <TableHead>School ID</TableHead>
-                  <TableHead>Location</TableHead>
+                  {/* <TableHead>School ID</TableHead> */}
+                  {/* <TableHead>Location</TableHead> */}
+                  <TableHead className="text-center">Locations</TableHead>
                   <TableHead className="text-center">Students</TableHead>
                   <TableHead className="text-center">Alerts</TableHead>
                   <TableHead className="text-center">
                     Check-ins Today
                   </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6">
+                    <TableCell colSpan={6} className="text-center py-6">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : organizations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6">
+                    <TableCell colSpan={6} className="text-center py-6">
                       No schools found.
                     </TableCell>
                   </TableRow>
@@ -322,12 +423,18 @@ export default function OrganizationsPage() {
                         </div>
                       </TableCell>
 
-                      <TableCell className="font-mono text-sm text-[#64748B]">
+                      {/* <TableCell className="font-mono text-sm text-[#64748B]">
                         {school.id}
-                      </TableCell>
+                      </TableCell> */}
 
-                      <TableCell className="text-[#64748B]">
+                      {/* <TableCell className="text-[#64748B]">
                         {school.location || "N/A"}
+                      </TableCell> */}
+
+                      <TableCell className="text-center">
+                        <Badge variant="outline">
+                          {school.locationsCount || 0}
+                        </Badge>
                       </TableCell>
 
                       <TableCell className="text-center">
@@ -345,18 +452,39 @@ export default function OrganizationsPage() {
                       </TableCell>
 
                       <TableCell className="text-center">
-                        {school.checkInsToday}
+                        {school.checkInsToday || 0}
                       </TableCell>
 
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewSchool(school.id)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
+                      <TableCell className="text-center">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/admin/locations?school=${school.id}`)}
+                          >
+                            <MapPin className="h-4 w-4 mr-1" />
+                            Locations
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewSchool(school.id)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          {permissions.canDeleteOrgs && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteOrganization(school)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -402,6 +530,34 @@ export default function OrganizationsPage() {
             handleAddOrganization(newSchool);
           }}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteDialog && organizationToDelete && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Organization</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {organizationToDelete.name}?
+                This action cannot be undone and will permanently remove the organization from the system.
+                Note: You can only delete organizations that have no users or classes assigned.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete Organization"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

@@ -70,7 +70,7 @@ export default function JournalViewPage() {
       
       if (result.success) {
         toast.success('Journal deleted successfully');
-        router.push('/students/journaling');
+        router.push('/students/selfhelptools/journaling/all');
       } else {
         toast.error(result.error?.message || 'Failed to delete journal');
       }
@@ -153,18 +153,18 @@ export default function JournalViewPage() {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/students/selfhelptools/journaling')}
-            className="flex items-center gap-2 text-slate-400 hover:text-blue-600 transition-colors group mb-6"
+            onClick={() => router.push('/students/selfhelptools/journaling/all')}
+            className="flex items-center gap-2 text-[#73829A] hover:text-[#1a9bcc] transition-colors group mb-6"
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm font-medium">Back to Journaling</span>
+            <ArrowLeft className="w-4 h-5" />
+            <span className="text-[13px] sm:text-[16px]">Back to your Journals</span>
           </button>
 
           <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-50 rounded-2xl">
-                  <BookOpen className="w-6 h-6 text-blue-600" />
+                  <BookOpen className="w-6 h-6 text-slate-600" />
                 </div>
                 <div>
                   {isEditing ? (

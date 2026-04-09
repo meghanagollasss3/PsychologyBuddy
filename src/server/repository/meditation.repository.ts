@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/src/generated/prisma/client';
+import { PrismaClient } from "@/src/generated/prisma/client";
 import { z } from "zod";
 import {
   CreateMeditationResourceSchema,
@@ -11,7 +11,6 @@ import {
   UpdateMeditationInstructionSchema,
 } from "../validators/meditation.validators";
 
-// Type inference from Zod schemas
 type CreateMeditationResourceInput = z.infer<typeof CreateMeditationResourceSchema>;
 type UpdateMeditationResourceInput = z.infer<typeof UpdateMeditationResourceSchema>;
 type CreateMeditationCategoryInput = z.infer<typeof CreateMeditationCategorySchema>;
@@ -24,89 +23,106 @@ type UpdateMeditationInstructionInput = z.infer<typeof UpdateMeditationInstructi
 export class MeditationRepository {
   constructor(private prisma: PrismaClient) {}
 
-  // ====================================
-  //        MEDITATION RESOURCE OPERATIONS
-  // ====================================
+  /* -------------------------------------------------- */
+  /*                HELPER UTILITIES                    */
+  /* -------------------------------------------------- */
 
-  async createMeditationResource(data: CreateMeditationResourceInput & { schoolId?: string; createdBy: string }) {
-    const { categoryIds, moodIds, goalIds, category, mood, goal, schoolId, createdBy, ...resourceData } = data;
+  private mergeIds(primary?: string[], single?: string) {
+    const ids = new Set(primary || []);
+    if (single) ids.add(single);
+    return [...ids];
+  }
 
-    // Combine legacy and new field formats
-    const allCategoryIds = [...(categoryIds || [])];
-    if (category && !allCategoryIds.includes(category)) {
-      allCategoryIds.push(category);
-    }
-    
-    const allMoodIds = [...(moodIds || [])];
-    if (mood && !allMoodIds.includes(mood)) {
-      allMoodIds.push(mood);
-    }
-    
-    const allGoalIds = [...(goalIds || [])];
-    if (goal && !allGoalIds.includes(goal)) {
-      allGoalIds.push(goal);
-    }
+  /* -------------------------------------------------- */
+  /*           MEDITATION RESOURCE OPERATIONS           */
+  /* -------------------------------------------------- */
 
-    return this.prisma.$transaction(async (tx) => {
-      // Create the meditation with relations in a single transaction
-      const meditation = await tx.meditation.create({
-        data: {
-          ...resourceData,
-          ...(schoolId && { schoolId }),
-          createdBy,
-          // Create relations in the same transaction
-          ...(allCategoryIds.length > 0 && {
-            categories: {
-              create: allCategoryIds.map((categoryId: string) => ({
-                category: { connect: { id: categoryId } }
-              }))
-            }
-          }),
-          ...(allMoodIds.length > 0 && {
-            moods: {
-              create: allMoodIds.map((moodId: string) => ({
-                mood: { connect: { id: moodId } }
-              }))
-            }
-          }),
-          ...(allGoalIds.length > 0 && {
-            goals: {
-              create: allGoalIds.map((goalId: string) => ({
-                goal: { connect: { id: goalId } }
-              }))
-            }
-          })
-        },
-        include: {
-          moods: {
-            include: {
-              mood: true,
-            },
-          },
-          categories: {
-            include: {
-              category: true,
-            },
-          },
-          goals: {
-            include: {
-              goal: true,
-            },
-          },
-          admin: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
+  async createMeditationResource(
+    data: CreateMeditationResourceInput & { schoolId?: string; createdBy: string }
+  ) {
+    const {
+      categoryIds,
+      moodIds,
+      goalIds,
+      category,
+      mood,
+      goal,
+      schoolId,
+      createdBy,
+      ...resourceData
+    } = data;
+
+    const allCategoryIds = this.mergeIds(categoryIds, category);
+    const allMoodIds = this.mergeIds(moodIds, mood);
+    const allGoalIds = this.mergeIds(goalIds, goal);
+
+    /* ---------- Create Meditation ---------- */
+
+    const meditation = await this.prisma.meditation.create({
+      data: {
+        ...resourceData,
+        ...(schoolId && { schoolId }),
+        createdBy,
+      },
+    });
+
+    const meditationId = meditation.id;
+
+    /* ---------- Create Relations ---------- */
+
+    if (allCategoryIds.length) {
+      await this.prisma.meditationMeditationCategory.createMany({
+        data: allCategoryIds.map((categoryId) => ({
+          meditationId,
+          categoryId,
+        })),
+        skipDuplicates: true,
       });
+    }
 
-      return meditation;
+    if (allMoodIds.length) {
+      await this.prisma.meditationMood.createMany({
+        data: allMoodIds.map((moodId) => ({
+          meditationId,
+          moodId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    if (allGoalIds.length) {
+      await this.prisma.meditationMeditationGoal.createMany({
+        data: allGoalIds.map((goalId) => ({
+          meditationId,
+          goalId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    /* ---------- Return Full Resource ---------- */
+
+    return this.prisma.meditation.findUnique({
+      where: { id: meditationId },
+      include: {
+        moods: { include: { mood: true } },
+        categories: { include: { category: true } },
+        goals: { include: { goal: true } },
+        admin: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
     });
   }
+
+  /* -------------------------------------------------- */
+  /*                GET MEDITATION LIST                 */
+  /* -------------------------------------------------- */
 
   async getMeditationResources(params: {
     page: number;
@@ -120,18 +136,29 @@ export class MeditationRepository {
     goalId?: string;
     schoolId?: string;
   }) {
-    const { page, limit, search, status, format, type, categoryId, moodId, goalId, schoolId } = params;
+    const {
+      page,
+      limit,
+      search,
+      status,
+      format,
+      type,
+      categoryId,
+      moodId,
+      goalId,
+      schoolId,
+    } = params;
+
     const skip = (page - 1) * limit;
 
     const where: any = {
-      deletedAt: null, // Exclude soft-deleted records
+      deletedAt: null,
       ...(schoolId && { schoolId }),
       ...(status && { status }),
       ...(format && { format }),
       ...(type && { type }),
     };
 
-    // Add search conditions
     if (search) {
       where.OR = [
         { title: { contains: search, mode: "insensitive" } },
@@ -140,39 +167,26 @@ export class MeditationRepository {
       ];
     }
 
-    // Add filter conditions
     if (categoryId || moodId || goalId) {
       where.AND = [];
-      if (categoryId) {
+
+      if (categoryId)
         where.AND.push({
-          categories: {
-            some: {
-              category: { id: categoryId },
-            },
-          },
+          categories: { some: { category: { id: categoryId } } },
         });
-      }
-      if (moodId) {
+
+      if (moodId)
         where.AND.push({
-          moods: {
-            some: {
-              mood: { id: moodId },
-            },
-          },
+          moods: { some: { mood: { id: moodId } } },
         });
-      }
-      if (goalId) {
+
+      if (goalId)
         where.AND.push({
-          goals: {
-            some: {
-              goal: { id: goalId },
-            },
-          },
+          goals: { some: { goal: { id: goalId } } },
         });
-      }
     }
 
-    const [meditations, total] = await Promise.all([
+    const [meditations, total] = await this.prisma.$transaction([
       this.prisma.meditation.findMany({
         where,
         skip,
@@ -189,83 +203,57 @@ export class MeditationRepository {
           status: true,
           createdAt: true,
           updatedAt: true,
-          deletedAt: true,
-          // Include minimal relation data for list view
+
           categories: {
             select: {
-              id: true,
-              category: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
+              category: { select: { id: true, name: true } },
             },
           },
+
           moods: {
             select: {
-              id: true,
-              mood: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
+              mood: { select: { id: true, name: true } },
             },
           },
+
           goals: {
             select: {
-              id: true,
-              goal: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
+              goal: { select: { id: true, name: true } },
             },
           },
+
           admin: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
-              email: true,
             },
           },
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: { createdAt: "desc" },
       }),
+
       this.prisma.meditation.count({ where }),
     ]);
 
     return { meditations, total };
   }
 
+  /* -------------------------------------------------- */
+  /*              GET SINGLE MEDITATION                 */
+  /* -------------------------------------------------- */
+
   async getMeditationResourceById(id: string, schoolId?: string) {
-    return this.prisma.meditation.findUnique({
-      where: { 
+    return this.prisma.meditation.findFirst({
+      where: {
         id,
-        deletedAt: null, // Exclude soft-deleted records
+        deletedAt: null,
         ...(schoolId && { schoolId }),
       },
       include: {
-        moods: {
-          include: {
-            mood: true,
-          },
-        },
-        categories: {
-          include: {
-            category: true,
-          },
-        },
-        goals: {
-          include: {
-            goal: true,
-          },
-        },
+        moods: { include: { mood: true } },
+        categories: { include: { category: true } },
+        goals: { include: { goal: true } },
         admin: {
           select: {
             id: true,
@@ -278,102 +266,95 @@ export class MeditationRepository {
     });
   }
 
-  async updateMeditationResource(id: string, data: UpdateMeditationResourceInput & { schoolId?: string }) {
+  /* -------------------------------------------------- */
+  /*                UPDATE MEDITATION                   */
+  /* -------------------------------------------------- */
+
+  async updateMeditationResource(
+    id: string,
+    data: UpdateMeditationResourceInput & { schoolId?: string }
+  ) {
     const { categoryIds, moodIds, goalIds, schoolId, ...updateData } = data;
 
-    return this.prisma.$transaction(async (tx) => {
-      // Update the basic meditation data
-      const meditation = await tx.meditation.update({
-        where: { id },
-        data: {
-          ...updateData,
-          ...(schoolId && { schoolId }),
-          // Update relations in the same transaction
-          ...(moodIds !== undefined && {
-            moods: {
-              deleteMany: {},
-              ...(moodIds.length > 0 && {
-                create: moodIds.map((moodId: string) => ({
-                  mood: { connect: { id: moodId } }
-                }))
-              })
-            }
-          }),
-          ...(categoryIds !== undefined && {
-            categories: {
-              deleteMany: {},
-              ...(categoryIds.length > 0 && {
-                create: categoryIds.map((categoryId: string) => ({
-                  category: { connect: { id: categoryId } }
-                }))
-              })
-            }
-          }),
-          ...(goalIds !== undefined && {
-            goals: {
-              deleteMany: {},
-              ...(goalIds.length > 0 && {
-                create: goalIds.map((goalId: string) => ({
-                  goal: { connect: { id: goalId } }
-                }))
-              })
-            }
-          })
-        },
-        include: {
-          moods: {
-            include: {
-              mood: true,
-            },
-          },
-          categories: {
-            include: {
-              category: true,
-            },
-          },
-          goals: {
-            include: {
-              goal: true,
-            },
-          },
-          admin: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
+    const meditation = await this.prisma.meditation.update({
+      where: { id },
+      data: {
+        ...updateData,
+        ...(schoolId && { schoolId }),
+      },
+    });
+
+    if (categoryIds !== undefined) {
+      await this.prisma.meditationMeditationCategory.deleteMany({
+        where: { meditationId: id },
       });
 
-      return meditation;
-    });
+      if (categoryIds.length) {
+        await this.prisma.meditationMeditationCategory.createMany({
+          data: categoryIds.map((categoryId) => ({
+            meditationId: id,
+            categoryId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    if (moodIds !== undefined) {
+      await this.prisma.meditationMood.deleteMany({
+        where: { meditationId: id },
+      });
+
+      if (moodIds.length) {
+        await this.prisma.meditationMood.createMany({
+          data: moodIds.map((moodId) => ({
+            meditationId: id,
+            moodId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    if (goalIds !== undefined) {
+      await this.prisma.meditationMeditationGoal.deleteMany({
+        where: { meditationId: id },
+      });
+
+      if (goalIds.length) {
+        await this.prisma.meditationMeditationGoal.createMany({
+          data: goalIds.map((goalId) => ({
+            meditationId: id,
+            goalId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    return meditation;
   }
+
+  /* -------------------------------------------------- */
+  /*               DELETE (SOFT DELETE)                 */
+  /* -------------------------------------------------- */
 
   async deleteMeditationResource(id: string) {
-    return this.prisma.$transaction(async (tx) => {
-      // Soft delete by setting deletedAt timestamp
-      const meditation = await tx.meditation.update({
-        where: { id },
-        data: {
-          deletedAt: new Date(),
-          status: "ARCHIVED"
-        }
-      });
-
-      return meditation;
+    return this.prisma.meditation.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        status: "ARCHIVED",
+      },
     });
   }
 
-  // ====================================
-  //        MEDITATION CATEGORY OPERATIONS
-  // ====================================
+  /* -------------------------------------------------- */
+  /*                 CATEGORY CRUD                      */
+  /* -------------------------------------------------- */
 
   async createMeditationCategory(data: CreateMeditationCategoryInput) {
-    return this.prisma.meditationCategory.create({
-      data,
-    });
+    return this.prisma.meditationCategory.create({ data });
   }
 
   async getMeditationCategories(params: {
@@ -387,34 +368,25 @@ export class MeditationRepository {
 
     const where: any = {
       ...(status && { status }),
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+        ],
+      }),
     };
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    const [categories, total] = await Promise.all([
+    const [categories, total] = await this.prisma.$transaction([
       this.prisma.meditationCategory.findMany({
         where,
         skip,
         take: limit,
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: { createdAt: "desc" },
       }),
       this.prisma.meditationCategory.count({ where }),
     ]);
 
     return { categories, total };
-  }
-
-  async getMeditationCategoryById(id: string) {
-    return this.prisma.meditationCategory.findUnique({
-      where: { id },
-    });
   }
 
   async updateMeditationCategory(id: string, data: UpdateMeditationCategoryInput) {
@@ -430,14 +402,12 @@ export class MeditationRepository {
     });
   }
 
-  // ====================================
-  //           MEDITATION GOAL OPERATIONS
-  // ====================================
+  /* -------------------------------------------------- */
+  /*                     GOALS CRUD                     */
+  /* -------------------------------------------------- */
 
   async createMeditationGoal(data: CreateMeditationGoalInput) {
-    return this.prisma.meditationGoal.create({
-      data,
-    });
+    return this.prisma.meditationGoal.create({ data });
   }
 
   async getMeditationGoals(params: {
@@ -451,34 +421,25 @@ export class MeditationRepository {
 
     const where: any = {
       ...(status && { status }),
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+        ],
+      }),
     };
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    const [goals, total] = await Promise.all([
+    const [goals, total] = await this.prisma.$transaction([
       this.prisma.meditationGoal.findMany({
         where,
         skip,
         take: limit,
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: { createdAt: "desc" },
       }),
       this.prisma.meditationGoal.count({ where }),
     ]);
 
     return { goals, total };
-  }
-
-  async getMeditationGoalById(id: string) {
-    return this.prisma.meditationGoal.findUnique({
-      where: { id },
-    });
   }
 
   async updateMeditationGoal(id: string, data: UpdateMeditationGoalInput) {
@@ -494,138 +455,23 @@ export class MeditationRepository {
     });
   }
 
-  // ====================================
-  //     MEDITATION INSTRUCTION OPERATIONS
-  // ====================================
+  /* -------------------------------------------------- */
+  /*            MEDITATION INSTRUCTIONS CRUD            */
+  /* -------------------------------------------------- */
 
-  async createMeditationInstruction(data: CreateMeditationInstructionInput & { schoolId?: string; createdBy?: string }) {
+  async createMeditationInstruction(
+    data: CreateMeditationInstructionInput & {
+      schoolId?: string;
+      createdBy?: string;
+    }
+  ) {
     return this.prisma.meditationListeningInstruction.create({
       data: {
-        title: data.title,
-        description: data.description,
-        steps: data.steps,
-        duration: data.duration,
-        difficulty: data.difficulty,
-        status: data.status,
-        resourceId: data.resourceId,
-        ...(data.schoolId && { schoolId: data.schoolId }),
-        ...(data.createdBy && { createdBy: data.createdBy }),
+        ...data,
       },
       include: {
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        school: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-  }
-
-  async getMeditationInstructions(params: {
-    page: number;
-    limit: number;
-    search?: string;
-    status?: string;
-    difficulty?: string;
-    schoolId?: string;
-  }) {
-    const { page, limit, search, status, difficulty, schoolId } = params;
-    const skip = (page - 1) * limit;
-
-    const where: any = {
-      ...(schoolId && { schoolId }),
-      ...(status && { status }),
-      ...(difficulty && { difficulty }),
-    };
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    const [instructions, total] = await Promise.all([
-      this.prisma.meditationListeningInstruction.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          creator: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-          school: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      }),
-      this.prisma.meditationListeningInstruction.count({ where }),
-    ]);
-
-    return { instructions, total };
-  }
-
-  async getMeditationInstructionById(id: string) {
-    return this.prisma.meditationListeningInstruction.findUnique({
-      where: { id },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        school: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-  }
-
-  async updateMeditationInstruction(id: string, data: UpdateMeditationInstructionInput) {
-    return this.prisma.meditationListeningInstruction.update({
-      where: { id },
-      data,
-      include: {
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        school: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        creator: { select: { id: true, firstName: true, lastName: true } },
+        school: { select: { id: true, name: true } },
       },
     });
   }
@@ -633,31 +479,6 @@ export class MeditationRepository {
   async deleteMeditationInstruction(id: string) {
     return this.prisma.meditationListeningInstruction.delete({
       where: { id },
-    });
-  }
-
-  async getInstructionsByResource(resourceId: string) {
-    return this.prisma.meditationListeningInstruction.findMany({
-      where: { resourceId },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        school: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
     });
   }
 }

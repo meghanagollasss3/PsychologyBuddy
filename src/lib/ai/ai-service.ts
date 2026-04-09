@@ -1,12 +1,12 @@
-import { groq } from '@ai-sdk/groq'
+import { openai } from '@ai-sdk/openai'
 import { generateText, streamText } from 'ai'
 
 // Configuration
-const GROQ_API_KEY = process.env.GROQ_API_KEY
-const DEFAULT_MODEL = 'llama-3.1-8b-instant'
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+const DEFAULT_MODEL = 'gpt-3.5-turbo'
 
-if (!GROQ_API_KEY) {
-  console.warn('Groq API key not configured - AI features will be disabled')
+if (!OPENAI_API_KEY) {
+  console.warn('OpenAI API key not configured - AI features will be disabled')
 }
 
 // Types for AI operations
@@ -31,11 +31,11 @@ export interface AIConfig {
 
 // AI Service class with error handling
 export class AIService {
-  private static model = groq(DEFAULT_MODEL)
+  private static model = openai(DEFAULT_MODEL)
   
   private static validateConfig() {
-    if (!GROQ_API_KEY) {
-      throw new Error('Groq API key not configured')
+    if (!OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured')
     }
   }
   
@@ -99,24 +99,26 @@ export class AIService {
         })
         .join('\n')
       
-      const prompt = `You are analyzing a therapy chat session between a student and an AI mental health companion. Based on the following conversation transcript, generate a structured JSON summary.
+      const prompt = `You are analyzing a therapy chat session between a student and Buddy (AI mental health companion). Based on the following conversation transcript, generate a structured JSON summary.
 
 Conversation Transcript:
 ${conversationText}
 
 Generate a JSON response with exactly these 4 fields:
 {
-  "mainTopic": "A concise title or main theme of the conversation",
-  "conversationStart": "How the conversation began - the opening topic or concern",
-  "conversationAbout": "What the conversation was primarily about - key themes discussed",
-  "reflection": "A thoughtful reflection on the conversation's emotional content and insights"
+  "mainTopic": "The primary concern or topic the student wanted to discuss",
+  "conversationStart": "How the conversation actually began - what the student said first and how Buddy responded",
+  "conversationAbout": "The main discussion points and themes that emerged during the conversation between student and Buddy",
+  "reflection": "A thoughtful reflection on the conversation's emotional journey, key insights gained, and how the student's understanding evolved"
 }
 
 Requirements:
-- mainTopic: Keep it brief (2-6 words), capture the essence
-- conversationStart: Describe the opening context (1-2 sentences)
-- conversationAbout: Summarize the main discussion points (2-3 sentences)
-- reflection: Provide empathetic insight about the emotional journey (2-3 sentences)
+- mainTopic: Focus on what the student actually wanted help with (2-6 words)
+- conversationStart: Describe the actual opening exchange and initial concern (1-2 sentences)
+- conversationAbout: Capture the real dialogue flow and key discussion points between both student and Buddy (2-3 sentences)
+- reflection: Provide empathetic insight about the emotional journey and understanding gained (2-3 sentences)
+
+Important: Analyze the ACTUAL conversation between student and Buddy, not just generic themes. Capture how the discussion evolved, what insights were shared, and the emotional progression.
 
 Respond ONLY with valid JSON. No additional text, explanations, or formatting.`
       
@@ -205,7 +207,7 @@ Respond only with valid JSON, no other text.`
   // Get configuration status
   static getConfigStatus(): { configured: boolean; model: string } {
     return {
-      configured: !!GROQ_API_KEY,
+      configured: !!OPENAI_API_KEY,
       model: DEFAULT_MODEL
     }
   }

@@ -1,0 +1,639 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  Shield, 
+  Users, 
+  MapPin, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Eye,
+  UserPlus,
+  Crown,
+  Building2,
+  Mail,
+  Phone,
+  Calendar
+} from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {  useToast } from '@/components/ui/use-toast';
+
+interface PrimaryAdmin {
+  id: string;
+  userId: string;
+  schoolId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    role: { name: string };
+    createdAt: string;
+  };
+  school: { name: string };
+  _count: { locationAdmins: number };
+}
+
+interface LocationAdmin {
+  id: string;
+  userId: string;
+  schoolId: string;
+  locationId: string;
+  primaryAdminId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    role: { name: string };
+    createdAt: string;
+  };
+  school: { name: string };
+  location: {
+    id: string;
+    name: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    isMain: boolean;
+  };
+}
+
+interface School {
+  id: string;
+  name: string;
+  locations: Array<{
+    id: string;
+    name: string;
+    isMain: boolean;
+  }>;
+}
+
+interface AvailableAdmin {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  role: { name: string };
+  createdAt: string;
+}
+
+export default function SchoolAdminsSection() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const schoolId = searchParams.get('school');
+
+  const [schools, setSchools] = useState<School[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [primaryAdmin, setPrimaryAdmin] = useState<PrimaryAdmin | null>(null);
+  const [locationAdmins, setLocationAdmins] = useState<LocationAdmin[]>([]);
+  const [availableAdmins, setAvailableAdmins] = useState<AvailableAdmin[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showPrimaryAdminModal, setShowPrimaryAdminModal] = useState(false);
+  const [showLocationAdminModal, setShowLocationAdminModal] = useState(false);
+  const [showAvailableAdminsModal, setShowAvailableAdminsModal] = useState(false);
+  const [selectedLocationAdmin, setSelectedLocationAdmin] = useState<LocationAdmin | null>(null);
+
+  const [primaryAdminForm, setPrimaryAdminForm] = useState({
+    userId: '',
+  });
+
+  const [locationAdminForm, setLocationAdminForm] = useState({
+    userId: '',
+    locationId: '',
+  });
+
+  const loadSchools = async () => {
+    try {
+      const res = await fetch('/api/admin/schools/with-locations', {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      setSchools(data);
+      
+      if (!selectedSchool && data.length > 0) {
+        setSelectedSchool(data[0]);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load schools",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadSchoolAdmins = async (schoolId: string) => {
+    try {
+      const res = await fetch(`/api/admin/schools/${schoolId}/admins`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      setPrimaryAdmin(data.primaryAdmin);
+      setLocationAdmins(data.locationAdmins || []);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load school admins",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadAvailableAdmins = async (schoolId: string) => {
+    try {
+      const res = await fetch(`/api/admin/admins/available?schoolId=${schoolId}`, {
+        credentials: 'include',
+      });
+      
+      if (!res.ok) {
+        console.error('Failed to load available admins:', res.status, res.statusText);
+        
+        // Try to get error details
+        try {
+          const errorData = await res.json();
+          console.error('Error response:', errorData);
+        } catch (parseError) {
+          console.error('Could not parse error response');
+        }
+        
+        setAvailableAdmins([]);
+        return;
+      }
+      
+      const data = await res.json();
+      console.log('Available admins data:', data);
+      setAvailableAdmins(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to load available admins:', error);
+      setAvailableAdmins([]);
+    }
+  };
+
+  const handleCreatePrimaryAdmin = async () => {
+    if (!selectedSchool || !primaryAdminForm.userId) return;
+
+    try {
+      const res = await fetch('/api/admin/schools/primary-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: primaryAdminForm.userId,
+          schoolId: selectedSchool.id,
+        }),
+      });
+
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: "Primary admin created successfully",
+        });
+        setShowPrimaryAdminModal(false);
+        setPrimaryAdminForm({ userId: '' });
+        loadSchoolAdmins(selectedSchool.id);
+      } else {
+        const error = await res.json();
+        toast({
+          title: "Error",
+          description: error.error?.message || "Failed to create primary admin",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateLocationAdmin = async () => {
+    if (!selectedSchool || !primaryAdmin || !locationAdminForm.userId || !locationAdminForm.locationId) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/schools/location-admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: locationAdminForm.userId,
+          schoolId: selectedSchool.id,
+          locationId: locationAdminForm.locationId,
+          primaryAdminId: primaryAdmin.id,
+        }),
+      });
+
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: "Location admin created successfully",
+        });
+        setShowLocationAdminModal(false);
+        setLocationAdminForm({ userId: '', locationId: '' });
+        loadSchoolAdmins(selectedSchool.id);
+        loadAvailableAdmins(selectedSchool.id);
+      } else {
+        const error = await res.json();
+        toast({
+          title: "Error",
+          description: error.error?.message || "Failed to create location admin",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveLocationAdmin = async (locationAdminId: string) => {
+    if (!confirm('Are you sure you want to remove this location admin? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/schools/location-admins/${locationAdminId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: "Location admin removed successfully",
+        });
+        loadSchoolAdmins(selectedSchool!.id);
+        loadAvailableAdmins(selectedSchool!.id);
+      } else {
+        const error = await res.json();
+        toast({
+          title: "Error",
+          description: error.error?.message || "Failed to remove location admin",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading school admins...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* School Selector */}
+      <div className="bg-white rounded-lg border p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">School Administration</h2>
+            <p className="text-sm text-gray-600">Manage primary and location administrators</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Select value={selectedSchool?.id || ''} onValueChange={(value) => {
+              const school = schools.find(s => s.id === value);
+              setSelectedSchool(school || null);
+            }}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select a school" />
+              </SelectTrigger>
+              <SelectContent>
+                {schools.map((school) => (
+                  <SelectItem key={school.id} value={school.id}>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      <span>{school.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setShowAvailableAdminsModal(true)} disabled={!selectedSchool}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              View Available Admins
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {selectedSchool && (
+        <>
+          {/* Primary Admin Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-yellow-600" />
+                  <CardTitle>Primary Administrator</CardTitle>
+                  <Badge variant="outline" className="text-xs">
+                    School-wide access
+                  </Badge>
+                </div>
+                {!primaryAdmin && (
+                  <Button onClick={() => setShowPrimaryAdminModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Assign Primary Admin
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {primaryAdmin ? (
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-yellow-50">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 rounded-full bg-yellow-200">
+                      <Crown className="h-6 w-6 text-yellow-700" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">{primaryAdmin.user.firstName} {primaryAdmin.user.lastName}</h4>
+                      <p className="text-sm text-gray-600">{primaryAdmin.user.email}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">
+                          {primaryAdmin.user.role.name}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          Managing {primaryAdmin._count.locationAdmins} location admins
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">Assigned on</p>
+                    <p className="text-sm font-medium">
+                      {new Date(primaryAdmin.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Crown className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No primary admin assigned</p>
+                  <p className="text-sm">Assign a primary admin to manage this school</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Location Admins Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                  <CardTitle>Location Administrators</CardTitle>
+                  <Badge variant="outline" className="text-xs">
+                    Location-specific access
+                  </Badge>
+                </div>
+                <Button 
+                  onClick={() => setShowLocationAdminModal(true)} 
+                  disabled={!primaryAdmin}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Location Admin
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {locationAdmins.length > 0 ? (
+                <div className="space-y-4">
+                  {locationAdmins.map((locationAdmin) => (
+                    <div key={locationAdmin.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="p-2 rounded-full bg-blue-100">
+                          <MapPin className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{locationAdmin.user.firstName} {locationAdmin.user.lastName}</h4>
+                          <p className="text-sm text-gray-600">{locationAdmin.user.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {locationAdmin.user.role.name}
+                            </Badge>
+                            <span className="text-xs text-gray-500">
+                              {locationAdmin.location.name}
+                              {locationAdmin.location.isMain && ' (Main)'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Assigned on</p>
+                          <p className="text-sm font-medium">
+                            {new Date(locationAdmin.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRemoveLocationAdmin(locationAdmin.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No location admins assigned</p>
+                  <p className="text-sm">
+                    {primaryAdmin ? 'Add location admins to manage specific branches' : 'Assign a primary admin first'}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Primary Admin Modal */}
+      <Dialog open={showPrimaryAdminModal} onOpenChange={setShowPrimaryAdminModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Primary Administrator</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="primaryAdmin">Select Admin</Label>
+              <Select value={primaryAdminForm.userId} onValueChange={(value) => 
+                setPrimaryAdminForm({ userId: value })
+              }>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an admin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.isArray(availableAdmins) && availableAdmins.map((admin) => (
+                    <SelectItem key={admin.id} value={admin.id}>
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        <span>{admin.firstName} {admin.lastName}</span>
+                        <span className="text-sm text-gray-500">({admin.email})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowPrimaryAdminModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreatePrimaryAdmin} disabled={!primaryAdminForm.userId}>
+                Assign Admin
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Location Admin Modal */}
+      <Dialog open={showLocationAdminModal} onOpenChange={setShowLocationAdminModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Location Administrator</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="locationAdmin">Select Admin</Label>
+              <Select value={locationAdminForm.userId} onValueChange={(value) => 
+                setLocationAdminForm({ ...locationAdminForm, userId: value })
+              }>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an admin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.isArray(availableAdmins) && availableAdmins.map((admin) => (
+                    <SelectItem key={admin.id} value={admin.id}>
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        <span>{admin.firstName} {admin.lastName}</span>
+                        <span className="text-sm text-gray-500">({admin.email})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="location">Select Location</Label>
+              <Select value={locationAdminForm.locationId} onValueChange={(value) => 
+                setLocationAdminForm({ ...locationAdminForm, locationId: value })
+              }>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedSchool?.locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        <span>{location.name}</span>
+                        {location.isMain && <Badge variant="outline" className="text-xs">Main</Badge>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowLocationAdminModal(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateLocationAdmin} 
+                disabled={!locationAdminForm.userId || !locationAdminForm.locationId}
+              >
+                Assign Admin
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Available Admins Modal */}
+      <Dialog open={showAvailableAdminsModal} onOpenChange={setShowAvailableAdminsModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Available Administrators</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {availableAdmins.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {availableAdmins.map((admin) => (
+                  <Card key={admin.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-gray-100">
+                          <Shield className="h-5 w-5 text-gray-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium">{admin.firstName} {admin.lastName}</h4>
+                          <p className="text-sm text-gray-600">{admin.email}</p>
+                          {admin.phone && (
+                            <p className="text-sm text-gray-500">{admin.phone}</p>
+                          )}
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {admin.role.name}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Shield className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>No available administrators</p>
+                <p className="text-sm">All admins are currently assigned</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

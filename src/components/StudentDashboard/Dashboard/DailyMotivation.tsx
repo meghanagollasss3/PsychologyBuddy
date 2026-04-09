@@ -132,13 +132,13 @@ export default function DailyMotivation() {
 
   return (
     <div
-      className="rounded-[16px] p-10 border-2 border-white bg-gradient-to-br 
-                 from-[#bcffe5ac] via-[#edfff873] to-[#beffe0bc] drop-shadow-xl w-auto h-auto "
+      className="rounded-[12px] sm:rounded-[14px] md:rounded-[16px] p-6 sm:p-8 md:p-10 border-2 border-white bg-gradient-to-br 
+                 from-[#bcffe5ac] via-[#edfff873] to-[#beffe0bc] drop-shadow-xl w-full h-auto"
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Quote className="h-[20px] w-[25px] text-[#096112]" />
-          <h3 className="text-[20px] font-semibold text-[#096112]">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Quote className="h-[16px] w-[20px] sm:h-[18px] sm:w-[22px] md:h-[20px] md:w-[25px] text-[#096112]" />
+          <h3 className="text-[16px] sm:text-[18px] md:text-[20px] font-semibold text-[#096112]">
             Daily Motivation
           </h3>
         </div>
@@ -146,17 +146,17 @@ export default function DailyMotivation() {
         {/* Refresh Button */}
         <button
           onClick={refreshQuote}
-          className="p-1.5  rounded-full drop-shadow-sm bg-[#c8ffdd] hover:bg-green-200 transition"
+          className="p-1.5 sm:p-2 rounded-full drop-shadow-sm bg-[#c8ffdd] hover:bg-green-200 transition"
         >
-          <RefreshCw className="h-4 w-4 text-[#5C7364]" />
+          <RefreshCw className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-[#5C7364]" />
         </button>
       </div>
 
-      <p className="mt-8 text-[#3A3A3A] text-[16px] leading-relaxed">
-        “{quote.text}”
+      <p className="mt-6 sm:mt-7 md:mt-8 text-[#3A3A3A] text-[14px] sm:text-[15px] md:text-[16px] leading-relaxed">
+        "{quote.text}"
       </p>
 
-      <p className="mt-7 ml-60 text-[14px] text-[#7C7C7C]">— {quote.author}</p>
+      <p className="mt-5 sm:mt-6 md:mt-7 ml-auto text-right text-[12px] sm:text-[13px] md:text-[14px] text-[#7C7C7C]">— {quote.author}</p>
     </div>
   );
 }

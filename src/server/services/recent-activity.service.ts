@@ -35,6 +35,9 @@ export class RecentActivityService {
       classId?: string;
       schoolId?: string;
       dateRange?: string;
+      timeFilter?: string;
+      startDate?: string;
+      endDate?: string;
       limit?: number;
       offset?: number;
     } = {}
@@ -45,6 +48,9 @@ export class RecentActivityService {
       classId,
       schoolId,
       dateRange,
+      timeFilter,
+      startDate,
+      endDate,
       limit = 50,
       offset = 0
     } = filters;
@@ -76,8 +82,15 @@ export class RecentActivityService {
       admin.role.rolePermissions.some((rp: any) => rp.permission.name === 'VIEW_ALL_SCHOOLS') ||
       admin.role.rolePermissions.some((rp: any) => rp.permission.name === 'access.control.manage'); // Using actual permission
 
-    // Build date filter
-    const dateFilter = this.buildDateFilter(dateRange);
+    // Build date filter using time filter logic
+    const dateFilter = this.buildDateFilterFromTimeFilter(timeFilter, startDate, endDate);
+    
+    console.log('RecentActivityService: Date filter built', {
+      timeFilter,
+      startDate,
+      endDate,
+      dateFilter
+    });
 
     // Determine school filter based on role and provided schoolId
     let effectiveSchoolId = undefined;
@@ -492,10 +505,11 @@ export class RecentActivityService {
 
     // Alert resolved and active alerts
     if (!type || type === 'alert') {
-      // Get all alerts (both active and resolved) - remove date filter for testing
+      // Get all alerts (both active and resolved) - apply date filter
       const allAlerts = await prisma.escalationAlert.findMany({
         where: {
           user: userFilter,
+          createdAt: dateFilter,
           ...(search && {
             user: {
               OR: [
@@ -586,6 +600,65 @@ export class RecentActivityService {
     }
 
     return await prisma.moodCheckin.count({ where: whereClause });
+  }
+
+  /**
+   * Build date filter based on time filter parameters
+   */
+  private static buildDateFilterFromTimeFilter(
+    timeFilter?: string, 
+    startDate?: string, 
+    endDate?: string
+  ): { gte?: Date; lt?: Date } {
+    if (startDate && endDate) {
+      return {
+        gte: new Date(startDate),
+        lt: new Date(endDate)
+      };
+    }
+
+    if (!timeFilter) {
+      return {};
+    }
+
+    const now = new Date();
+    const start = new Date();
+    const end = new Date();
+
+    switch (timeFilter) {
+      case 'all':
+        // For 'all', return a very wide date range to show everything
+        start.setFullYear(now.getFullYear() - 10); // 10 years ago
+        start.setHours(0, 0, 0, 0);
+        end.setFullYear(now.getFullYear() + 1); // 1 year in future
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'today':
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'week':
+        const dayOfWeek = now.getDay();
+        start.setDate(now.getDate() - dayOfWeek);
+        start.setHours(0, 0, 0, 0);
+        end.setDate(now.getDate() + (6 - dayOfWeek));
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'month':
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        end.setMonth(now.getMonth() + 1, 0);
+        end.setHours(23, 59, 59, 999);
+        break;
+      default:
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+    }
+
+    return {
+      gte: start,
+      lt: end
+    };
   }
 
   /**

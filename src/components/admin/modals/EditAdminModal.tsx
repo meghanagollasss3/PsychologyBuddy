@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SchoolSearch } from '@/src/components/admin/modals/SchoolSearch';
+import { LocationSearch } from '@/src/components/admin/modals/LocationSearch';
 
 interface EditAdminModalProps {
   admin: any;
@@ -26,6 +28,7 @@ interface FormData {
   email: string;
   phone: string;
   schoolId: string;
+  locationId: string;
   department: string;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 }
@@ -38,6 +41,7 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
     email: '',
     phone: '',
     schoolId: '',
+    locationId: '',
     department: '',
     status: 'ACTIVE'
   });
@@ -54,6 +58,7 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
         email: admin.email || '',
         phone: admin.phone || '',
         schoolId: admin.school?.id || '',
+        locationId: admin.assignedLocations?.[0]?.id || '', // Pre-select first assigned location
         department: admin.adminProfile?.department || '',
         status: admin.status || 'ACTIVE'
       });
@@ -78,6 +83,11 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
       newErrors.email = 'Invalid email format';
     }
     if (!formData.schoolId) newErrors.schoolId = 'School is required';
+    
+    // Location is required for ADMIN role
+    if (admin?.role?.name === 'ADMIN' && !formData.locationId) {
+      newErrors.locationId = 'Location is required for ADMIN role';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -258,6 +268,36 @@ export function EditAdminModal({ admin, onClose, onSuccess, schools }: EditAdmin
               )}
             </div>
           </div>
+
+          {/* Location Assignment - Only show for ADMIN role */}
+          {admin?.role?.name === 'ADMIN' && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Location Assignment</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location *
+                </label>
+                <LocationSearch
+                  schoolId={formData.schoolId}
+                  onLocationSelect={(location: any) => {
+                    if (location) {
+                      handleInputChange('locationId', location.id);
+                    } else {
+                      handleInputChange('locationId', '');
+                    }
+                  }}
+                  placeholder="Search for a location..."
+                  initialLocationId={formData.locationId}
+                />
+                {errors.locationId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.locationId}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Select the specific location this admin will manage
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-end space-x-3 pt-6 border-t">

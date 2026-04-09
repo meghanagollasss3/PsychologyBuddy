@@ -111,7 +111,7 @@ export default function BadgeProgress() {
     } else if (!hasBadges) {
       subtitlePrimary = "Admins haven't created any badges yet.";
     } else {
-      subtitlePrimary = `${remaining} actions away`;
+      subtitlePrimary = `${remaining} % away`;
       subtitleSecondary = "from earning your next badge! Keep going 🌟";
     }
 
@@ -125,7 +125,7 @@ export default function BadgeProgress() {
   ----------------------------- */
   if (isLoading) {
     return (
-      <div className="rounded-2xl p-5 border bg-white shadow-sm w-full">
+      <div className="rounded-2xl p-4 sm:p-5 border bg-white shadow-sm w-full">
         <div className="animate-pulse space-y-3">
           <div className="h-4 bg-gray-200 rounded"></div>
           <div className="w-full h-3 bg-gray-200 rounded-full"></div>
@@ -140,7 +140,7 @@ export default function BadgeProgress() {
   ----------------------------- */
   if (isError || !data) {
     return (
-      <div className="rounded-2xl p-5 border bg-white shadow-sm w-full">
+      <div className="rounded-2xl p-4 sm:p-5 border bg-white shadow-sm w-full">
         <p className="text-sm text-red-500 font-medium">
           Failed to load badge progress.
         </p>
@@ -156,32 +156,31 @@ export default function BadgeProgress() {
   ----------------------------- */
   return (
     <div
-      className="rounded-[16px] p-5 border-2 border-white bg-gradient-to-br 
-                 from-[#b8dbf95c] via-[#e7f7ff85] to-[#b8dbf97a] drop-shadow-sm shadow-[#3F7AC90D] w-auto h-auto "
+      className="rounded-[12px] sm:rounded-[14px] md:rounded-[16px] p-4 sm:p-5 border-2 border-white bg-gradient-to-br 
+                 from-[#b8dbf95c] via-[#e7f7ff85] to-[#b8dbf97a] drop-shadow-sm shadow-[#3F7AC90D] w-full h-auto"
     >
-      <div className="flex items-center ml-4 gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         {/* ICON BLOCK */}
 
-        {/* CONTENT */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 sm:gap-3 mb-1">
             <div
-              className="w-[48px] h-[48px] bg-gradient-to-br 
-                 from-[#4193FF] to-[#4A8FE9] rounded-[9px] flex items-center justify-center shadow-md"
+              className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px] md:w-[48px] md:h-[48px] bg-gradient-to-br 
+                 from-[#4193FF] to-[#4A8FE9] rounded-[8px] sm:rounded-[9px] flex items-center justify-center shadow-md"
             >
-              <Star className="h-6 w-6 text-white" />
+              <Star className="h-5 w-5 sm:h-5.5 sm:w-5.5 md:h-6 md:w-6 text-white" />
             </div>
-            <h3 className="text-[20px] -mt-5 font-semibold text-[#2F3D43]">
+            <h3 className="text-[16px] sm:text-[18px] md:text-[20px] -mt-4 sm:-mt-5 font-semibold text-[#2F3D43]">
               Badge Progress
             </h3>
-            <div className="text-xs -mt-3.5 text-gray-500">
+            <div className="text-xs -mt-2.5 sm:-mt-3.5 text-gray-500">
               ({data.earnedBadges}/{data.totalBadges})
             </div>
           </div>
-          <p className="text-[16px] text-[#767676] -mt-6 ml-14 mb-2">{title}</p>
+          <p className="text-[14px] sm:text-[15px] md:text-[16px] text-[#767676] -mt-4 sm:-mt-6 ml-12 sm:ml-14 mb-2">{title}</p>
 
           {/* PROGRESS BAR */}
-          <div className="w-[485px] bg-[#C6DDFC] rounded-full h-[14px] overflow-hidden mt-8 mb-2">
+          <div className="w-full sm:w-[400px] md:w-[485px] bg-[#C6DDFC] rounded-full h-[12px] sm:h-[14px] overflow-hidden mt-6 sm:mt-8 mb-2">
             <div
               className={`h-full ${
                 displayValue === 100 ? "bg-green-500" : "bg-[#4293FE]"
@@ -190,7 +189,7 @@ export default function BadgeProgress() {
             />
           </div>
 
-          <div className="text-[16px] mt-4 ml-1">
+          <div className="text-[14px] sm:text-[15px] md:text-[16px] mt-3 sm:mt-4 ml-1">
             <span className="text-[#2F80ED] font-medium">
               {subtitlePrimary}
             </span>

@@ -18,13 +18,8 @@ export class AdminService {
         throw AuthError.conflict('A user with this email already exists');
       }
 
-      // For ADMIN role, check if school already has an admin (one admin per school policy)
-      if (data.role === 'ADMIN' && data.schoolId) {
-        const existingSchoolAdmin = await AdminRepository.findAdminBySchoolId(data.schoolId);
-        if (existingSchoolAdmin) {
-          throw AuthError.conflict('School already has an admin assigned');
-        }
-      }
+      // Multiple admins can be assigned to the same school
+      // No longer enforcing one admin per school policy
 
       // Get role based on selection
       const role = await prisma.role.findUnique({
@@ -43,6 +38,7 @@ export class AdminService {
         ...data,
         password: hashedPassword,
         roleId: role.id,
+        createdBy: creatorId,
       });
 
       // Remove password from response
@@ -54,10 +50,10 @@ export class AdminService {
     }
   }
 
-  // Get all admins (SuperAdmin only)
-  static async getAllAdmins(schoolId?: string) {
+  // Get all admins (SuperAdmin and SchoolSuperAdmin only)
+  static async getAllAdmins(schoolId?: string, userSchoolId?: string, locationId?: string) {
     try {
-      const admins = await AdminRepository.getAllAdmins(schoolId);
+      const admins = await AdminRepository.getAllAdmins(schoolId, locationId);
       
       // Remove passwords from response
       const adminsWithoutPasswords = admins.map(admin => {
@@ -74,17 +70,22 @@ export class AdminService {
   // Get admin by ID
   static async getAdminById(id: string) {
     try {
+      console.log('Getting admin by ID:', id);
       const admin = await AdminRepository.getAdminById(id);
+      console.log('Admin repository result:', admin);
       
       if (!admin) {
+        console.log('Admin not found for ID:', id);
         throw AuthError.notFound('Admin not found');
       }
 
       // Remove password from response
       const { password, ...adminWithoutPassword } = admin;
+      console.log('Admin without password:', adminWithoutPassword);
 
       return ApiResponse.success(adminWithoutPassword, 'Admin retrieved successfully');
     } catch (error) {
+      console.error('Error in getAdminById:', error);
       throw error;
     }
   }
@@ -98,13 +99,8 @@ export class AdminService {
         throw AuthError.notFound('Admin not found');
       }
 
-      // If updating schoolId, check if new school already has admin
-      if (data.schoolId && data.schoolId !== existingAdmin.schoolId) {
-        const existingSchoolAdmin = await AdminRepository.findAdminBySchoolId(data.schoolId);
-        if (existingSchoolAdmin && existingSchoolAdmin.id !== id) {
-          throw AuthError.conflict('Target school already has an admin assigned');
-        }
-      }
+      // Multiple admins can be assigned to the same school
+      // No longer enforcing one admin per school policy
 
       // Update admin
       const updatedAdmin = await AdminRepository.updateAdmin(id, data);
@@ -167,13 +163,18 @@ export class AdminService {
     }
   }
 
-  // Update admin status (SuperAdmin only)
-  static async updateAdminStatus(id: string, data: UpdateAdminStatusData) {
+  // Update admin status (SuperAdmin and SchoolSuperAdmin only)
+  static async updateAdminStatus(id: string, data: UpdateAdminStatusData, currentUser?: any) {
     try {
       // Check if admin exists
       const existingAdmin = await AdminRepository.getAdminById(id);
       if (!existingAdmin) {
         throw AuthError.notFound('Admin not found');
+      }
+
+      // For SCHOOL_SUPERADMIN, ensure the admin being updated is in the same school
+      if (currentUser?.role?.name === 'SCHOOL_SUPERADMIN' && existingAdmin.schoolId !== currentUser.schoolId) {
+        throw AuthError.forbidden('You can only manage admins in your own school');
       }
 
       // Update status
@@ -188,7 +189,7 @@ export class AdminService {
     }
   }
 
-  // Update admin permissions (SuperAdmin only)
+  // Update admin permissions (SuperAdmin and SchoolSuperAdmin only)
   static async updateAdminPermissions(id: string, permissions: string[]) {
     try {
       // Check if admin exists
@@ -197,22 +198,19 @@ export class AdminService {
         throw AuthError.notFound('Admin not found');
       }
 
-      // Don't allow updating permissions for SuperAdmin
-      if (existingAdmin.role.name === 'SUPERADMIN') {
-        throw new Error('Cannot modify SuperAdmin permissions');
-      }
-
-      // Update admin permissions
       const updatedAdmin = await AdminRepository.updateAdminPermissions(id, permissions);
 
-      return ApiResponse.success(updatedAdmin, 'Admin permissions updated successfully');
+      // Remove password from response
+      const { password, ...adminWithoutPassword } = updatedAdmin;
+
+      return ApiResponse.success(adminWithoutPassword, 'Admin permissions updated successfully');
     } catch (error) {
       throw error;
     }
   }
 
-  // Delete admin (SuperAdmin only)
-  static async deleteAdmin(id: string) {
+  // Delete admin (SuperAdmin and SchoolSuperAdmin only - hard delete)
+  static async deleteAdmin(id: string, currentUser?: any) {
     try {
       // Check if admin exists
       const existingAdmin = await AdminRepository.getAdminById(id);
@@ -220,13 +218,18 @@ export class AdminService {
         throw AuthError.notFound('Admin not found');
       }
 
-      // Soft delete by setting status to INACTIVE
+      // For SCHOOL_SUPERADMIN, ensure the admin being deleted is in the same school
+      if (currentUser?.role?.name === 'SCHOOL_SUPERADMIN' && existingAdmin.schoolId !== currentUser.schoolId) {
+        throw AuthError.forbidden('You can only manage admins in your own school');
+      }
+
+      // Hard delete - completely remove from database
       const deletedAdmin = await AdminRepository.deleteAdmin(id);
 
       // Remove password from response
       const { password, ...adminWithoutPassword } = deletedAdmin;
 
-      return ApiResponse.success(adminWithoutPassword, 'Admin deleted successfully');
+      return ApiResponse.success(adminWithoutPassword, 'Admin deleted permanently from the system');
     } catch (error) {
       throw error;
     }

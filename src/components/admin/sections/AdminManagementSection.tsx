@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/dialog';
 
 import { cn } from '@/lib/utils';
-import { useToast } from '@/src/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 
 ///////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -74,8 +74,12 @@ const REVERSE_PERMISSION_MAP: Record<string, string> = Object.fromEntries(
   Object.entries(PERMISSION_MAP).map(([ui, perm]) => [perm, ui])
 );
 
+// Default permissions that are automatically assigned to all admins (except SUPERADMIN)
+const DEFAULT_PERMISSIONS = ['dashboard', 'activity', 'alerts', 'settings'];
+
 const ROLE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   "SUPERADMIN": { bg: "bg-[#3B82F6]/10", text: "text-[#3B82F6]", label: "Super Admin" },
+  "SCHOOL_SUPERADMIN": { bg: "bg-[#10B981]/10", text: "text-[#10B981]", label: "School Superadmin" },
   "ADMIN": { bg: "bg-[#3B82F6]/10", text: "text-[#3B82F6]", label: "Admin" },
   // Default fallback for unknown roles
   "DEFAULT": { bg: "bg-gray-100", text: "text-gray-600", label: "Unknown Role" },
@@ -86,6 +90,8 @@ const ROLE_STYLES: Record<string, { bg: string; text: string; label: string }> =
 ///////////////////////////////////////////////////////////////////////////
 
 const extractAdminPermissionKeys = (admin: Admin): Record<string, boolean> => {
+  // Only use adminProfile.adminPermissions, ignore role.rolePermissions
+  // This ensures individual admin permissions are used, not role-based permissions
   const adminPerms = admin.adminProfile?.adminPermissions || [];
 
   const permNames = adminPerms.map((ap: any) => {
@@ -114,6 +120,8 @@ export function AdminManagementSection() {
 
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [locationFilter, setLocationFilter] = useState("all");
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -127,6 +135,11 @@ export function AdminManagementSection() {
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
 
   const { hasPermission } = usePermissions();
+
+  // Check if user should see location filter
+  // Only SCHOOL_SUPERADMIN should see location filter (ADMIN users are auto-restricted to their assigned locations)
+  const effectiveSchoolId = (user?.role?.name === 'SCHOOL_SUPERADMIN' || user?.role?.name === 'ADMIN') ? user?.school?.id : selectedSchoolId;
+  const shouldShowLocationFilter = user?.role?.name === 'SCHOOL_SUPERADMIN' && effectiveSchoolId && effectiveSchoolId !== 'all';
 
   const canCreateAdmins = hasPermission('users.create');
   const canViewAdmins = hasPermission('users.view');
@@ -148,6 +161,11 @@ export function AdminManagementSection() {
         params.append('schoolId', selectedSchoolId);
       }
       
+      // Add location filter if applicable
+      if (locationFilter && locationFilter !== 'all') {
+        params.append('locationId', locationFilter);
+      }
+      
       const url = `/api/admins${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) return;
@@ -160,7 +178,33 @@ export function AdminManagementSection() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSchoolId, isSuperAdmin]);
+  }, [selectedSchoolId, isSuperAdmin, locationFilter]);
+
+  ///////////////////////////////////////////////////////////////////////////
+  // FETCH LOCATIONS
+  ///////////////////////////////////////////////////////////////////////////
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      if (effectiveSchoolId && effectiveSchoolId !== 'all') {
+        try {
+          const response = await fetch(`/api/admin/schools/locations?schoolId=${effectiveSchoolId}`, { 
+            credentials: 'include' 
+          });
+          const data = await response.json();
+          setLocations(data || []);
+        } catch (error) {
+          console.error('Failed to fetch locations:', error);
+          setLocations([]);
+        }
+      } else {
+        setLocations([]);
+        setLocationFilter("all");
+      }
+    };
+
+    fetchLocations();
+  }, [effectiveSchoolId]);
 
   ///////////////////////////////////////////////////////////////////////////
   // INITIAL LOAD
@@ -203,14 +247,27 @@ export function AdminManagementSection() {
       const data = await response.json();
 
       if (data.success) {
-        toast({ title: "Admin Removed", description: "Admin removed successfully." });
+        toast({
+          title: "Admin deleted successfully",
+          description: `${selectedAdmin.firstName} ${selectedAdmin.lastName} has been permanently deleted from the system.`
+        });
+
         fetchAdmins();
       } else {
-        toast({ title: "Error", description: data.error?.message, variant: "destructive" });
+        toast({
+          title: "Failed to delete admin",
+          description: data.message || "An error occurred while deleting the admin.",
+          variant: "destructive"
+        });
       }
 
     } catch (err) {
       console.error("Delete error:", err);
+      toast({
+        title: "Failed to delete admin",
+        description: "Network error occurred. Please try again.",
+        variant: "destructive"
+      });
     }
   }, [selectedAdmin, fetchAdmins, toast]);
 
@@ -254,7 +311,21 @@ export function AdminManagementSection() {
     if (!selectedAdmin) return;
 
     try {
-      const enabledPermissions = Object.entries(editedPermissions)
+      // Always include default permissions for admins (except SUPERADMIN)
+      let finalPermissions = { ...editedPermissions };
+      
+      if (!['SUPERADMIN', 'SCHOOL_SUPERADMIN'].includes(selectedAdmin.role.name)) {
+        DEFAULT_PERMISSIONS.forEach(perm => {
+          finalPermissions[perm] = true;
+        });
+      } else if (selectedAdmin.role.name === 'SCHOOL_SUPERADMIN') {
+        // For SCHOOL_SUPERADMIN, also ensure default permissions are always included
+        DEFAULT_PERMISSIONS.forEach(perm => {
+          finalPermissions[perm] = true;
+        });
+      }
+
+      const enabledPermissions = Object.entries(finalPermissions)
         .filter(([_, enabled]) => enabled)
         .map(([key]) => PERMISSION_MAP[key]);
 
@@ -329,6 +400,10 @@ export function AdminManagementSection() {
         schoolFilterValue={selectedSchoolId}
         schools={schools}
         onSchoolFilterChange={setSelectedSchoolId}
+        showLocationFilter={shouldShowLocationFilter || false}
+        locationFilterValue={locationFilter}
+        onLocationFilterChange={setLocationFilter}
+        locations={locations}
         actions={
           canCreateAdmins && (
             <Button onClick={() => setShowAddModal(true)} className="gap-2">
@@ -358,6 +433,8 @@ export function AdminManagementSection() {
               <TableRow className="bg-gray-200/50">
                 <TableHead>User</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>School</TableHead>
+                <TableHead>Locations</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Permissions</TableHead>
                 <TableHead>Last Active</TableHead>
@@ -368,7 +445,7 @@ export function AdminManagementSection() {
             <TableBody>
               {filteredAdmins.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-gray-500">
+                  <TableCell colSpan={8} className="text-center py-12 text-gray-500">
                     No admins found
                   </TableCell>
                 </TableRow>
@@ -411,6 +488,29 @@ export function AdminManagementSection() {
                       </Badge>
                     </TableCell>
 
+                    {/* SCHOOL */}
+                    <TableCell>
+                      <span className="text-sm text-gray-700">
+                        {admin.school?.name || 'No school assigned'}
+                      </span>
+                    </TableCell>
+
+                    {/* LOCATIONS */}
+                    <TableCell>
+                      <span className="text-sm text-gray-700">
+                        {admin.role.name === 'SUPERADMIN' 
+                          ? 'All locations'
+                          : admin.role.name === 'SCHOOL_SUPERADMIN'
+                          ? 'All school locations'
+                          : admin.role.name === 'ADMIN'
+                          ? (admin.assignedLocations && admin.assignedLocations.length > 0
+                              ? admin.assignedLocations.map((loc: any) => loc.name).join(', ')
+                              : 'No location assigned')
+                          : 'No locations'
+                        }
+                      </span>
+                    </TableCell>
+
                     {/* STATUS */}
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -427,7 +527,10 @@ export function AdminManagementSection() {
                     {/* PERMISSIONS */}
                     <TableCell>
                       <Badge variant="outline" className="text-xs">
-                        {admin.role.name === "SUPERADMIN" ? "All features" : `${admin.adminProfile?.adminPermissions?.length || 0}/9 features`}
+                        {admin.role.name === "SUPERADMIN" 
+                          ? "All features" 
+                          : `${Array.isArray(admin.adminProfile?.adminPermissions) ? admin.adminProfile.adminPermissions.length : 0}/9 features`
+                        }
                       </Badge>
                     </TableCell>
 
@@ -462,9 +565,11 @@ export function AdminManagementSection() {
                             <Edit className="h-4 w-4" /> Edit
                           </DropdownMenuItem>
 
-                          <DropdownMenuItem className="gap-2" onClick={() => openPermissions(admin)}>
-                            <Shield className="h-4 w-4" /> Manage Permissions
-                          </DropdownMenuItem>
+                          {user?.role.name === 'SUPERADMIN' && (
+                            <DropdownMenuItem className="gap-2" onClick={() => openPermissions(admin)}>
+                              <Shield className="h-4 w-4" /> Manage Permissions
+                            </DropdownMenuItem>
+                          )}
 
                           <DropdownMenuItem
                             className="gap-2 text-red-500"
@@ -473,7 +578,7 @@ export function AdminManagementSection() {
                               setIsDeleteOpen(true);
                             }}
                           >
-                            <Trash2 className="h-4 w-4" /> Remove
+                            <Trash2 className="h-4 w-4" /> Delete
                           </DropdownMenuItem>
 
                         </DropdownMenuContent>
@@ -496,7 +601,7 @@ export function AdminManagementSection() {
             setShowAddModal(false);
             fetchAdmins();
           }}
-          schools={schools}
+          schools={schools || []}
         />
       )}
 
@@ -509,7 +614,7 @@ export function AdminManagementSection() {
             setShowEditModal(false);
             fetchAdmins();
           }}
-          schools={schools}
+          schools={schools || []}
         />
       )}
 
@@ -525,9 +630,10 @@ export function AdminManagementSection() {
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove Admin</DialogTitle>
+            <DialogTitle>Delete Admin</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove "{selectedAdmin?.firstName} {selectedAdmin?.lastName}"?
+              Are you sure you want to permanently delete {selectedAdmin?.firstName} {selectedAdmin?.lastName}?
+              This action cannot be undone and all admin data will be permanently removed from the system.
             </DialogDescription>
           </DialogHeader>
 
@@ -540,7 +646,7 @@ export function AdminManagementSection() {
                 setIsDeleteOpen(false);
               }}
             >
-              Remove
+              Delete Admin
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -593,28 +699,66 @@ export function AdminManagementSection() {
               <div className="rounded-lg bg-gray-200 p-3 text-sm text-gray-700">
                 Super Admin permissions cannot be modified. They have full access.
               </div>
+            ) : selectedAdmin?.role.name === 'SCHOOL_SUPERADMIN' ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-green-100 p-3 text-sm text-green-900">
+                  As a Super Admin, you can manage this School Superadmin's access.
+                </div>
+                {/* <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
+                  <strong>Default Permissions:</strong> Dashboard, Activity, Escalation & Alerts, and Settings are automatically available to all admins and cannot be removed.
+                </div> */}
+              </div>
             ) : (
-              <div className="rounded-lg bg-blue-100 p-3 text-sm text-blue-900">
-                As a Super Admin, you can manage this admin's access.
+              <div className="space-y-3">
+                <div className="rounded-lg bg-blue-100 p-3 text-sm text-blue-900">
+                  As a Super Admin, you can manage this admin's access.
+                </div>
+                {/* <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
+                  <strong>Default Permissions:</strong> Dashboard, Activity, Escalation & Alerts, and Settings are automatically available to all admins and cannot be removed.
+                </div> */}
               </div>
             )}
 
             <div className="space-y-3">
-              {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
-                <div key={key} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
-                  <span className="text-sm font-medium">{label}</span>
+              {Object.entries(PERMISSION_LABELS).map(([key, label]) => {
+                const isDefaultPermission = DEFAULT_PERMISSIONS.includes(key) && 
+                  !['SUPERADMIN', 'SCHOOL_SUPERADMIN'].includes(selectedAdmin?.role.name || '');
+                const isDisabled = selectedAdmin?.role.name === 'SUPERADMIN' || 
+                  (selectedAdmin?.role.name === 'SCHOOL_SUPERADMIN' && DEFAULT_PERMISSIONS.includes(key)) ||
+                  isDefaultPermission;
+                
+                return (
+                  <div key={key} className={`flex items-center justify-between py-2 border-b border-gray-200 last:border-0 ${
+                    isDefaultPermission || (selectedAdmin?.role.name === 'SCHOOL_SUPERADMIN' && DEFAULT_PERMISSIONS.includes(key)) 
+                      ? 'bg-blue-50/50 px-2 -mx-2' 
+                      : ''
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{label}</span>
+                      {(isDefaultPermission || (selectedAdmin?.role.name === 'SCHOOL_SUPERADMIN' && DEFAULT_PERMISSIONS.includes(key))) && (
+                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                          Default
+                        </Badge>
+                      )}
+                    </div>
 
-                  <Switch
-                    checked={editedPermissions[key] || false}
-                    onCheckedChange={(checked) => {
-                      if (selectedAdmin?.role.name !== 'SUPERADMIN') {
-                        setEditedPermissions((prev) => ({ ...prev, [key]: checked }));
+                    <Switch
+                      checked={
+                        selectedAdmin?.role.name === 'SUPERADMIN' ? true :
+                        (selectedAdmin?.role.name === 'SCHOOL_SUPERADMIN' && DEFAULT_PERMISSIONS.includes(key)) ? true :
+                        isDefaultPermission ? true :
+                        (editedPermissions[key] || false)
                       }
-                    }}
-                    disabled={selectedAdmin?.role.name === 'SUPERADMIN'}
-                  />
-                </div>
-              ))}
+                      onCheckedChange={(checked) => {
+                        if (!isDisabled) {
+                          setEditedPermissions((prev) => ({ ...prev, [key]: checked }));
+                        }
+                      }}
+                      disabled={isDisabled}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 

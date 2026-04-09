@@ -11,6 +11,7 @@ export const CreateStudentSchema = z.object({
   email: z.string().email('Valid email required').optional(),
   classId: z.string().min(1, 'Class ID is required'),
   schoolId: z.string().min(1, 'School selection is required'),
+  locationId: z.string().min(1, 'Location is required'),
   phone: z.string().optional(),
 });
 

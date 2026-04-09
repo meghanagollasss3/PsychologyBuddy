@@ -1,6 +1,25 @@
 import prisma from '@/src/prisma';
 
 export class DatabaseService {
+  static async getRecentSummary(studentId: string) {
+    // Get the most recent summary for this student
+    const summaries = await this.getStudentStructuredSummaries(studentId, 1);
+    return summaries.length > 0 ? summaries[0] : null;
+  }
+
+  static async getStudentChatSessions(studentId: string, limit: number = 10) {
+    return await prisma.chatSession.findMany({
+      where: {
+        user: {
+          studentId: studentId
+        }
+      },
+      orderBy: {
+        startedAt: 'desc'
+      },
+      take: limit,
+    });
+  }
   static async connect() {
     try {
       await prisma.$connect();
@@ -288,6 +307,17 @@ export class DatabaseService {
     await prisma.triggerSelection.delete({
       where: {
         id: selectionId,
+      },
+    });
+  }
+
+  static async getChatMessages(sessionId: string) {
+    return await prisma.chatMessage.findMany({
+      where: {
+        sessionId: sessionId,
+      },
+      orderBy: {
+        createdAt: 'asc',
       },
     });
   }

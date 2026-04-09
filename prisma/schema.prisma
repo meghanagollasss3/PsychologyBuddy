@@ -9,19 +9,20 @@ datasource db {
 
 model User {
   id                     String                           @id @default(uuid())
-  studentId              String?                          @unique
   firstName              String
   lastName               String
   email                  String                           @unique
   phone                  String?
   password               String?
-  roleId                 String
   schoolId               String?
-  classId                String?
-  status                 String                           @default("ACTIVE")
   createdAt              DateTime                         @default(now())
   updatedAt              DateTime                         @updatedAt
   emailVerified          Boolean                          @default(false)
+  classId                String?
+  roleId                 String
+  status                 String                           @default("ACTIVE")
+  studentId              String?                          @unique
+  locationId             String?
   adminNotifications     AdminNotification[]
   adminProfile           AdminProfile?
   artJournals            ArtJournal[]
@@ -48,21 +49,25 @@ model User {
   triggerSelections      TriggerSelection[]
   userBadges             UserBadge[]
   classRef               Class?                           @relation(fields: [classId], references: [id])
+  location               SchoolLocation?                  @relation(fields: [locationId], references: [id])
   role                   Role                             @relation(fields: [roleId], references: [id])
   school                 School?                          @relation(fields: [schoolId], references: [id])
   writingJournals        WritingJournal[]
+  primaryAdminSchools    School[]                         @relation("SchoolPrimaryAdmin")
+  locationAdminAssignments LocationAdminAssignment[]
+  assignedLocations      LocationAdminAssignment[]        @relation("AssignmentAssigner")
 
   @@map("Users")
 }
 
 model StudentProfile {
-  id               String  @id @default(uuid())
-  userId           String  @unique
+  id               String    @id @default(uuid())
+  userId           String    @unique
   profileImage     String?
+  status           String    @default("ACTIVE")
   dateOfBirth      DateTime?
   emergencyContact Json?
-  status           String  @default("ACTIVE")
-  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("StudentProfiles")
 }
@@ -81,33 +86,58 @@ model AdminProfile {
 model School {
   id                     String                           @id @default(uuid())
   name                   String
-  address                String?
   phone                  String?
   email                  String?
+  primaryAdminId         String?
   createdAt              DateTime                         @default(now())
   updatedAt              DateTime                         @updatedAt
+  articles               Article[]
   classes                Class[]
   journalingConfig       JournalingToolConfig?
   meditationResources    Meditation[]
   meditationInstructions MeditationListeningInstruction[]
   musicInstructions      MusicInstruction[]
   musicResources         MusicResource[]
+  locations              SchoolLocation[]
   users                  User[]
-  articles               Article[]
+  primaryAdmin           User?                            @relation("SchoolPrimaryAdmin", fields: [primaryAdminId], references: [id])
 
   @@map("Schools")
 }
 
+model SchoolLocation {
+  id         String   @id @default(uuid())
+  schoolId   String
+  name       String
+  address    String?
+  city       String?
+  state      String?
+  country    String?
+  postalCode String?
+  notes      String?
+  isMain     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  classes    Class[]
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  users      User[]
+  locationAdminAssignments LocationAdminAssignment[]
+
+  @@map("SchoolLocations")
+}
+
 model Class {
-  id        String   @id @default(uuid())
-  name      String
-  grade     Int
-  section   String?
-  schoolId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  users     User[]
+  id         String          @id @default(uuid())
+  name       String
+  grade      Int
+  section    String?
+  schoolId   String
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  locationId String?
+  location   SchoolLocation? @relation(fields: [locationId], references: [id])
+  school     School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  users      User[]
 
   @@map("Classes")
 }
@@ -154,14 +184,28 @@ model AdminPermission {
   @@map("AdminPermissions")
 }
 
+model LocationAdminAssignment {
+  id         String         @id @default(uuid())
+  locationId String
+  adminId    String
+  assignedAt DateTime       @default(now())
+  assignedBy String
+  location   SchoolLocation @relation(fields: [locationId], references: [id], onDelete: Cascade, map: "LocationAdminAssignment_locationId_fkey")
+  admin      User           @relation(fields: [adminId], references: [id], onDelete: Cascade, map: "LocationAdminAssignment_adminId_fkey")
+  assigner   User           @relation("AssignmentAssigner", fields: [assignedBy], references: [id], map: "LocationAdminAssignment_assignedBy_fkey")
+
+  @@unique([locationId, adminId])
+  @@map("LocationAdminAssignments")
+}
+
 model ChatSession {
   id        String        @id @default(uuid())
-  userId    String
   mood      String?
-  triggers  String?
   startedAt DateTime      @default(now())
   endedAt   DateTime?
   isActive  Boolean       @default(true)
+  triggers  String?
+  userId    String
   messages  ChatMessage[]
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   summaries Summary[]
@@ -172,9 +216,9 @@ model ChatSession {
 model ChatMessage {
   id         String      @id @default(uuid())
   sessionId  String
-  senderType SenderType
   content    String
   createdAt  DateTime    @default(now())
+  senderType SenderType
   session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("ChatMessages")
@@ -182,11 +226,11 @@ model ChatMessage {
 
 model MoodCheckin {
   id        String   @id @default(uuid())
-  userId    String
   mood      String
   notes     String?
   date      DateTime @default(now())
   createdAt DateTime @default(now())
+  userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("MoodCheckins")
@@ -194,10 +238,10 @@ model MoodCheckin {
 
 model TriggerSelection {
   id        String   @id @default(uuid())
-  userId    String
   triggers  String[]
   notes     String?
   createdAt DateTime @default(now())
+  userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("TriggerSelections")
@@ -219,17 +263,18 @@ model Summary {
 }
 
 model JournalingToolConfig {
-  id                String  @id @default(uuid())
-  schoolId          String  @unique
-  enableWriting     Boolean @default(true)
-  enableAudio       Boolean @default(true)
-  enableArt         Boolean @default(true)
-  maxAudioDuration  Int     @default(300)
-  autoSaveAudio     Boolean @default(true)
-  enableUndo        Boolean @default(true)
-  enableRedo        Boolean @default(true)
-  enableClearCanvas Boolean @default(true)
-  school            School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id                 String  @id @default(uuid())
+  schoolId           String  @unique
+  enableWriting      Boolean @default(true)
+  enableAudio        Boolean @default(true)
+  enableArt          Boolean @default(true)
+  maxAudioDuration   Int     @default(300)
+  autoSaveAudio      Boolean @default(true)
+  enableUndo         Boolean @default(true)
+  enableRedo         Boolean @default(true)
+  enableClearCanvas  Boolean @default(true)
+  enableColorPalette Boolean @default(true)
+  school             School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@map("JournalingToolConfig")
 }
@@ -303,14 +348,14 @@ model Meditation {
   audioUrl     String?
   videoUrl     String?
   durationSec  Int?
-  instructor   String?
-  type         String                         @default("GUIDED")
   status       ResourceStatus                 @default(DRAFT)
-  schoolId     String?
   createdBy    String
   createdAt    DateTime                       @default(now())
-  updatedAt    DateTime                       @updatedAt
   deletedAt    DateTime?
+  instructor   String?
+  schoolId     String?
+  type         String                         @default("GUIDED")
+  updatedAt    DateTime                       @updatedAt
   admin        User                           @relation("UserMeditations", fields: [createdBy], references: [id])
   school       School?                        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   categories   MeditationMeditationCategory[] @relation("MeditationCategories")
@@ -425,14 +470,14 @@ model Article {
   author             String
   thumbnailUrl       String?
   description        String
-  readTime           Int?
   status             ResourceStatus      @default(DRAFT)
   createdBy          String
-  schoolId           String?
-  averageRating      Float?
-  ratingCount        Int?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  averageRating      Float?
+  ratingCount        Int?
+  readTime           Int?
+  schoolId           String?
   views              Int                 @default(0)
   blocks             ArticleBlock[]
   categories         ArticleCategory[]
@@ -564,8 +609,8 @@ model Streak {
   id         String   @id @default(uuid())
   userId     String   @unique
   count      Int      @default(0)
-  bestStreak Int      @default(0)
   lastActive DateTime @default(now())
+  bestStreak Int      @default(0)
   user       User     @relation(fields: [userId], references: [id])
 
   @@map("Streaks")

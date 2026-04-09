@@ -94,6 +94,32 @@ export const handleError = (error: unknown) => {
 
 
 
+  // Handle Zod validation errors
+
+  if (error && typeof error === 'object' && 'issues' in error) {
+
+    const zodError = error as any;
+
+    const firstError = zodError.issues?.[0];
+
+    if (firstError) {
+
+      return {
+
+        success: false,
+
+        message: firstError.message || 'Validation failed',
+
+        error: firstError.message || 'Validation failed'
+
+      };
+
+    }
+
+  }
+
+
+
   // Return appropriate error response
 
   if (error instanceof Error) {
@@ -104,15 +130,7 @@ export const handleError = (error: unknown) => {
 
       message: error.message,
 
-      error: {
-
-        code: 500,
-
-        type: 'Error',
-
-        details: error
-
-      }
+      error: error.message
 
     };
 
@@ -132,15 +150,7 @@ export const handleError = (error: unknown) => {
 
       message: `Database operation failed: ${prismaError.message}`,
 
-      error: {
-
-        code: prismaError.code || 500,
-
-        type: 'DatabaseError',
-
-        details: prismaError.meta
-
-      }
+      error: `Database operation failed: ${prismaError.message}`
 
     };
 
@@ -156,15 +166,7 @@ export const handleError = (error: unknown) => {
 
     message: error instanceof Error ? error.message : 'Unknown error occurred',
 
-    error: {
-
-      code: 500,
-
-      type: 'Error',
-
-      details: error
-
-    }
+    error: error instanceof Error ? error.message : 'Unknown error occurred'
 
   };
 

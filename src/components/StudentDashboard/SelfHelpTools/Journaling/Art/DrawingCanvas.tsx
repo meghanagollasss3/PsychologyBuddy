@@ -19,6 +19,9 @@ interface DrawingCanvasProps {
 export default function DrawingCanvas({ onSave, loading = false, config }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showColorPicker, setShowColorPicker] = useState(true);
+  
+  // Force enable color palette regardless of config
+  const colorPaletteEnabled = true;
   const [opacity, setOpacity] = useState(100);
   const [currentColor, setCurrentColor] = useState('#1F4B43');
   const [brushSize, setBrushSize] = useState(8);
@@ -280,10 +283,12 @@ const fetchArtJournals = async () => {
               />
             ))}
           </div>
-          {config?.enableColorPalette !== false && (
+          {colorPaletteEnabled && (
             <button 
               onClick={() => setShowColorPicker(!showColorPicker)}
-              className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#1F4B43] flex items-center justify-center text-white hover:opacity-90 transition-opacity"
+              className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white hover:opacity-90 transition-all hover:scale-110 ${showColorPicker ? 'ring-2 ring-offset-2 ring-[#1F4B43]' : ''}`}
+              style={{ backgroundColor: currentColor }}
+              title="Color Palette"
             >
               <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
             </button>
@@ -370,7 +375,7 @@ const fetchArtJournals = async () => {
         </div>
 
         {/* Color Picker Modal */}
-        {showColorPicker && config?.enableColorPalette !== false && (
+        {showColorPicker && colorPaletteEnabled && (
           <div className="absolute top-12 sm:top-16 left-0 sm:left-2 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 sm:p-4 w-[280px] sm:w-[320px] animate-in fade-in zoom-in-95 duration-200">
              <div className="flex justify-between items-center mb-2 sm:mb-3">
                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Color Palette</h4>

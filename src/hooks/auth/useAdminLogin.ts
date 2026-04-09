@@ -38,6 +38,7 @@ export function useAdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
 
@@ -78,7 +79,7 @@ export function useAdminLogin() {
       const data: AdminLoginResponse = await response.json();
 
       if (data.success && data.data?.user) {
-        setSuccess('Login successful! Redirecting...');
+        setSuccess('Login successful!');
         
         // Login user in context with required adminProfile
         const userWithProfile = {
@@ -91,7 +92,7 @@ export function useAdminLogin() {
         const userRole = data.data.user.role.name;
         
         setTimeout(() => {
-          if (userRole === 'SUPERADMIN') {
+          if (userRole === 'SUPERADMIN' || userRole === 'SCHOOL_SUPERADMIN') {
             router.push('/admin');
           } else if (userRole === 'ADMIN') {
             router.push('/admin');
@@ -115,13 +116,19 @@ export function useAdminLogin() {
     setError('Google sign-in is not available. Please use email and password.');
   };
 
+  const togglePassword = () => {
+    setShowPassword(prev => !prev);
+  };
+
   return {
     formData,
     loading,
     error,
     success,
+    showPassword,
     handleChange,
     handleSubmit,
     handleGoogleSignIn,
+    togglePassword,
   };
 }

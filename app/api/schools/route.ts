@@ -112,11 +112,11 @@ export const GET = withPermission({
         return {
           id: school.id,
           name: school.name,
-          location: school.address || 'Unknown Location',
+          location: 'Multiple Locations Available',
           studentCount: school._count.users,
           alertCount,
           checkInsToday,
-          address: school.address,
+          address: '', // No longer available - use locations instead
           phone: school.phone,
           email: school.email,
         };
@@ -174,22 +174,6 @@ export const GET = withPermission({
     return Response.json(response);
   } catch (error) {
     console.error('Get schools error:', error);
-    const errorResponse = handleError(error);
-    return Response.json(errorResponse, { status: errorResponse.error?.code || 500 });
-  }
-});
-
-// DELETE /api/schools/[id] - Delete school (Superadmin only)
-export const DELETE = withPermission({ 
-  module: 'ORGANIZATIONS', 
-  action: 'DELETE' 
-})(async (req: NextRequest, { params }: any) => {
-  try {
-    const { id } = params;
-    const result = await UserService.deleteSchool(id);
-    return Response.json(result);
-  } catch (error) {
-    console.error('Delete school error:', error);
     const errorResponse = handleError(error);
     return Response.json(errorResponse, { status: errorResponse.error?.code || 500 });
   }

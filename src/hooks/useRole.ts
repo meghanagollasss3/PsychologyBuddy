@@ -24,9 +24,10 @@ export function useRole() {
     loading,
     isSuperAdmin: role === 'SUPERADMIN',
     isAdmin: role === 'ADMIN',
+    isSchoolSuperAdmin: role === 'SCHOOL_SUPERADMIN',
     isStudent: role === 'STUDENT',
-    canManageUsers: ['SUPERADMIN'].includes(role || ''),
-    canManageContent: ['SUPERADMIN', 'ADMIN'].includes(role || ''),
+    canManageUsers: ['SUPERADMIN', 'SCHOOL_SUPERADMIN'].includes(role || ''),
+    canManageContent: ['SUPERADMIN', 'ADMIN', 'SCHOOL_SUPERADMIN'].includes(role || ''),
     canViewOnly: ['STUDENT'].includes(role || ''),
   };
 }

@@ -14,7 +14,7 @@ export type ExtendedUpdateStudentData = UpdateStudentData & {
 
 export const StudentRepository = {
   // Create student with profile
-  createStudent: async (data: CreateStudentData & { roleId: string; schoolId: string; studentId: string }) => {
+  createStudent: async (data: CreateStudentData & { roleId: string; schoolId: string; studentId: string; locationId: string }) => {
     return prisma.user.create({
       data: {
         studentId: data.studentId,
@@ -26,6 +26,7 @@ export const StudentRepository = {
         roleId: data.roleId,
         schoolId: data.schoolId,
         classId: data.classId,
+        locationId: data.locationId,
         emailVerified: true,
         studentProfile: {
           create: {
@@ -50,17 +51,22 @@ export const StudentRepository = {
             section: true,
           },
         },
+        location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   },
 
   // Get students by school (Admin only - school-scoped)
-  getStudentsBySchool: async (schoolId?: string, filters?: { search?: string; status?: string; classId?: string }) => {
+  getStudentsBySchool: async (schoolId?: string, filters?: { search?: string; status?: string; classId?: string; locationId?: string; page?: number; limit?: number }) => {
     const whereCondition: any = {
       role: {
         name: 'STUDENT',
       },
-      status: 'ACTIVE' // Only include active users
     };
 
     // Only apply schoolId filter if it's provided
@@ -80,19 +86,34 @@ export const StudentRepository = {
         ];
       }
 
-      // Filter by status - this applies to studentProfile status, not user status
+      // Filter by status - use User.status, not studentProfile.status
       if (filters.status && filters.status !== 'all') {
-        whereCondition.studentProfile = {
-          ...whereCondition.studentProfile,
-          status: filters.status,
-        };
+        whereCondition.status = filters.status;
       }
 
       // Filter by class
       if (filters.classId && filters.classId !== 'all') {
         whereCondition.classId = filters.classId;
       }
+
+      // Filter by location
+      if (filters.locationId && filters.locationId !== 'all') {
+        whereCondition.locationId = filters.locationId;
+      }
+    } else {
+      // By default, only show active students when no filters are provided
+      whereCondition.status = 'ACTIVE';
     }
+
+    // Get pagination parameters
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 5;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination
+    const total = await prisma.user.count({
+      where: whereCondition,
+    });
 
     const students = await prisma.user.findMany({
       where: whereCondition,
@@ -129,6 +150,8 @@ export const StudentRepository = {
         { firstName: 'asc' },
         { lastName: 'asc' },
       ],
+      skip,
+      take: limit,
     });
 
     console.log('Query executed, found students:', students.length);
@@ -146,7 +169,16 @@ export const StudentRepository = {
     })));
 
     console.log('Student repository result:', students.length, 'students found');
-    return students;
+    
+    return {
+      students,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
 
   // Get student by ID
@@ -296,11 +328,7 @@ export const StudentRepository = {
     return prisma.user.update({
       where: { id },
       data: {
-        studentProfile: {
-          update: {
-            status: status as any,
-          },
-        },
+        status: status,
       },
       include: {
         role: true,
@@ -323,17 +351,11 @@ export const StudentRepository = {
     });
   },
 
-  // Delete student (soft delete by setting status to INACTIVE)
+  // Delete student (hard delete - completely remove from database)
   deleteStudent: async (id: string) => {
-    return prisma.user.update({
+    // First get the student data to return before deletion
+    const student = await prisma.user.findUnique({
       where: { id },
-      data: {
-        studentProfile: {
-          update: {
-            status: 'INACTIVE',
-          },
-        },
-      },
       include: {
         role: true,
         studentProfile: true,
@@ -347,12 +369,21 @@ export const StudentRepository = {
           select: {
             id: true,
             name: true,
-            grade: true,
-            section: true,
           },
         },
       },
     });
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
+    // Perform hard delete
+    await prisma.user.delete({
+      where: { id },
+    });
+
+    return student;
   },
 
   // Check if student ID exists

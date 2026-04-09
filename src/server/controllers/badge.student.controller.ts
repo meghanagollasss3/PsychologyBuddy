@@ -28,6 +28,7 @@ export class BadgeStudentController {
         iconBg: "bg-amber-50",
         name: badge.badge.name,
         description: badge.badge.description,
+        requirement:badge.badge.requirement,
         date: new Date(badge.earnedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       }));
 
@@ -37,6 +38,7 @@ export class BadgeStudentController {
         iconBg: "bg-rose-50",
         name: badge.badge.name,
         description: badge.badge.description,
+        requirement:badge.badge.requirement,
         progress: badge.progress,
         color: "bg-blue-400",
       }));

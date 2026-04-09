@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Save, Trash2, PenLine, Lightbulb } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 interface JournalEditorProps {
   title: string;
@@ -24,7 +25,27 @@ export default function JournalEditor({
   onClear, 
   loading = false 
 }: JournalEditorProps) {
+  const { toast } = useToast();
   console.log('JournalEditor - prompt:', prompt);
+  
+  const handleSave = () => {
+    if (!content.trim()) {
+      toast({
+        title: "Please write something before saving",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Call the original save function
+    onSave();
+    
+    // Show success toast (assuming save was successful)
+    toast({
+      title: "Journal entry saved successfully!",
+      description: "Your thoughts have been safely recorded."
+    });
+  };
   
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -114,7 +135,7 @@ export default function JournalEditor({
       {/* Action Buttons */}
       <div className="flex items-center gap-3 sm:gap-4">
         <button 
-          onClick={onSave}
+          onClick={handleSave}
           disabled={loading}
           className="flex-1 h-12 sm:h-[67px] bg-gradient-to-l from-[#67CCFF] to-[#1B9EE0] hover:bg-cyan-600 disabled:bg-slate-300 text-white rounded-[24px] font-base text-base sm:text-lg shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
         >

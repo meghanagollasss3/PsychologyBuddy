@@ -81,7 +81,7 @@ export function useStudentLogin() {
       const data: StudentLoginResponse = await response.json();
 
       if (data.success && data.data?.user) {
-        setSuccess('Login successful! Redirecting to student portal...');
+        setSuccess('Login successful!');
         
         // Login user in context with required adminProfile (empty for students)
         const userWithProfile = {

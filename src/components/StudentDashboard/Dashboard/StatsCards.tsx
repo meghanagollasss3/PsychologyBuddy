@@ -73,7 +73,7 @@ const StatCard = React.memo(function StatCard({
 }) {
   return (
     <Card 
-      className={`relative w-[293px] h-auto overflow-hidden rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] ${config.className} ${
+      className={`relative w-full max-w-[293px] min-h-[180px] sm:min-h-[200px] md:min-h-[220px] overflow-hidden rounded-[16px] sm:rounded-[20px] xl:rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] ${config.className} ${
         onClick ? 'cursor-pointer hover:shadow-lg transition-shadow duration-200' : ''
       }`}
       onClick={onClick}
@@ -96,13 +96,13 @@ const StatCard = React.memo(function StatCard({
         />
       </svg>
 
-      <CardContent className="relative p-6 flex flex-col gap-4">
+      <CardContent className="relative p-4 sm:p-5 md:p-6 flex flex-col gap-3 sm:gap-4">
         {/* Image */}
         <div>
           <img 
             src={config.image} 
             alt={config.label}
-            className="h-[56px] w-[55px] "
+            className="h-[40px] w-[40px] sm:h-[48px] sm:w-[48px] md:h-[56px] md:w-[55px]"
             onError={(e) => {
               // Fallback to a placeholder if image fails to load
               const target = e.target as HTMLImageElement;
@@ -115,15 +115,15 @@ const StatCard = React.memo(function StatCard({
         {loading ? (
           <Skeleton className="h-10 w-20 rounded-md" />
         ) : (
-          <h2 className="text-[37px] -mt-4 font-bold text-[#2F3D43] z-10">
+          <h2 className="text-[28px] sm:text-[32px] md:text-[35px] xl:text-[37px] -mt-3 sm:-mt-4 font-bold text-[#2F3D43] z-10">
             {value.toString().padStart(2, "0")}
           </h2>
         )}
 
         {/* Labels */}
         <div className="z-10">
-          <p className="text-[16px] -mt-6 font-medium text-[#686D70]">{config.sublabel}</p>
-          <p className="text-[14px] mt-2 text-[#767676] -mt-1">{config.label}</p>
+          <p className="text-[14px] sm:text-[15px] md:text-[16px] -mt-4 sm:-mt-6 font-medium text-[#686D70]">{config.sublabel}</p>
+          <p className="text-[12px] sm:text-[13px] md:text-[14px] mt-1 sm:mt-2 text-[#767676]">{config.label}</p>
         </div>
       </CardContent>
     </Card>
@@ -184,7 +184,7 @@ export default function StatsCards() {
 
   /* --- Render --- */
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6 w-full sm:pl-7">
       {statsConfig.map((config, idx) => (
         <StatCard
           key={config.key}

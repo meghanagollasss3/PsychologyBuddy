@@ -46,8 +46,8 @@ function getMoodEmoji(score: number) {
   const map: any = {
     1: { img: "/Summary/Angry.svg" },
     2: { img: "/Summary/Sad.svg" },
-    3: { img: "/Summary/Okay.svg" },
-    4: { img: "/Summary/Worry.svg" },
+    3: { img: "/Summary/Worry.svg" },
+    4: { img: "/Summary/Okay.svg" },
     5: { img: "/Summary/Happy1.svg" },
   };
   return map[score] || map[3];
@@ -119,6 +119,23 @@ export default function WeeklyMoodTrends() {
   const [positions, setPositions] = useState<
     { x: number; y: number; img: string; key: string }[]
   >([]);
+  const [barThickness, setBarThickness] = useState(40);
+
+  // Update bar thickness based on screen size
+  useEffect(() => {
+    const updateThickness = () => {
+      const width = window.innerWidth;
+      const thickness = width < 640 ? 30 : width < 1024 ? 35 : 45;
+      setBarThickness(thickness);
+    };
+
+    updateThickness();
+    window.addEventListener('resize', updateThickness);
+    
+    return () => {
+      window.removeEventListener('resize', updateThickness);
+    };
+  }, []);
 
   /* Query */
   const { data, isLoading, isError } = useQuery({
@@ -175,15 +192,16 @@ export default function WeeklyMoodTrends() {
           data: data?.weeklyData.map((d) => d.moodScore) || Array(7).fill(0),
           hasDataFlags: data?.weeklyData.map((d) => d.hasData) || Array(7).fill(false),
           borderRadius: 24,
+
           borderWidth:2,
           borderColor:"#ffffff",
           
-          barThickness: 50,
+          barThickness: barThickness,
           borderSkipped: "bottom" as const,
         } as any,
       ],
     }),
-    [data]
+    [data, barThickness]
   );
 
   /* -------------------------
@@ -193,11 +211,9 @@ export default function WeeklyMoodTrends() {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
-
-      
+      resizeDelay: 0,
 
       // parsing disabled - not needed for this chart
-
       animation: {
         onComplete: updateEmojiPositions,
       },
@@ -214,9 +230,12 @@ export default function WeeklyMoodTrends() {
           type: 'category' as const,
           offset: true, // prevents overlap with bars
           ticks: {
-            padding: 12, // 🔥 FIX — Push labels DOWN
-            font: { size: 14, weight: "normal" as const },
+            padding: 6,
+            font: { size: 10, family: 'Inter' },
             color: "#585858",
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
           },
           grid: { display: false },
           border: { display: false },
@@ -228,9 +247,16 @@ export default function WeeklyMoodTrends() {
         title: { display: false },
         subtitle: { display: false },
         datalabels: { display: false },
+        tooltip: {
+          enabled: false,
+        },
+      },
+      // Ensure consistent sizing
+      onResize: (chart: any) => {
+        chart.update('none');
       },
     } as any), // Type assertion to bypass strict Chart.js typing
-    []
+    [updateEmojiPositions]
   );
 
   /* -------------------------
@@ -238,7 +264,7 @@ export default function WeeklyMoodTrends() {
   ------------------------- */
   if (isLoading) {
     return (
-      <div className="rounded-3xl p-6 bg-white shadow-sm border h-[280px] animate-pulse">
+      <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-6 bg-white shadow-sm border h-[240px] sm:h-[280px] animate-pulse">
         <div className="h-4 w-32 bg-gray-200 rounded mb-4" />
         <div className="h-[200px] bg-gray-100 rounded-xl" />
       </div>
@@ -250,7 +276,7 @@ export default function WeeklyMoodTrends() {
   ------------------------- */
   if (isError || !data) {
     return (
-      <div className="rounded-3xl p-6 bg-white shadow-sm border h-[280px] flex items-center justify-center">
+      <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-6 bg-white shadow-sm border h-[240px] sm:h-[280px] flex items-center justify-center">
         <p className="text-sm text-gray-500">Failed to load mood trends</p>
       </div>
     );
@@ -260,21 +286,29 @@ export default function WeeklyMoodTrends() {
      MAIN UI
   ------------------------- */
   return (
-    <div className="relative rounded-[15px] p-6 bg-white drop-shadow-sm drop-shadow-[#65656514] shadow-inner-xl border border-[#ffffff] h-auto w-auto overflow-hidden">
+    <div className="relative rounded-[12px] sm:rounded-[15px] p-4 sm:p-6 bg-white drop-shadow-sm drop-shadow-[#65656514] shadow-inner-xl border border-[#ffffff] h-auto w-full max-w-[600px] mx-auto overflow-hidden">
       {/* Header */}
-      <div className="flex mb-3">
-        {/* <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-md"> */}
-        <Smile className="h-[20px] w-[20px] mt-1.5 mr-1 text-[#1C76DC]" />
-        <span className="text-[20px] font-semibold text-[#2F3D43]">
-Weekly Mood Trends</span>
-      </div>
-        <div className="text-xs text-right -mt-8 mb-6 text-gray-400">
+      <div className="flex justify-between items-start mb-3 sm:mb-4">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <Smile className="h-[16px] w-[16px] sm:h-[20px] sm:w-[20px] text-[#1C76DC]" />
+          <span className="text-[16px] sm:text-[18px] md:text-[20px] font-semibold text-[#2F3D43]">
+            Weekly Mood Trends
+          </span>
+        </div>
+        <div className="text-[10px] sm:text-xs text-gray-400">
           {data.totalCheckins} check-ins • Avg: {data.averageMood.toFixed(1)}/5
         </div>
+      </div>
 
       {/* Chart + emoji */}
-      <div className="relative h-[285px]">
-        <Bar ref={chartRef} data={chartData} options={options} plugins={[blueGradientPlugin]} />
+      <div className="relative h-[180px] sm:h-[220px] md:h-[250px] lg:h-[285px]">
+        <Bar 
+          key={`mood-chart-${data?.weeklyData.length || 0}`}
+          ref={chartRef} 
+          data={chartData} 
+          options={options} 
+          plugins={[blueGradientPlugin]} 
+        />
 
         {/* Emoji overlay */}
         <div className="absolute inset-0 pointer-events-none">
@@ -282,7 +316,7 @@ Weekly Mood Trends</span>
             <img
               key={p.key}
               src={p.img}
-              className="absolute w-[32px] h-[32px] select-none"
+              className="absolute w-[20px] h-[20px] sm:w-[24px] sm:h-[24px] md:w-[28px] md:h-[28px] lg:w-[32px] lg:h-[32px] select-none"
               style={{
                 left: p.x,
                 top: p.y,
