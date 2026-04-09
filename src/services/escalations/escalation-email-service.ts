@@ -42,7 +42,7 @@ export class EscalationEmailService {
    */
   private static async getAdminRecipients(studentUserId: string): Promise<EmailRecipient[]> {
     try {
-      // Get the student's school information
+      // Get student's school information
       const student = await prisma.user.findUnique({
         where: { id: studentUserId },
         select: {
@@ -94,7 +94,7 @@ export class EscalationEmailService {
           schoolName: student.school?.name || 'Unknown School'
         })))
 
-        // 2. Get Primary Admin of the school
+        // 2. Get Primary Admin of school
         if (student.school?.primaryAdminId) {
           const primaryAdmin = await prisma.user.findUnique({
             where: { id: student.school.primaryAdminId },
@@ -221,14 +221,12 @@ export class EscalationEmailService {
         })))
       }
 
-      // Remove duplicates and filter out invalid emails
+      // Remove duplicates
       const uniqueRecipients = recipients.filter((recipient, index, self) =>
-        index === self.findIndex(r => r.id === recipient.id) && 
-        recipient.email && 
-        recipient.email.includes('@')
+        index === self.findIndex((r) => r.id === recipient.id)
       )
 
-      console.log(`[EscalationEmail] Found ${uniqueRecipients.length} admin recipients for escalation`)
+      console.log(`[EscalationEmail] Found ${uniqueRecipients.length} admin recipients`)
       return uniqueRecipients
 
     } catch (error) {
@@ -238,108 +236,310 @@ export class EscalationEmailService {
   }
 
   /**
+   * Generates modern HTML email template for escalation alert
+   */
+  private static generateHtmlTemplate(data: EmailNotificationData): string {
+    const severityColors = {
+      critical: '#dc2626',
+      high: '#ea580c', 
+      medium: '#f59e0b',
+      low: '#10b981'
+    }
+
+    const severityColor = severityColors[data.level as keyof typeof severityColors] || '#6b7280'
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Escalation Alert - ${data.studentName}</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.5;
+            color: #374151;
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+          }
+          
+          .container {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+          }
+          
+          .header {
+            background: ${severityColor};
+            color: white;
+            padding: 24px 32px;
+            text-align: center;
+          }
+          
+          .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+          }
+          
+          .header p {
+            font-size: 14px;
+            opacity: 0.9;
+          }
+          
+          .content {
+            padding: 32px;
+          }
+          
+          .section {
+            margin-bottom: 28px;
+          }
+          
+          .section:last-child {
+            margin-bottom: 0;
+          }
+          
+          .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+          }
+          
+          .info-item {
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .info-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 4px;
+            font-weight: 500;
+          }
+          
+          .info-value {
+            font-size: 14px;
+            color: #111827;
+            font-weight: 400;
+          }
+          
+          .severity-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: ${severityColor};
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-radius: 4px;
+          }
+          
+          .context-box {
+            background: #f9fafb;
+            border-left: 3px solid ${severityColor};
+            padding: 16px;
+            font-style: italic;
+            color: #4b5563;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-top: 12px;
+          }
+          
+          .recommendation-box {
+            background: #f0fdf4;
+            border-left: 3px solid #10b981;
+            padding: 16px;
+            color: #065f46;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-top: 12px;
+          }
+          
+          .action-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+          }
+          
+          .action-box h3 {
+            color: #dc2626;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+          }
+          
+          .action-box p {
+            color: #991b1b;
+            font-size: 14px;
+          }
+          
+          .phrases {
+            margin-top: 12px;
+          }
+          
+          .phrase {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 500;
+            border-radius: 4px;
+            margin: 2px 4px 2px 0;
+          }
+          
+          .footer {
+            background: #f9fafb;
+            padding: 20px 32px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #6b7280;
+          }
+          
+          @media (max-width: 600px) {
+            body {
+              margin: 20px;
+            }
+            
+            .content {
+              padding: 24px;
+            }
+            
+            .info-grid {
+              grid-template-columns: 1fr;
+              gap: 12px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>ESCALATION ALERT</h1>
+            <p>Immediate attention required</p>
+          </div>
+          
+          <div class="content">
+            <div class="section">
+              <div class="section-title">Student Information</div>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Name</span>
+                  <span class="info-value">${data.studentName}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Student ID</span>
+                  <span class="info-value">${data.studentId}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Class</span>
+                  <span class="info-value">${data.studentClass || 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">School</span>
+                  <span class="info-value">${data.schoolName || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">Alert Details</div>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Category</span>
+                  <span class="info-value">${data.category.replace('_', ' ').toUpperCase()}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Severity</span>
+                  <span class="severity-badge">${data.level.toUpperCase()}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Score</span>
+                  <span class="info-value">${data.severity}/10</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Detected</span>
+                  <span class="info-value">${new Date(data.messageTimestamp).toLocaleString()}</span>
+                </div>
+              </div>
+              
+              ${data.detectedPhrases && data.detectedPhrases.length > 0 ? `
+              <div class="phrases">
+                <span class="info-label">Key Indicators</span>
+                <div style="margin-top: 8px;">
+                  ${data.detectedPhrases.map(phrase => `<span class="phrase">${phrase}</span>`).join('')}
+                </div>
+              </div>
+              ` : ''}
+            </div>
+            
+            ${data.context ? `
+            <div class="section">
+              <div class="section-title">Context</div>
+              <div class="context-box">
+                "${data.context}"
+              </div>
+            </div>
+            ` : ''}
+            
+            ${data.recommendation ? `
+            <div class="section">
+              <div class="section-title">Recommendation</div>
+              <div class="recommendation-box">
+                ${data.recommendation}
+              </div>
+            </div>
+            ` : ''}
+            
+            ${data.requiresImmediateAction ? `
+            <div class="action-box">
+              <h3>Action Required</h3>
+              <p>Please check your admin dashboard immediately and take appropriate action.</p>
+            </div>
+            ` : ''}
+          </div>
+          
+          <div class="footer">
+            <p>Alert ID: ${data.alertId} | Generated: ${new Date().toLocaleString()}</p>
+            <p>This is an automated alert from Psychology Buddy.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  }
+
+  /**
    * Generates email template for escalation alert
    */
   public static generateEmailTemplate(data: EmailNotificationData): EmailTemplate {
-    const urgencyLevel = data.requiresImmediateAction ? 'URGENT - ' : ''
-    const severityColor = data.level === 'critical' ? '#dc2626' : 
-                         data.level === 'high' ? '#ea580c' : 
-                         data.level === 'medium' ? '#ca8a04' : '#65a30d'
-
-    const subject = `${urgencyLevel}Escalation Alert: ${data.category.replace('_', ' ').toUpperCase()} - ${data.studentName}`
-
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Escalation Alert</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #f8fafc; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
-        .alert-level { display: inline-block; padding: 6px 12px; border-radius: 4px; color: white; font-weight: bold; margin: 10px 0; }
-        .content { background: white; padding: 20px; border: 1px solid #e5e7eb; }
-        .student-info { background: #f1f5f9; padding: 15px; border-radius: 6px; margin: 15px 0; }
-        .alert-details { margin: 20px 0; }
-        .footer { background: #f8fafc; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #6b7280; }
-        .urgent { color: #dc2626; font-weight: bold; }
-        .action-required { background: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 6px; margin: 15px 0; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Psychology Buddy - Escalation Alert</h1>
-            <div class="alert-level" style="background-color: ${severityColor};">
-                ${data.level.toUpperCase()} SEVERITY
-            </div>
-            ${data.requiresImmediateAction ? '<p class="urgent">IMMEDIATE ATTENTION REQUIRED</p>' : ''}
-        </div>
-
-        <div class="content">
-            <h2>Student Information</h2>
-            <div class="student-info">
-                <p><strong>Name:</strong> ${data.studentName}</p>
-                <p><strong>Class:</strong> ${data.studentClass || 'Not assigned'}</p>
-                <p><strong>Student ID:</strong> ${data.studentId}</p>
-                ${data.schoolName ? `<p><strong>School:</strong> ${data.schoolName}</p>` : ''}
-            </div>
-
-            <h2>Alert Details</h2>
-            <div class="alert-details">
-                <p><strong>Category:</strong> ${data.category.replace('_', ' ').toUpperCase()}</p>
-                <p><strong>Severity Level:</strong> ${data.level.toUpperCase()}</p>
-                <p><strong>Detection Method:</strong> ${data.detectionMethod}</p>
-                <p><strong>Detected:</strong> ${new Date(data.messageTimestamp).toLocaleString()}</p>
-                <p><strong>Description:</strong> ${data.description}</p>
-                
-                ${data.detectedPhrases.length > 0 ? `
-                <p><strong>Key Indicators:</strong></p>
-                <ul>
-                    ${data.detectedPhrases.map(phrase => `<li>${phrase}</li>`).join('')}
-                </ul>
-                ` : ''}
-                
-                ${data.context ? `
-                <p><strong>Context:</strong></p>
-                <p style="background: #f9fafb; padding: 10px; border-radius: 4px; font-style: italic;">
-                    ${data.context}
-                </p>
-                ` : ''}
-                
-                ${data.recommendation ? `
-                <p><strong>Recommendation:</strong></p>
-                <p style="background: #ecfdf5; padding: 10px; border-radius: 4px;">
-                    ${data.recommendation}
-                </p>
-                ` : ''}
-            </div>
-
-            ${data.requiresImmediateAction ? `
-            <div class="action-required">
-                <h3 style="color: #dc2626; margin-top: 0;">Action Required</h3>
-                <p>This escalation requires immediate attention. Please log in to the Psychology Buddy admin panel to review and take appropriate action.</p>
-            </div>
-            ` : ''}
-
-            <div style="text-align: center; margin: 20px 0;">
-                <a href="#" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                    View Alert in Admin Panel
-                </a>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p>This is an automated alert from the Psychology Buddy system.</p>
-            <p>If you believe this is an error or need assistance, please contact your system administrator.</p>
-            <p>Alert ID: ${data.alertId}</p>
-        </div>
-    </div>
-</body>
-</html>
-    `
+    const htmlBody = this.generateHtmlTemplate(data)
+    
+    const subject = `🚨 ${data.level.toUpperCase()} ESCALATION: ${data.category.replace('_', ' ').toUpperCase()} - ${data.studentName}`
 
     const textBody = `
 ESCALATION ALERT - ${data.level.toUpperCase()}
@@ -358,13 +558,9 @@ Alert Details:
 - Description: ${data.description}
 
 ${data.detectedPhrases.length > 0 ? `Key Indicators:\n${data.detectedPhrases.map(phrase => `- ${phrase}`).join('\n')}\n` : ''}
-
 ${data.context ? `Context:\n${data.context}\n` : ''}
-
 ${data.recommendation ? `Recommendation:\n${data.recommendation}\n` : ''}
-
 ${data.requiresImmediateAction ? 'IMMEDIATE ATTENTION REQUIRED - Please log in to the admin panel to review this alert.' : ''}
-
 Alert ID: ${data.alertId}
 
 This is an automated alert from the Psychology Buddy system.

@@ -294,6 +294,10 @@ Generate the summary:`;
       // Create admin notifications
       await this.createAdminNotifications(alert.id, detection)
 
+      // Send email notifications to admins
+      const { EscalationEmailService } = await import('./escalation-email-service')
+      await EscalationEmailService.sendEscalationEmails(alert.id)
+
       return {
         id: alert.id,
         studentId,
@@ -418,6 +422,10 @@ Generate the summary:`;
 
       // Create admin notifications
       await this.createAdminNotifications(alert.id, detection)
+
+      // Send email notifications to admins
+      const { EscalationEmailService } = await import('./escalation-email-service')
+      await EscalationEmailService.sendEscalationEmails(alert.id)
 
       return {
         id: alert.id,
