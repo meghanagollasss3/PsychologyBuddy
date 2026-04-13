@@ -4,6 +4,8 @@ import { SessionUtil } from '@/src/utils/session-server.util';
 import { ApiResponse } from '@/src/utils/api-response';
 import { AuthError } from '@/src/utils/errors';
 import { StreakService } from '../services/streak.service';
+import { otpService } from '@/src/services/otp/otp-service';
+import { getSMSService } from '@/src/services/otp/sms-service';
 
 export class AuthService {
   // Student login
@@ -155,6 +157,82 @@ export class AuthService {
     try {
       await AuthRepository.deleteExpiredSessions();
       return ApiResponse.success(null, 'Expired sessions cleaned');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Send OTP to admin phone number
+  static async sendOTPToAdmin(phoneNumber: string) {
+    try {
+      // Format phone number for consistency
+      const smsService = getSMSService();
+      const formattedPhone = smsService.formatPhoneNumber(phoneNumber);
+      
+      // Find admin by phone number (excluding SUPERADMIN)
+      const admin = await AuthRepository.findAdminByPhone(formattedPhone);
+      
+      if (!admin) {
+        throw AuthError.invalidCredentials('No admin found with this phone number');
+      }
+
+      // Send OTP
+      const otpResult = await otpService.sendOTP(formattedPhone);
+      
+      if (!otpResult.success) {
+        throw AuthError.internalError(otpResult.error || 'Failed to send OTP');
+      }
+
+      return ApiResponse.success({
+        adminId: admin.id,
+        adminName: `${admin.firstName} ${admin.lastName}`,
+        role: admin.role.name,
+      }, 'OTP sent successfully');
+
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Verify OTP and login admin
+  static async verifyOTPAndLogin(phoneNumber: string, otp: string) {
+    try {
+      // Format phone number for consistency
+      const smsService = getSMSService();
+      const formattedPhone = smsService.formatPhoneNumber(phoneNumber);
+      
+      // Verify OTP first
+      const otpResult = await otpService.verifyOTP(formattedPhone, otp);
+      
+      if (!otpResult.success) {
+        throw AuthError.invalidCredentials(otpResult.error || 'Invalid OTP');
+      }
+
+      // Find admin by phone number
+      const admin = await AuthRepository.findAdminByPhone(formattedPhone);
+      
+      if (!admin) {
+        throw AuthError.invalidCredentials('Admin not found');
+      }
+
+      // Create session
+      const sessionId = SessionUtil.generateSessionId();
+      const expiresAt = SessionUtil.getExpirationTime();
+      
+      await AuthRepository.createSession(sessionId, admin.id, admin.roleId, expiresAt);
+
+      // Consume the OTP after successful login
+      otpService.consumeOTP(phoneNumber);
+
+      // Return user data without sensitive info
+      const { password: _, ...userWithoutPassword } = admin;
+      
+      return ApiResponse.success({
+        user: userWithoutPassword,
+        sessionId,
+        expiresAt,
+      }, 'Login successful');
+
     } catch (error) {
       throw error;
     }

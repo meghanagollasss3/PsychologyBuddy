@@ -242,6 +242,118 @@ export class AuthController {
 
   }
 
+
+
+  // --------------------------------------------------
+
+  // POST /auth/send-otp
+
+  // --------------------------------------------------
+
+  async sendOTP(req: NextRequest) {
+
+    try {
+
+      const body = await req.json();
+
+      const { phoneNumber } = body;
+
+
+
+      if (!phoneNumber) {
+
+        const errorResponse = ApiResponse.error('Phone number is required', 400);
+
+        return NextResponse.json(errorResponse, { status: 400 });
+
+      }
+
+
+
+      const result = await AuthService.sendOTPToAdmin(phoneNumber);
+
+
+
+      return NextResponse.json(result);
+
+    } catch (err) {
+
+      const errorResponse = handleError(err);
+
+      return NextResponse.json(errorResponse, { status: errorResponse.error?.code || 500 });
+
+    }
+
+  }
+
+
+
+  // --------------------------------------------------
+
+  // POST /auth/verify-otp
+
+  // --------------------------------------------------
+
+  async verifyOTP(req: NextRequest) {
+
+    try {
+
+      const body = await req.json();
+
+      const { phoneNumber, otp } = body;
+
+
+
+      if (!phoneNumber || !otp) {
+
+        const errorResponse = ApiResponse.error('Phone number and OTP are required', 400);
+
+        return NextResponse.json(errorResponse, { status: 400 });
+
+      }
+
+
+
+      const result = await AuthService.verifyOTPAndLogin(phoneNumber, otp);
+
+
+
+      // Set session cookie for successful OTP login
+
+      const response = NextResponse.json(result);
+
+      if (result.data?.sessionId) {
+
+        response.cookies.set('sessionId', result.data.sessionId, {
+
+          httpOnly: true,
+
+          secure: process.env.NODE_ENV === 'production',
+
+          sameSite: 'lax',
+
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+
+          path: '/',
+
+        });
+
+      }
+
+
+
+      return response;
+
+    } catch (err) {
+
+      const errorResponse = handleError(err);
+
+      return NextResponse.json(errorResponse, { status: errorResponse.error?.code || 500 });
+
+    }
+
+  }
+
 }
 
 

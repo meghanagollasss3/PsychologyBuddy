@@ -76,6 +76,14 @@ export class AuthError extends AppError {
 
   }
 
+
+
+  static internalError(message: string = 'Internal server error') {
+
+    return new AuthError(message, 500);
+
+  }
+
 }
 
 

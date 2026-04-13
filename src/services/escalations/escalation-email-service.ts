@@ -42,7 +42,7 @@ export class EscalationEmailService {
    */
   private static async getAdminRecipients(studentUserId: string): Promise<EmailRecipient[]> {
     try {
-      // Get student's school information
+      // Get the student's school information
       const student = await prisma.user.findUnique({
         where: { id: studentUserId },
         select: {
@@ -94,7 +94,7 @@ export class EscalationEmailService {
           schoolName: student.school?.name || 'Unknown School'
         })))
 
-        // 2. Get Primary Admin of school
+        // 2. Get Primary Admin of the school
         if (student.school?.primaryAdminId) {
           const primaryAdmin = await prisma.user.findUnique({
             where: { id: student.school.primaryAdminId },
@@ -221,12 +221,14 @@ export class EscalationEmailService {
         })))
       }
 
-      // Remove duplicates
+      // Remove duplicates and filter out invalid emails
       const uniqueRecipients = recipients.filter((recipient, index, self) =>
-        index === self.findIndex((r) => r.id === recipient.id)
+        index === self.findIndex(r => r.id === recipient.id) && 
+        recipient.email && 
+        recipient.email.includes('@')
       )
 
-      console.log(`[EscalationEmail] Found ${uniqueRecipients.length} admin recipients`)
+      console.log(`[EscalationEmail] Found ${uniqueRecipients.length} admin recipients for escalation`)
       return uniqueRecipients
 
     } catch (error) {
@@ -236,310 +238,150 @@ export class EscalationEmailService {
   }
 
   /**
-   * Generates modern HTML email template for escalation alert
+   * Generates email template for escalation alert
    */
-  private static generateHtmlTemplate(data: EmailNotificationData): string {
+  public static generateEmailTemplate(data: EmailNotificationData): EmailTemplate {
     const severityColors = {
-      critical: '#dc2626',
-      high: '#ea580c', 
-      medium: '#f59e0b',
-      low: '#10b981'
+      low: '#10b981',      // green
+      medium: '#f59e0b',    // amber  
+      high: '#ef4444',       // red
+      critical: '#dc2626'     // dark red
     }
 
-    const severityColor = severityColors[data.level as keyof typeof severityColors] || '#6b7280'
+    const categoryIcons = {
+      self_harm: '⚠️',
+      violence: '🔫',
+      abuse: '🛡️',
+      substance_abuse: '💊',
+      mental_health_crisis: '🧠',
+      behavioral_concern: '📊',
+      check_in_missed: '📅',
+      mood_trend_decline: '📉',
+      other: '⚡'
+    }
 
-    return `
+    const urgencyBadge = data.requiresImmediateAction 
+      ? `<div style="display: inline-block; background: linear-gradient(135deg, #dc2626, #ef4444); color: white; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+          🚨 Immediate Action Required
+        </div>`
+      : `<div style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">
+          📋 Attention Required
+        </div>`
+
+    const subject = `${categoryIcons[data.category as keyof typeof categoryIcons]} ${data.level.toUpperCase()} ESCALATION: ${data.category.replace('_', ' ').toUpperCase()} - ${data.studentName}`
+
+    const htmlBody = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Escalation Alert - ${data.studentName}</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.5;
-            color: #374151;
-            max-width: 600px;
-            margin: 40px auto;
-            background: #ffffff;
-          }
-          
-          .container {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            overflow: hidden;
-          }
-          
-          .header {
-            background: ${severityColor};
-            color: white;
-            padding: 24px 32px;
-            text-align: center;
-          }
-          
-          .header h1 {
-            font-size: 20px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-          }
-          
-          .header p {
-            font-size: 14px;
-            opacity: 0.9;
-          }
-          
-          .content {
-            padding: 32px;
-          }
-          
-          .section {
-            margin-bottom: 28px;
-          }
-          
-          .section:last-child {
-            margin-bottom: 0;
-          }
-          
-          .section-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #e5e7eb;
-          }
-          
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-          }
-          
-          .info-item {
-            display: flex;
-            flex-direction: column;
-          }
-          
-          .info-label {
-            font-size: 12px;
-            color: #6b7280;
-            margin-bottom: 4px;
-            font-weight: 500;
-          }
-          
-          .info-value {
-            font-size: 14px;
-            color: #111827;
-            font-weight: 400;
-          }
-          
-          .severity-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            background: ${severityColor};
-            color: white;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-radius: 4px;
-          }
-          
-          .context-box {
-            background: #f9fafb;
-            border-left: 3px solid ${severityColor};
-            padding: 16px;
-            font-style: italic;
-            color: #4b5563;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-top: 12px;
-          }
-          
-          .recommendation-box {
-            background: #f0fdf4;
-            border-left: 3px solid #10b981;
-            padding: 16px;
-            color: #065f46;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-top: 12px;
-          }
-          
-          .action-box {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            padding: 20px;
-            text-align: center;
-            margin-top: 20px;
-          }
-          
-          .action-box h3 {
-            color: #dc2626;
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-          }
-          
-          .action-box p {
-            color: #991b1b;
-            font-size: 14px;
-          }
-          
-          .phrases {
-            margin-top: 12px;
-          }
-          
-          .phrase {
-            display: inline-block;
-            background: #fef3c7;
-            color: #92400e;
-            padding: 3px 8px;
-            font-size: 11px;
-            font-weight: 500;
-            border-radius: 4px;
-            margin: 2px 4px 2px 0;
-          }
-          
-          .footer {
-            background: #f9fafb;
-            padding: 20px 32px;
-            text-align: center;
-            border-top: 1px solid #e5e7eb;
-            font-size: 12px;
-            color: #6b7280;
-          }
-          
-          @media (max-width: 600px) {
-            body {
-              margin: 20px;
-            }
-            
-            .content {
-              padding: 24px;
-            }
-            
-            .info-grid {
-              grid-template-columns: 1fr;
-              gap: 12px;
-            }
-          }
-        </style>
+        <title>Escalation Alert</title>
       </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>ESCALATION ALERT</h1>
-            <p>Immediate attention required</p>
-          </div>
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+        
+        <!-- Email Container -->
+        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
           
-          <div class="content">
-            <div class="section">
-              <div class="section-title">Student Information</div>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Name</span>
-                  <span class="info-value">${data.studentName}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Student ID</span>
-                  <span class="info-value">${data.studentId}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Class</span>
-                  <span class="info-value">${data.studentClass || 'N/A'}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">School</span>
-                  <span class="info-value">${data.schoolName || 'N/A'}</span>
-                </div>
-              </div>
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #4FC1F9, #1B9EE0); padding: 32px 24px; text-align: center; position: relative;">
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0;">
+              <div style="font-size: 48px; margin-bottom: 16px;">${categoryIcons[data.category as keyof typeof categoryIcons]}</div>
+              <h1 style="margin: 0; color: white; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
+                ${data.level.toUpperCase()} ESCALATION ALERT
+              </h1>
+              <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px; font-weight: 500;">
+                ${data.category.replace('_', ' ').toUpperCase()}
+              </p>
             </div>
-            
-            <div class="section">
-              <div class="section-title">Alert Details</div>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Category</span>
-                  <span class="info-value">${data.category.replace('_', ' ').toUpperCase()}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Severity</span>
-                  <span class="severity-badge">${data.level.toUpperCase()}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Score</span>
-                  <span class="info-value">${data.severity}/10</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Detected</span>
-                  <span class="info-value">${new Date(data.messageTimestamp).toLocaleString()}</span>
-                </div>
-              </div>
-              
-              ${data.detectedPhrases && data.detectedPhrases.length > 0 ? `
-              <div class="phrases">
-                <span class="info-label">Key Indicators</span>
-                <div style="margin-top: 8px;">
-                  ${data.detectedPhrases.map(phrase => `<span class="phrase">${phrase}</span>`).join('')}
-                </div>
-              </div>
-              ` : ''}
-            </div>
-            
-            ${data.context ? `
-            <div class="section">
-              <div class="section-title">Context</div>
-              <div class="context-box">
-                "${data.context}"
-              </div>
-            </div>
-            ` : ''}
-            
-            ${data.recommendation ? `
-            <div class="section">
-              <div class="section-title">Recommendation</div>
-              <div class="recommendation-box">
-                ${data.recommendation}
-              </div>
-            </div>
-            ` : ''}
-            
-            ${data.requiresImmediateAction ? `
-            <div class="action-box">
-              <h3>Action Required</h3>
-              <p>Please check your admin dashboard immediately and take appropriate action.</p>
-            </div>
-            ` : ''}
           </div>
-          
-          <div class="footer">
-            <p>Alert ID: ${data.alertId} | Generated: ${new Date().toLocaleString()}</p>
-            <p>This is an automated alert from Psychology Buddy.</p>
+
+          <!-- Urgency Badge -->
+          <div style="padding: 24px 24px 0 24px; text-align: center;">
+            ${urgencyBadge}
           </div>
+
+          <!-- Student Info Card -->
+          <div style="padding: 0 24px 24px 24px;">
+            <div style="background: linear-gradient(135deg, #f1f5f9, #e2e8f0); border-radius: 12px; padding: 20px; border-left: 4px solid ${severityColors[data.level as keyof typeof severityColors]};">
+              <h2 style="margin: 0 0 16px 0; color: #475569; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                👤 Student Information
+              </h2>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                  <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Name</p>
+                  <p style="margin: 4px 0 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${data.studentName}</p>
+                </div>
+                <div>
+                  <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Class</p>
+                  <p style="margin: 4px 0 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${data.studentClass}</p>
+                </div>
+                <div>
+                  <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Student ID</p>
+                  <p style="margin: 4px 0 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${data.studentId}</p>
+                </div>
+                <div>
+                  <p style="margin: 0; color: #64748b; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">School</p>
+                  <p style="margin: 4px 0 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${data.schoolName}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div style="padding: 0 24px 24px 24px;">
+            <div style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 12px; padding: 20px; border-left: 4px solid ${severityColors[data.level as keyof typeof severityColors]};">
+              <h2 style="margin: 0 0 16px 0; color: #475569; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                📋 Description
+              </h2>
+              <p style="margin: 0; color: #1e293b; line-height: 1.6; font-weight: 500;">${data.description}</p>
+            </div>
+          </div>
+
+          ${data.recommendation ? `
+          <!-- Recommendation -->
+          <div style="padding: 0 24px 24px 24px;">
+            <div style="background: linear-gradient(135deg, #dcfce7, #bbf7d0); border-radius: 12px; padding: 20px; border-left: 4px solid #22c55e;">
+              <h2 style="margin: 0 0 16px 0; color: #14532d; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                💡 Recommendation
+              </h2>
+              <p style="margin: 0; color: #166534; line-height: 1.6; font-weight: 500;">${data.recommendation}</p>
+            </div>
+          </div>
+          ` : ''}
+
+          ${data.requiresImmediateAction ? `
+          <!-- Action Required -->
+          <div style="padding: 0 24px 24px 24px;">
+            <div style="background: linear-gradient(135deg, #fee2e2, #fecaca); border-radius: 12px; padding: 20px; border-left: 4px solid #ef4444;">
+              <h2 style="margin: 0 0 16px 0; color: #991b1b; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                🚨 Action Required
+              </h2>
+              <p style="margin: 0; color: #7f1d1d; line-height: 1.6; font-weight: 500;">
+                This escalation requires immediate attention. Please check your admin dashboard for full details and take appropriate action to ensure student safety.
+              </p>
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Footer -->
+          <div style="background: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <div style="margin-bottom: 16px;">
+              <div style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+                View in Admin Dashboard
+              </div>
+            </div>
+            <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.5;">
+              This alert was generated by Psychology Buddy's intelligent monitoring system.<br>
+              Alert ID: ${data.alertId} | Generated: ${new Date().toLocaleString()}
+            </p>
+          </div>
+
         </div>
+
       </body>
       </html>
     `
-  }
-
-  /**
-   * Generates email template for escalation alert
-   */
-  public static generateEmailTemplate(data: EmailNotificationData): EmailTemplate {
-    const htmlBody = this.generateHtmlTemplate(data)
-    
-    const subject = `🚨 ${data.level.toUpperCase()} ESCALATION: ${data.category.replace('_', ' ').toUpperCase()} - ${data.studentName}`
 
     const textBody = `
 ESCALATION ALERT - ${data.level.toUpperCase()}
@@ -558,9 +400,13 @@ Alert Details:
 - Description: ${data.description}
 
 ${data.detectedPhrases.length > 0 ? `Key Indicators:\n${data.detectedPhrases.map(phrase => `- ${phrase}`).join('\n')}\n` : ''}
+
 ${data.context ? `Context:\n${data.context}\n` : ''}
+
 ${data.recommendation ? `Recommendation:\n${data.recommendation}\n` : ''}
+
 ${data.requiresImmediateAction ? 'IMMEDIATE ATTENTION REQUIRED - Please log in to the admin panel to review this alert.' : ''}
+
 Alert ID: ${data.alertId}
 
 This is an automated alert from the Psychology Buddy system.

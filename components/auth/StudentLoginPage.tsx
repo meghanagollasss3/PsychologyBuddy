@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { useStudentLogin } from '@/src/hooks/auth/useStudentLogin';
 import { StudentLoginForm } from '@/src/components/forms/StudentLoginForm';

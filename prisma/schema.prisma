@@ -893,21 +893,33 @@ model MusicResourceGoal {
   @@map("MusicResourceGoals")
 }
 
+
+model OTP {
+  id               String    @id @default(uuid())
+  phoneNumber      String    @unique
+  otp              String
+  attempts         Int       @default(0)
+  createdAt        DateTime   @default(now())
+  expiresAt        DateTime
+  isVerified       Boolean   @default(false)
+  userId           String?
+  @@map("OTPs")
+}
+
 model Badge {
-  id             String      @id @default(uuid())
+  id             String   @id @default(uuid())
   name           String
-  icon           String
+  icon           String?
   description    String
   requirement    String
-  isActive       Boolean     @default(true)
+  isActive       Boolean   @default(true)
   type           BadgeType
   conditionValue Int?
   createdBy      String
   createdAt      DateTime    @default(now())
   schoolId       String?
-  admin          User        @relation("BadgeCreator", fields: [createdBy], references: [id])
+  admin          User        @relation("BadgeCreator", fields: [createdBy], references: [id], onDelete: Cascade)
   userBadges     UserBadge[]
-
   @@map("Badges")
 }
 

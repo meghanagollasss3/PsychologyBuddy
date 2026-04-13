@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { User, Lock } from 'lucide-react';
 import { RegistrationFormField } from './RegistrationFormField';

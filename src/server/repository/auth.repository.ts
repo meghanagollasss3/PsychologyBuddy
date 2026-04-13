@@ -204,6 +204,36 @@ export const AuthRepository = {
 
 
 
+  // Find admin user by phone number (excluding SUPERADMIN)
+
+  findAdminByPhone: (phone: string) =>
+    prisma.user.findFirst({
+      where: { 
+        phone: phone,
+        role: { 
+          name: { 
+            in: ['ADMIN', 'SCHOOL_SUPERADMIN', 'COUNSELOR', 'TEACHER'] 
+          } 
+        },
+        status: 'ACTIVE'
+      },
+      include: { 
+        role: true, 
+        adminProfile: {
+          include: {
+            adminPermissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        },
+        school: true
+      },
+    }),
+
+
+
   // Check if user has specific permission
 
   userHasPermission: async (userId: string, permissionName: string) => {

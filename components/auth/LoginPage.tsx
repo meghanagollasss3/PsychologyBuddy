@@ -13,7 +13,7 @@ export default function LoginPage() {
     handleChange,
     handleSubmit,
     handleGoogleSignIn,
-    togglePassword,
+    togglePassword, 
   } = useAdminLogin();
 
   return (
@@ -24,12 +24,12 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-white relative z-10">
         <div className="w-full max-w-md sm:max-w-lg space-y-6">
           <div className="text-center">
-            <h1 className="text-[28px] sm:text-[32px] lg:text-[32px] font-bold text-[#2F3D43] mb-2">
+            <h1 className="text-2xl font-semibold text-gray-900 mb-6">
               Admin Login
             </h1>
-            
           </div>
 
+          {/* Login Form */}
           <LoginForm
             formData={formData}
             showPassword={showPassword}

@@ -16,6 +16,7 @@ interface RegistrationFormFieldProps {
   error?: string;
   required?: boolean;
   className?: string;
+  maxLength?: number;
 }
 
 export const RegistrationFormField: React.FC<RegistrationFormFieldProps> = ({
@@ -33,6 +34,7 @@ export const RegistrationFormField: React.FC<RegistrationFormFieldProps> = ({
   error,
   required = false,
   className = "",
+  maxLength,
 }) => {
   const inputType = showPasswordToggle && showPassword ? "text" : type;
   
@@ -55,6 +57,7 @@ export const RegistrationFormField: React.FC<RegistrationFormFieldProps> = ({
           value={value}
           onChange={onChange}
           placeholder={placeholder}
+          maxLength={maxLength}
           className={`w-full h-[50px] -mb-[5px] pl-13 pr-4 py-4 border border-[#D0D5DD] rounded-[16px] focus:ring-2 focus:ring-[#1B9EE0] focus:border-transparent outline-none transition ${
             icon ? 'pl-11' : 'pl-4'
           } ${showPasswordToggle ? 'pr-12' : 'pr-4'} ${className}`}

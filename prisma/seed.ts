@@ -74,6 +74,7 @@ async function main() {
   // 1. Create Roles
   // ------------------------------------------------
   const superAdminRole = await upsertRole("SUPERADMIN", "System owner");
+  const schoolSuperAdminRole = await upsertRole("SCHOOL_SUPERADMIN", "School system owner");
   const adminRole = await upsertRole("ADMIN", "Organization admin");
   const studentRole = await upsertRole("STUDENT", "Student user");
 
@@ -149,7 +150,34 @@ async function main() {
   );
 
   // ------------------------------------------------
-  // 6. Create Admin User
+  // 6. Create School Super Admin User
+  // ------------------------------------------------
+  const schoolSuperAdminUser = await upsertUser(
+    "schoolsuperadmin@calmpath.ai",
+    "SchoolSuperAdmin@123",
+    schoolSuperAdminRole.id,
+    school.id
+  );
+
+  // Update school super admin user with phone number for OTP testing
+  await prisma.user.update({
+    where: { id: schoolSuperAdminUser.id },
+    data: {
+      phone: "+919876543210"
+    }
+  });
+
+  // Create AdminProfile for School Super Admin
+  await prisma.adminProfile.upsert({
+    where: { userId: schoolSuperAdminUser.id },
+    update: {},
+    create: {
+      userId: schoolSuperAdminUser.id,
+      department: "School Administration",
+    },
+  });
+
+  // 7. Create Admin User
   // ------------------------------------------------
   const adminUser = await upsertUser(
     "admin@calmpath.ai",
@@ -157,6 +185,14 @@ async function main() {
     adminRole.id,
     school.id
   );
+
+  // Update admin user with phone number for OTP testing
+  await prisma.user.update({
+    where: { id: adminUser.id },
+    data: {
+      phone: "+918978009953"
+    }
+  });
 
   // Create AdminProfile
   await prisma.adminProfile.upsert({
