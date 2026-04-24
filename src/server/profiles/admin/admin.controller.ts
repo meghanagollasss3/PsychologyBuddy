@@ -32,12 +32,14 @@ export class AdminController {
       const { searchParams } = new URL(req.url);
       const schoolId = searchParams.get('schoolId') || undefined;
       const locationId = searchParams.get('locationId') || undefined;
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = parseInt(searchParams.get('limit') || '10');
       
       // For SCHOOL_SUPERADMIN, only show admins from their school (same as SUPERADMIN features)
       // For SUPERADMIN, use the schoolId parameter (if provided)
       const effectiveSchoolId = ctx.user.role.name === 'SCHOOL_SUPERADMIN' ? ctx.userSchoolId : (schoolId ?? undefined);
       
-      const result = await AdminService.getAllAdmins(effectiveSchoolId, ctx.userSchoolId, locationId);
+      const result = await AdminService.getAllAdmins(effectiveSchoolId, ctx.userSchoolId, locationId, page, limit);
       return NextResponse.json(result);
     } catch (error) {
       console.error('Get admins error:', error);

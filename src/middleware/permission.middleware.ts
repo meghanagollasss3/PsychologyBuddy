@@ -110,6 +110,88 @@ export function withPermission(options: PermissionOptions) {
 
 
 
+      // Step 3.5: Check user status
+
+      // Check student status
+
+      if (user.role?.name === 'STUDENT') {
+
+        const studentStatus = user.studentProfile?.status || 'ACTIVE';
+
+        if (studentStatus === 'INACTIVE') {
+
+          await AuthRepository.deleteSession(sessionId);
+
+          return NextResponse.json(
+
+            { success: false, message: "Your account is inactive. Please contact your school administrator." },
+
+            { status: 403 }
+
+          );
+
+        }
+
+        
+
+        if (studentStatus === 'SUSPENDED') {
+
+          await AuthRepository.deleteSession(sessionId);
+
+          return NextResponse.json(
+
+            { success: false, message: "Your account is suspended. Please contact your school administrator." },
+
+            { status: 403 }
+
+          );
+
+        }
+
+      }
+
+
+
+      // Check admin status
+
+      if (user.role?.name && ['ADMIN', 'SCHOOL_SUPERADMIN', 'SUPERADMIN'].includes(user.role.name)) {
+
+        const adminStatus = user.status || 'ACTIVE';
+
+        if (adminStatus === 'INACTIVE') {
+
+          await AuthRepository.deleteSession(sessionId);
+
+          return NextResponse.json(
+
+            { success: false, message: "Your account is inactive. Please contact your school administrator." },
+
+            { status: 403 }
+
+          );
+
+        }
+
+        
+
+        if (adminStatus === 'SUSPENDED') {
+
+          await AuthRepository.deleteSession(sessionId);
+
+          return NextResponse.json(
+
+            { success: false, message: "Your account is suspended. Please contact your school administrator." },
+
+            { status: 403 }
+
+          );
+
+        }
+
+      }
+
+
+
       // Extract schoolId from user's school relation
 
       const userSchoolId = user.school?.id || user.schoolId;

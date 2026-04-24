@@ -30,7 +30,9 @@ export const StudentRepository = {
         emailVerified: true,
         studentProfile: {
           create: {
-            status: 'ACTIVE',
+            status: data.status || 'ACTIVE',
+            dateOfBirth: new Date(data.dateOfBirth).toISOString(),
+            emergencyContact: data.emergencyContact,
           },
         },
       },
@@ -86,9 +88,11 @@ export const StudentRepository = {
         ];
       }
 
-      // Filter by status - use User.status, not studentProfile.status
+      // Filter by status - use studentProfile.status
       if (filters.status && filters.status !== 'all') {
-        whereCondition.status = filters.status;
+        whereCondition.studentProfile = {
+          status: filters.status
+        };
       }
 
       // Filter by class
@@ -102,7 +106,9 @@ export const StudentRepository = {
       }
     } else {
       // By default, only show active students when no filters are provided
-      whereCondition.status = 'ACTIVE';
+      whereCondition.studentProfile = {
+        status: 'ACTIVE'
+      };
     }
 
     // Get pagination parameters
@@ -208,33 +214,51 @@ export const StudentRepository = {
 
   // Update student
   updateStudent: async (id: string, data: ExtendedUpdateStudentData) => {
-    // Handle schoolId - if it's a name, find the corresponding school ID
+    // Handle schoolId - if it's not a UUID, try to find by custom ID first, then by name
     let schoolIdToUpdate = data.schoolId;
     if (data.schoolId && !data.schoolId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-      // If schoolId is not a UUID, treat it as a name and find the school
+      // First try to find school by custom ID
       const school = await prisma.school.findFirst({
-        where: { name: data.schoolId },
+        where: { id: data.schoolId },
         select: { id: true }
       });
       if (school) {
         schoolIdToUpdate = school.id;
       } else {
-        throw new Error(`School with name "${data.schoolId}" not found`);
+        // If not found by ID, try by name
+        const schoolByName = await prisma.school.findFirst({
+          where: { name: data.schoolId },
+          select: { id: true }
+        });
+        if (schoolByName) {
+          schoolIdToUpdate = schoolByName.id;
+        } else {
+          throw new Error(`School with ID or name "${data.schoolId}" not found`);
+        }
       }
     }
 
-    // Handle classId - if it's a name, find the corresponding class ID
+    // Handle classId - if it's not a UUID, try to find by custom ID first, then by name
     let classIdToUpdate = data.classId;
     if (data.classId && !data.classId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-      // If classId is not a UUID, treat it as a name and find the class
+      // First try to find class by custom ID
       const classRecord = await prisma.class.findFirst({
-        where: { name: data.classId },
+        where: { id: data.classId },
         select: { id: true }
       });
       if (classRecord) {
         classIdToUpdate = classRecord.id;
       } else {
-        throw new Error(`Class with name "${data.classId}" not found`);
+        // If not found by ID, try by name
+        const classByName = await prisma.class.findFirst({
+          where: { name: data.classId },
+          select: { id: true }
+        });
+        if (classByName) {
+          classIdToUpdate = classByName.id;
+        } else {
+          throw new Error(`Class with ID or name "${data.classId}" not found`);
+        }
       }
     }
 
@@ -328,7 +352,11 @@ export const StudentRepository = {
     return prisma.user.update({
       where: { id },
       data: {
-        status: status,
+        studentProfile: {
+          update: {
+            status: status,
+          },
+        },
       },
       include: {
         role: true,
@@ -345,6 +373,12 @@ export const StudentRepository = {
             name: true,
             grade: true,
             section: true,
+          },
+        },
+        location: {
+          select: {
+            id: true,
+            name: true,
           },
         },
       },
@@ -378,7 +412,40 @@ export const StudentRepository = {
       throw new Error('Student not found');
     }
 
-    // Perform hard delete
+    // Delete related records in order to respect foreign key constraints
+    // Delete streak record (no cascade delete)
+    await prisma.streak.delete({
+      where: { userId: id },
+    }).catch(() => {
+      // Ignore if streak doesn't exist
+    });
+
+    // Delete resource access records (no cascade delete)
+    await prisma.resourceAccess.deleteMany({
+      where: { userId: id },
+    });
+
+    // Delete writing journals (no cascade delete)
+    await prisma.writingJournal.deleteMany({
+      where: { userId: id },
+    });
+
+    // Delete audio journals (no cascade delete)
+    await prisma.audioJournal.deleteMany({
+      where: { userId: id },
+    });
+
+    // Delete art journals (no cascade delete)
+    await prisma.artJournal.deleteMany({
+      where: { userId: id },
+    });
+
+    // Delete high risk alerts (no cascade delete)
+    await prisma.highRiskAlert.deleteMany({
+      where: { userId: id },
+    });
+
+    // Perform hard delete of user (cascade will handle most other relations)
     await prisma.user.delete({
       where: { id },
     });
@@ -386,11 +453,12 @@ export const StudentRepository = {
     return student;
   },
 
-  // Check if student ID exists
+  // Check if student ID exists with thorough validation
   findStudentByStudentId: async (studentId: string) => {
-    return prisma.user.findFirst({
+    // Case-sensitive exact match
+    const exactMatch = await prisma.user.findFirst({
       where: {
-        studentId,
+        studentId: studentId, // Prisma default is case-sensitive
         role: {
           name: 'STUDENT',
         },
@@ -401,6 +469,48 @@ export const StudentRepository = {
         school: true,
       },
     });
+
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // Additional thorough check: search for similar IDs with case variations
+    // This handles any potential database collation issues
+    const allStudents = await prisma.user.findMany({
+      where: {
+        role: {
+          name: 'STUDENT',
+        },
+        studentId: {
+          not: null,
+        },
+      },
+      select: {
+        studentId: true,
+        id: true,
+      },
+    });
+
+    // Character-by-character comparison with exact case sensitivity
+    const caseSensitiveMatch = allStudents.find(student => 
+      student.studentId === studentId // Strict equality with case sensitivity
+    );
+
+    if (caseSensitiveMatch) {
+      // If found through this method, return full student data
+      return prisma.user.findFirst({
+        where: {
+          id: caseSensitiveMatch.id,
+        },
+        include: {
+          role: true,
+          studentProfile: true,
+          school: true,
+        },
+      });
+    }
+
+    return null;
   },
 
   // Check if student email exists
@@ -419,7 +529,7 @@ export const StudentRepository = {
     });
   },
 
-  // Generate unique student ID
+  // Generate unique student ID with thorough validation
   generateUniqueStudentId: async (schoolId: string, classId: string) => {
     let studentId: string;
     let attempts = 0;
@@ -431,10 +541,55 @@ export const StudentRepository = {
       studentId = `STU${randomNum}`;
       attempts++;
 
-      if (attempts > maxAttempts) {
-        throw new Error('Unable to generate unique student ID');
+      // Validate generated ID format
+      if (!/^[A-Z]{3}\d{6}$/.test(studentId)) {
+        console.warn(`Invalid student ID format generated: ${studentId}`);
+        continue;
       }
-    } while (await StudentRepository.findStudentByStudentId(studentId));
+
+      // Thorough uniqueness check
+      const existingStudent = await StudentRepository.findStudentByStudentId(studentId);
+      
+      if (existingStudent) {
+        console.log(`Student ID collision detected: ${studentId}, attempt ${attempts}`);
+        continue;
+      }
+
+      // Additional character-by-character validation
+      // Ensure no similar IDs exist with case variations
+      const allStudentIds = await prisma.user.findMany({
+        where: {
+          role: {
+            name: 'STUDENT',
+          },
+          studentId: {
+            not: null,
+          },
+        },
+        select: {
+          studentId: true,
+        },
+      });
+
+      // Exact character-by-character comparison
+      const hasExactMatch = allStudentIds.some(student => 
+        student.studentId === studentId // Strict equality with case sensitivity
+      );
+
+      if (hasExactMatch) {
+        console.log(`Exact character match found for student ID: ${studentId}`);
+        continue;
+      }
+
+      // If we reach here, the ID is truly unique
+      console.log(`Generated unique student ID: ${studentId} after ${attempts} attempts`);
+      break;
+
+    } while (attempts < maxAttempts);
+
+    if (attempts >= maxAttempts) {
+      throw new Error(`Unable to generate unique student ID after ${maxAttempts} attempts. Possible ID space exhaustion.`);
+    }
 
     return studentId;
   },

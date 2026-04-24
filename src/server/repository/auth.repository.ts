@@ -178,6 +178,20 @@ export const AuthRepository = {
 
 
 
+  // Update user's last active timestamp
+
+  updateLastActive: (userId: string) =>
+
+    prisma.user.update({
+
+      where: { id: userId },
+
+      data: { lastActive: new Date() },
+
+    }),
+
+
+
   // Find user by ID
 
   findUserById: (userId: string) =>

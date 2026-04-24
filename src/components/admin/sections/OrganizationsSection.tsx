@@ -15,6 +15,7 @@ import {
   Eye,
   MapPin,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
@@ -47,6 +48,8 @@ import {
 } from "@/components/ui/table";
 
 import { AddOrganizationModal } from "@/src/components/admin/modals/AddOrganizationModal";
+import { useAdminLoading, AdminActions } from '@/src/contexts/AdminLoadingContext';
+import { LoadingButton } from '@/src/components/admin/ui/AdminLoader';
 
 // ---------------------------
 // TYPES
@@ -155,6 +158,7 @@ export default function OrganizationsPage() {
   const permissions = usePermissions();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { executeWithLoading } = useAdminLoading();
 
   const {
     selectedSchoolId,
@@ -173,7 +177,6 @@ export default function OrganizationsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [organizationToDelete, setOrganizationToDelete] = useState<School | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Memoized search (debounce unnecessary because server handles it)
   const search = useMemo(() => searchInput.trim(), [searchInput]);
@@ -220,33 +223,38 @@ export default function OrganizationsPage() {
   const confirmDelete = async () => {
     if (!organizationToDelete) return;
     
-    setIsDeleting(true);
     try {
-      const response = await fetch(`/api/schools/${organizationToDelete.id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        toast({
-          title: "Organization deleted successfully",
-          description: `${organizationToDelete.name} has been deleted.`
-        });
-        
-        // Refresh the organizations list
-        queryClient.invalidateQueries({ queryKey: ["organizations"] });
-        
-        setShowDeleteDialog(false);
-        setOrganizationToDelete(null);
-      } else {
-        toast({
-          title: "Failed to delete organization",
-          description: data.message || "An error occurred while deleting the organization.",
-          variant: "destructive"
-        });
-      }
+      await executeWithLoading(
+        AdminActions.DELETE_ORGANIZATION,
+        (async () => {
+          const response = await fetch(`/api/schools/${organizationToDelete.id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            toast({
+              title: "Organization deleted successfully",
+              description: `${organizationToDelete.name} has been deleted.`
+            });
+            
+            // Refresh the organizations list
+            queryClient.invalidateQueries({ queryKey: ["organizations"] });
+            
+            setShowDeleteDialog(false);
+            setOrganizationToDelete(null);
+          } else {
+            toast({
+              title: "Failed to delete organization",
+              description: data.message || "An error occurred while deleting the organization.",
+              variant: "destructive"
+            });
+          }
+        })(),
+        'Deleting organization...'
+      );
     } catch (error) {
       console.error('Delete organization error:', error);
       toast({
@@ -254,8 +262,6 @@ export default function OrganizationsPage() {
         description: "Network error occurred. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -281,7 +287,7 @@ export default function OrganizationsPage() {
       <AdminHeader
         title="Organizations"
         subtitle="Manage all schools in the system"
-        showSchoolFilter={user?.role?.name === 'SUPERADMIN'}
+        showSchoolFilter={false}
         schoolFilterValue={selectedSchoolId}
         onSchoolFilterChange={setSelectedSchoolId}
         showTimeFilter={false}
@@ -369,13 +375,25 @@ export default function OrganizationsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by school or email..."
-            className="pl-9"
+            className="pl-9 pr-10"
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
               setPage(1); // Reset page when searching
             }}
           />
+          {searchInput && (
+            <button
+              onClick={() => {
+                setSearchInput('');
+                setPage(1); // Reset page when clearing search
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Organizations Table */}
@@ -432,12 +450,6 @@ export default function OrganizationsPage() {
                       </TableCell> */}
 
                       <TableCell className="text-center">
-                        <Badge variant="outline">
-                          {school.locationsCount || 0}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell className="text-center">
                         {school.studentCount}
                       </TableCell>
 
@@ -454,17 +466,22 @@ export default function OrganizationsPage() {
                       <TableCell className="text-center">
                         {school.checkInsToday || 0}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/admin/locations?school=${school.id}`)}
+                        >
+                          <MapPin className="h-4 w-4 mr-1" />
+                          Locations
+                          <Badge variant="secondary" className="ml-1">
+                            {school.locationsCount || 0}
+                          </Badge>
+                        </Button>
+                      </TableCell>
 
                       <TableCell className="text-center">
                         <div className="flex items-center gap-2 justify-end">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/admin/locations?school=${school.id}`)}
-                          >
-                            <MapPin className="h-4 w-4 mr-1" />
-                            Locations
-                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -545,15 +562,14 @@ export default function OrganizationsPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>
+              <AlertDialogCancel>
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDelete}
-                disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-[#EF4444] text-white hover:bg-[#EF4444]/90"
               >
-                {isDeleting ? "Deleting..." : "Delete Organization"}
+                Delete Organization
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

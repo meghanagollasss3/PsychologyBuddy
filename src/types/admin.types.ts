@@ -28,7 +28,6 @@ export interface Admin {
   }>;
   adminProfile?: {
     department?: string;
-    lastActive?: string;
     status?: string;
     profileImageUrl?: string;
     isPrimaryAdmin?: boolean;
@@ -40,6 +39,8 @@ export interface Admin {
     locationAssignments?: any[];
   };
   createdAt: string;
+  updatedAt: string;
+  lastActive?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
   _count?: {
     students: number;

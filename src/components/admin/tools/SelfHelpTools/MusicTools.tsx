@@ -30,6 +30,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { useAdminLoading, AdminActions } from '@/src/contexts/AdminLoadingContext';
+import { LoadingButton, AdminLoader } from '@/src/components/admin/ui/AdminLoader';
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { 
@@ -65,20 +67,23 @@ export default function MusicTools({
 }: MusicToolsProps) {
   const { toast } = useToast();
   const { user } = useAuth(); // Add auth context
+  const { executeWithLoading, setLoading } = useAdminLoading();
   
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+    
   // Data states
   const [musicResources, setMusicResources] = useState<MusicResource[]>([]);
   
   // Lists management
-  const [musicMoods, setMusicMoods] = useState<string[]>(defaultMusicMoods);
-  const [musicGoals, setMusicGoals] = useState<string[]>(defaultMusicGoals);
+  const [musicMoods, setMusicMoods] = useState<any[]>([]);
+  const [musicGoals, setMusicGoals] = useState<any[]>([]);
   const [musicCategories, setMusicCategories] = useState<string[]>([]);
   const [musicCategoriesMap, setMusicCategoriesMap] = useState<{[key: string]: string}>({});
   const [musicGoalsMap, setMusicGoalsMap] = useState<{[key: string]: string}>({});
+  const [musicMoodsMap, setMusicMoodsMap] = useState<{[key: string]: string}>({});
   
   // Form states
   const [musicForm, setMusicForm] = useState({
@@ -142,31 +147,52 @@ export default function MusicTools({
   // API Functions
   const fetchMoods = async () => {
     try {
-      const response = await fetch('/api/admin/music/moods');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        "x-user-id": user?.id || "admin@calmpath.ai",
+        ...(user?.school?.id && { "x-school-id": user.school.id }),
+      };
+      const response = await fetch('/api/labels/moods', { headers });
       const data: ApiResponse<any[]> = await response.json();
       if (data.success && data.data) {
-        const moodNames = data.data.map((mood: any) => mood.name);
-        setMusicMoods(moodNames);
+        setMusicMoods(data.data);
+        // Create mood map for ID mapping
+        const moodMap: {[key: string]: string} = {};
+        data.data.forEach((mood: any) => {
+          moodMap[mood.name] = mood.id;
+        });
+        setMusicMoodsMap(moodMap);
+      } else {
+        console.error("Moods API error:", data.message);
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to fetch music moods", variant: "destructive" });
+      console.error("Failed to fetch moods:", error);
+      toast({ title: "Error", description: "Failed to fetch moods", variant: "destructive" });
     }
   };
 
   const fetchGoals = async () => {
     try {
-      const response = await fetch('/api/admin/music/goals');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        "x-user-id": user?.id || "admin@calmpath.ai",
+        ...(user?.school?.id && { "x-school-id": user.school.id }),
+      };
+      const response = await fetch('/api/labels/goals', { headers });
       const data: ApiResponse<any[]> = await response.json();
       if (data.success && data.data) {
-        const goalNames = data.data.map((goal: any) => goal.name);
+        setMusicGoals(data.data);
+        // Create goal map for ID mapping
         const goalMap: {[key: string]: string} = {};
         data.data.forEach((goal: any) => {
           goalMap[goal.name] = goal.id;
         });
-        setMusicGoals(goalNames);
         setMusicGoalsMap(goalMap);
+      } else {
+        console.error("Goals API error:", data.message);
       }
     } catch (error) {
+      console.error("Failed to fetch goals:", error);
       toast({ title: "Error", description: "Failed to fetch goals", variant: "destructive" });
     }
   };
@@ -270,34 +296,80 @@ export default function MusicTools({
   };
 
   const deleteMusicResource = async (id: string) => {
-    try {
-      const headers: Record<string, string> = {
-        'x-user-id': user?.id || 'admin@calmpath.ai'
-      };
-      
-      if (user?.school?.id) {
-        headers['x-school-id'] = user.school.id;
-      }
-      
-      const response = await fetch(`/api/admin/music/resources/${id}?id=${id}`, {
-        method: 'DELETE',
-        headers
-      });
-      const data: ApiResponse<null> = await response.json();
-      if (data.success) {
-        toast({ title: "Success", description: "Music resource deleted successfully" });
-        await fetchMusicResources();
-      } else {
-        toast({ title: "Error", description: data.error || "Failed to delete resource", variant: "destructive" });
-      }
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to delete music resource", variant: "destructive" });
-    }
+    await executeWithLoading(
+      AdminActions.DELETE_MUSIC_RESOURCE,
+      (async () => {
+        try {
+          const headers: Record<string, string> = {
+            'x-user-id': user?.id || 'admin@calmpath.ai'
+          }
+          
+          if (user?.school?.id) {
+            headers['x-school-id'] = user.school.id;
+          }
+          
+          const response = await fetch(`/api/admin/music/resources/${id}?id=${id}`, {
+            method: 'DELETE',
+            headers
+          });
+          const data: ApiResponse<null> = await response.json();
+          if (data.success) {
+            toast({ title: "Success", description: "Music resource deleted successfully" });
+            await fetchMusicResources();
+          } else {
+            toast({ title: "Error", description: data.error || "Failed to delete resource", variant: "destructive" });
+          }
+        } catch (error) {
+          toast({ title: "Error", description: "Failed to delete music resource", variant: "destructive" });
+        }
+      })(),
+      'Deleting music resource...'
+    );
   };
 
   const createMusicResource = async () => {
     setIsSubmitting(true);
     try {
+      // Validate all required fields
+      const validationErrors: string[] = [];
+      
+      // Check title
+      if (!musicForm.title.trim()) {
+        validationErrors.push("Title is required");
+      }
+      
+      // Check audio file
+      const audioUrl = musicForm.audioUrl || musicForm.url;
+      if (!audioUrl) {
+        validationErrors.push("Please upload an audio file");
+      }
+      
+      // Check category
+      if (!musicForm.category) {
+        validationErrors.push("Category is required");
+      }
+      
+      // Check supported moods
+      if (!musicForm.supportedMoods || musicForm.supportedMoods.length === 0) {
+        validationErrors.push("At least one supported mood is required");
+      }
+      
+      // Check goal
+      if (!musicForm.goal) {
+        validationErrors.push("Goal is required");
+      }
+      
+      // If there are validation errors, show them and return
+      if (validationErrors.length > 0) {
+        toast({ 
+          title: "Required", 
+          description: validationErrors.join(", "), 
+          variant: "destructive" 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
       const durationInSeconds = musicForm.duration ? parseInt(Math.round(parseDurationToMinutes(musicForm.duration) * 60).toString()) : undefined;
       
       // Debug logging for duration
@@ -306,19 +378,6 @@ export default function MusicTools({
       console.log('Final duration in seconds:', durationInSeconds);
       console.log('Duration type:', typeof durationInSeconds);
       console.log('Is integer?:', Number.isInteger(durationInSeconds));
-      
-      const audioUrl = musicForm.audioUrl || musicForm.url;
-      if (!audioUrl) {
-        toast({ title: "Error", description: "Please upload an audio file", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (!musicForm.title.trim()) {
-        toast({ title: "Error", description: "Title is required", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
       
       const finalUrl = audioUrl;
       
@@ -467,20 +526,47 @@ export default function MusicTools({
     
     setIsSubmitting(true);
     try {
-      const durationInSeconds = musicForm.duration ? Math.round(parseDurationToMinutes(musicForm.duration) * 60) : undefined;
+      // Validate all required fields
+      const validationErrors: string[] = [];
       
+      // Check title
+      if (!musicForm.title.trim()) {
+        validationErrors.push("Title is required");
+      }
+      
+      // Check audio file
       const audioUrl = musicForm.audioUrl || musicForm.url;
       if (!audioUrl) {
-        toast({ title: "Error", description: "Please upload an audio file", variant: "destructive" });
+        validationErrors.push("Please upload an audio file");
+      }
+      
+      // Check category
+      if (!musicForm.category) {
+        validationErrors.push("Category is required");
+      }
+      
+      // Check supported moods
+      if (!musicForm.supportedMoods || musicForm.supportedMoods.length === 0) {
+        validationErrors.push("At least one supported mood is required");
+      }
+      
+      // Check goal
+      if (!musicForm.goal) {
+        validationErrors.push("Goal is required");
+      }
+      
+      // If there are validation errors, show them and return
+      if (validationErrors.length > 0) {
+        toast({ 
+          title: "Validation Error", 
+          description: validationErrors.join(", "), 
+          variant: "destructive" 
+        });
         setIsSubmitting(false);
         return;
       }
       
-      if (!musicForm.title.trim()) {
-        toast({ title: "Error", description: "Title is required", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
+      const durationInSeconds = musicForm.duration ? Math.round(parseDurationToMinutes(musicForm.duration) * 60) : undefined;
       
       const finalUrl = audioUrl;
       
@@ -575,14 +661,19 @@ export default function MusicTools({
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([
-        fetchMusicResources(),
-        fetchMoods(),
-        fetchGoals(),
-        fetchMusicCategories(),
-        fetchMusicInstructions()
-      ]);
-      setIsLoading(false);
+      setLoading(AdminActions.FETCH_MUSIC_RESOURCES, true, "Loading music data...");
+      try {
+        await Promise.all([
+          fetchMusicResources(),
+          fetchMoods(),
+          fetchGoals(),
+          fetchMusicCategories(),
+          fetchMusicInstructions()
+        ]);
+      } finally {
+        setIsLoading(false);
+        setLoading(AdminActions.FETCH_MUSIC_RESOURCES, false);
+      }
     };
     loadData();
   }, [selectedSchool]);
@@ -703,123 +794,135 @@ export default function MusicTools({
   };
 
   const handleDeleteMusicStep = async (stepIndex: number) => {
-    try {
-      if (!musicInstructions) return;
-      
-      // Remove step from current instruction
-      const updatedPoints = musicInstructions.points?.filter((_, i) => i !== stepIndex) || [];
-      
-      // Update the form and save to database
-      setInstructionsForm((prev) => ({
-        ...prev,
-        points: updatedPoints
-      }));
+    await executeWithLoading(
+      AdminActions.DELETE_MUSIC_RESOURCE,
+      (async () => {
+        try {
+          if (!musicInstructions) return;
+          
+          // Remove step from current instruction
+          const updatedPoints = musicInstructions.points?.filter((_, i) => i !== stepIndex) || [];
+          
+          // Update the form and save to database
+          setInstructionsForm((prev) => ({
+            ...prev,
+            points: updatedPoints
+          }));
 
-      // Save the updated instruction
-      const steps = updatedPoints
-        .filter((point) => point.trim() !== "")
-        .map((point, index) => ({
-          stepNumber: index + 1,
-          title: `Step ${index + 1}`,
-          description: point
-        }));
+          // Save the updated instruction
+          const steps = updatedPoints
+            .filter((point) => point.trim() !== "")
+            .map((point, index) => ({
+              stepNumber: index + 1,
+              title: `Step ${index + 1}`,
+              description: point
+            }));
 
-      // Validate that at least one step exists
-      if (steps.length === 0) {
-        toast({
-          title: "Error",
-          description: "At least one instruction step is required",
-          variant: "destructive"
-        });
-        return;
-      }
+          // Validate that at least one step exists
+          if (steps.length === 0) {
+            toast({
+              title: "Error",
+              description: "At least one instruction step is required",
+              variant: "destructive"
+            });
+            return;
+          }
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-user-id': user?.id || 'admin@calmpath.ai'
-      };
-      
-      if (user?.school?.id) {
-        headers['x-school-id'] = user.school.id;
-      }
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'x-user-id': user?.id || 'admin@calmpath.ai'
+          };
+          
+          if (user?.school?.id) {
+            headers['x-school-id'] = user.school.id;
+          }
 
-      const response = await fetch('/api/admin/music/instructions', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          title: musicInstructions.title,
-          description: musicInstructions.title,
-          steps: steps,
-          proTip: musicInstructions.proTip,
-          difficulty: "BEGINNER",
-          status: "PUBLISHED"
-        }),
-      });
+          const response = await fetch('/api/admin/music/instructions', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              title: musicInstructions.title,
+              description: musicInstructions.title,
+              steps: steps,
+              proTip: musicInstructions.proTip,
+              difficulty: "BEGINNER",
+              status: "PUBLISHED"
+            }),
+          });
 
-      if (response.ok) {
-        // Update local state
-        setMusicInstructions((prev) => ({
-          ...prev!,
-          points: updatedPoints,
-        }));
-        
-        toast({
-          title: "Step Deleted",
-          description: "The music instruction step has been removed",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to delete step",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete step",
-        variant: "destructive",
-      });
-    }
+          if (response.ok) {
+            // Update local state
+            setMusicInstructions((prev) => ({
+              ...prev!,
+              points: updatedPoints,
+            }));
+            
+            toast({
+              title: "Step Deleted",
+              description: "The music instruction step has been removed",
+            });
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to delete step",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to delete step",
+            variant: "destructive",
+          });
+        }
+      })(),
+      'Deleting instruction step...'
+    );
   };
 
   const handleDeleteInstructions = async () => {
-    try {
-      // Delete ALL music instructions from database
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-user-id': user?.id || 'admin@calmpath.ai'
-      };
-      
-      if (user?.school?.id) {
-        headers['x-school-id'] = user.school.id;
-      }
+    await executeWithLoading(
+      AdminActions.DELETE_MUSIC_RESOURCE,
+      (async () => {
+        try {
+          // Delete ALL music instructions from database
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'x-user-id': user?.id || 'admin@calmpath.ai'
+          };
+          
+          if (user?.school?.id) {
+            headers['x-school-id'] = user.school.id;
+          }
 
-      const response = await fetch('/api/admin/music/instructions', {
-        method: 'DELETE',
-        headers
-      });
-      
-      if (response.ok) {
-        setMusicInstructions(null);
-        toast({ 
-          title: "All Instructions Deleted", 
-          description: "All music listening instructions have been removed" 
-        });
-      } else {
-        toast({ 
-          title: "Error", 
-          description: "Failed to delete instructions",
-          variant: "destructive" 
-        });
-      }
-    } catch (error) {
-      toast({ 
-        title: "Error", 
-        description: "Failed to delete instructions",
-        variant: "destructive" 
-      });
-    }
+          const response = await fetch('/api/admin/music/instructions', {
+            method: 'DELETE',
+            headers
+          });
+          
+          if (response.ok) {
+            setMusicInstructions(null);
+            toast({ 
+              title: "All Instructions Deleted", 
+              description: "All music listening instructions have been removed" 
+            });
+          } else {
+            toast({ 
+              title: "Error", 
+              description: "Failed to delete instructions",
+              variant: "destructive" 
+            });
+          }
+        } catch (error) {
+          toast({ 
+            title: "Error", 
+            description: "Failed to delete instructions",
+            variant: "destructive" 
+          });
+        }
+      })(),
+      'Deleting instructions...'
+    );
   };
 
   const handleDeleteInstructionsClick = () => {
@@ -918,17 +1021,7 @@ export default function MusicTools({
     r.categories?.some(c => c.category.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading music resources...</span>
-        </div>
-      </div>
-    );
-  }
-
+  
   return (
     <div className="space-y-6">
       {/* Search Section */}
@@ -936,10 +1029,20 @@ export default function MusicTools({
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
         <Input 
           placeholder="Search music..."
-          className="pl-9"
+          className={`pl-9 ${searchQuery ? 'pr-9' : ''}`}
           value={searchQuery}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
         />
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 p-0 hover:bg-muted"
+            onClick={() => setSearchQuery('')}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1090,7 +1193,7 @@ export default function MusicTools({
 
       {/* Add Music Modal */}
       <Dialog open={isAddMusicTrackOpen} onOpenChange={setIsAddMusicTrackOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] bg-[#FFFFFF] overflow-y-auto p-0">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] bg-[#FFFFFF] overflow-y-auto p-0" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader className="p-6 border-b border-[#E2E8F0]">
             <DialogTitle className="text-xl ">Add Music Resource</DialogTitle>
             <DialogDescription className="text-[#64748B] mt-[-6px]">Create a new music therapy resource for learners.</DialogDescription>
@@ -1098,7 +1201,7 @@ export default function MusicTools({
           <div className="grid md:grid-cols-2 gap-0">
             <div className="p-6 border-r border-[#E2E8F0] space-y-4">
               <div className="space-y-2">
-                <Label >Thumbnail</Label>
+                <Label >Thumbnail <span className="text-red-500">*</span></Label>
                 <div 
                   className="border-2 mt-[8px] border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary/50"
                   onClick={() => document.getElementById('music-thumb')?.click()}
@@ -1116,15 +1219,15 @@ export default function MusicTools({
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label>Title</Label>
+                <Label>Title <span className="text-red-500">*</span></Label>
                 <Input value={musicForm.title} onChange={(e) => setMusicForm(prev => ({ ...prev, title: e.target.value }))} placeholder="Resource title" />
               </div>
               <div className="grid gap-2">
-                <Label>Subtitle</Label>
+                <Label>Subtitle <span className="text-red-500">*</span></Label>
                 <Input value={musicForm.subtitle} onChange={(e) => setMusicForm(prev => ({ ...prev, subtitle: e.target.value }))} placeholder="Short subtitle" />
               </div>
               <div className="grid gap-2">
-                <Label>Format</Label>
+                <Label>Format <span className="text-red-500">*</span></Label>
                 <Select
                   value={musicForm.format}
                   onValueChange={(v: "AUDIO" | "VIDEO" | "TEXT") =>
@@ -1148,7 +1251,7 @@ export default function MusicTools({
                     ? "Video"
                     : musicForm.format === "AUDIO"
                       ? "Audio"
-                      : "Text"}
+                      : "Text"} <span className="text-red-500">*</span>
                 </Label>
                 <div
                   className="border-2 border-dashed border-[#E2E8F0] rounded-lg p-4 text-center cursor-pointer hover:border-[#3B82F6]/50"
@@ -1199,7 +1302,7 @@ export default function MusicTools({
               <p className="text-xs text-muted-foreground">Duration: {musicForm.duration} minutes</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>Category</Label>
+                  <Label>Category <span className="text-red-500">*</span></Label>
                   <Select value={musicForm.category} onValueChange={(v) => setMusicForm(prev => ({ ...prev, category: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent className="bg-white">
@@ -1208,7 +1311,7 @@ export default function MusicTools({
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label>Status</Label>
+                  <Label>Status <span className="text-red-500">*</span></Label>
                   <Select value={musicForm.status} onValueChange={(v: "DRAFT" | "PUBLISHED") => setMusicForm(prev => ({ ...prev, status: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-white">
@@ -1220,7 +1323,7 @@ export default function MusicTools({
               </div>
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label>Supported Moods</Label>
+                  <Label>Supported Moods <span className="text-red-500">*</span></Label>
                   <Popover open={isMusicMoodPopoverOpen} onOpenChange={setIsMusicMoodPopoverOpen}>
                     <PopoverTrigger asChild className="bg-white">
                       <Button variant="outline" role="combobox" className="w-full justify-between h-auto min-h-10">
@@ -1246,17 +1349,17 @@ export default function MusicTools({
                     <PopoverContent className="w-full p-2 border bg-white shadow-xl rounded-[6px]" align="start">
                       <div className="space-y-2">
                         {musicMoods.map((mood) => (
-                          <div key={mood} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => {
-                            if (musicForm.supportedMoods?.includes(mood)) {
-                              setMusicForm(prev => ({ ...prev, supportedMoods: prev.supportedMoods?.filter(m => m !== mood) }));
+                          <div key={mood.id} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => {
+                            if (musicForm.supportedMoods?.includes(mood.name)) {
+                              setMusicForm(prev => ({ ...prev, supportedMoods: prev.supportedMoods?.filter(m => m !== mood.name) }));
                             } else {
-                              setMusicForm(prev => ({ ...prev, supportedMoods: [...(prev.supportedMoods || []), mood] }));
+                              setMusicForm(prev => ({ ...prev, supportedMoods: [...(prev.supportedMoods || []), mood.name] }));
                             }
                           }}>
-                            <div className={`h-4 w-4 border rounded flex items-center justify-center ${musicForm.supportedMoods?.includes(mood) ? 'bg-primary border-primary' : 'border-input'}`}>
-                              {musicForm.supportedMoods?.includes(mood) && <Check className="h-3 w-3 text-primary-foreground" />}
+                            <div className={`h-4 w-4 border rounded flex items-center justify-center ${musicForm.supportedMoods?.includes(mood.name) ? 'bg-primary border-primary' : 'border-input'}`}>
+                              {musicForm.supportedMoods?.includes(mood.name) && <Check className="h-3 w-3 text-primary-foreground" />}
                             </div>
-                            <span className="text-sm">{mood}</span>
+                            <span className="text-sm">{mood.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -1291,7 +1394,7 @@ export default function MusicTools({
                   </Popover>
                 </div>
                 <div className="grid gap-2">
-                  <Label>Goal</Label>
+                  <Label>Goal <span className="text-red-500">*</span></Label>
                   <Popover open={isMusicGoalPopoverOpen} onOpenChange={setIsMusicGoalPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" role="combobox" className="w-full justify-between hover:bg-gray-200">
@@ -1302,11 +1405,11 @@ export default function MusicTools({
                     <PopoverContent className="w-full p-2 border bg-white shadow-xl rounded-[6px]" align="start">
                       <div className="space-y-2">
                         {musicGoals.map((goal) => (
-                          <div key={goal} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => { setMusicForm(prev => ({ ...prev, goal })); setIsMusicGoalPopoverOpen(false); }}>
-                            <div className={`h-4 w-4 border rounded-full flex items-center justify-center ${musicForm.goal === goal ? 'bg-primary border-primary' : 'border-input'}`}>
-                              {musicForm.goal === goal && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
+                          <div key={goal.id} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => { setMusicForm(prev => ({ ...prev, goal: goal.name })); setIsMusicGoalPopoverOpen(false); }}>
+                            <div className={`h-4 w-4 border rounded-full flex items-center justify-center ${musicForm.goal === goal.name ? 'bg-primary border-primary' : 'border-input'}`}>
+                              {musicForm.goal === goal.name && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
                             </div>
-                            <span className="text-sm">{goal}</span>
+                            <span className="text-sm">{goal.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -1400,23 +1503,20 @@ export default function MusicTools({
           </div>
           <div className="p-6 border-t border-border flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsAddMusicTrackOpen?.(false)}>Cancel</Button>
-            <Button onClick={createMusicResource} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Save"
-              )}
-            </Button>
+            <LoadingButton 
+              onClick={createMusicResource}
+              disabled={isSubmitting}
+              loadingText="Creating..."
+            >
+              Save
+            </LoadingButton>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Music Modal */}
       <Dialog open={isEditMusicTrackOpen} onOpenChange={setIsEditMusicTrackOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] bg-white overflow-y-auto p-0">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] bg-white overflow-y-auto p-0" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader className="p-6 border-b border-border">
             <DialogTitle className="text-xl ">Edit Music Resource</DialogTitle>
             <DialogDescription className='text-[#65758b] mt-[-6px]'>Update the details of this music therapy resource.</DialogDescription>
@@ -1571,17 +1671,17 @@ export default function MusicTools({
                     <PopoverContent className="w-full p-2 border bg-white shadow-xl rounded-[6px]" align="start">
                       <div className="space-y-2">
                         {musicMoods.map((mood) => (
-                          <div key={mood} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => {
-                            if (musicForm.supportedMoods?.includes(mood)) {
-                              setMusicForm(prev => ({ ...prev, supportedMoods: prev.supportedMoods?.filter(m => m !== mood) }));
+                          <div key={mood.id} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => {
+                            if (musicForm.supportedMoods?.includes(mood.name)) {
+                              setMusicForm(prev => ({ ...prev, supportedMoods: prev.supportedMoods?.filter(m => m !== mood.name) }));
                             } else {
-                              setMusicForm(prev => ({ ...prev, supportedMoods: [...(prev.supportedMoods || []), mood] }));
+                              setMusicForm(prev => ({ ...prev, supportedMoods: [...(prev.supportedMoods || []), mood.name] }));
                             }
                           }}>
-                            <div className={`h-4 w-4 border rounded flex items-center justify-center ${musicForm.supportedMoods?.includes(mood) ? 'bg-primary border-primary' : 'border-input'}`}>
-                              {musicForm.supportedMoods?.includes(mood) && <Check className="h-3 w-3 text-primary-foreground" />}
+                            <div className={`h-4 w-4 border rounded flex items-center justify-center ${musicForm.supportedMoods?.includes(mood.name) ? 'bg-primary border-primary' : 'border-input'}`}>
+                              {musicForm.supportedMoods?.includes(mood.name) && <Check className="h-3 w-3 text-primary-foreground" />}
                             </div>
-                            <span className="text-sm">{mood}</span>
+                            <span className="text-sm">{mood.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -1636,11 +1736,11 @@ export default function MusicTools({
                     <PopoverContent className="w-full p-2 border bg-white shadow-xl rounded-[6px]" align="start">
                       <div className="space-y-2">
                         {musicGoals.map((goal) => (
-                          <div key={goal} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => { setMusicForm(prev => ({ ...prev, goal })); setIsMusicGoalPopoverOpen(false); }}>
-                            <div className={`h-4 w-4 border rounded-full flex items-center justify-center ${musicForm.goal === goal ? 'bg-primary border-primary' : 'border-input'}`}>
-                              {musicForm.goal === goal && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
+                          <div key={goal.id} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted" onClick={() => { setMusicForm(prev => ({ ...prev, goal: goal.name })); setIsMusicGoalPopoverOpen(false); }}>
+                            <div className={`h-4 w-4 border rounded-full flex items-center justify-center ${musicForm.goal === goal.name ? 'bg-primary border-primary' : 'border-input'}`}>
+                              {musicForm.goal === goal.name && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
                             </div>
-                            <span className="text-sm">{goal}</span>
+                            <span className="text-sm">{goal.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -1736,17 +1836,20 @@ export default function MusicTools({
           </div>
           <div className="p-6 border-t border-border flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsEditMusicTrackOpen(false)}>Cancel</Button>
-            <Button onClick={updateMusicResource} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            <LoadingButton 
+              onClick={updateMusicResource}
+              disabled={isSubmitting}
+              loadingText="Updating..."
+            >
               Update
-            </Button>
+            </LoadingButton>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Add Category Modal */}
       <Dialog open={isAddMusicCategoryOpen} onOpenChange={setIsAddMusicCategoryOpen}>
-        <DialogContent className="sm:max-w-md bg-white">
+        <DialogContent className="sm:max-w-md bg-white" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add Music Category</DialogTitle>
             <DialogDescription className='text-[#65758b]'>
@@ -1782,23 +1885,20 @@ export default function MusicTools({
             <Button variant="outline" onClick={() => setIsAddMusicCategoryOpen?.(false)}>
               Cancel
             </Button>
-            <Button onClick={createMusicCategory} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Category"
-              )}
-            </Button>
+            <LoadingButton 
+              onClick={createMusicCategory}
+              disabled={isSubmitting}
+              loadingText="Creating..."
+            >
+              Create Category
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Instructions Edit Modal */}
       <Dialog open={isEditMusicInstructionsOpen} onOpenChange={setIsEditMusicInstructionsOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>{musicInstructions ? "Edit" : "Add"} Music Listening Instructions</DialogTitle>
             <DialogDescription>These instructions will be shown to all learners on Music Therapy resources.</DialogDescription>

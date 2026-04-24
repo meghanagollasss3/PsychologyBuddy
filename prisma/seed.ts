@@ -115,7 +115,6 @@ async function main() {
     school = await prisma.school.create({
       data: {
         name: "Calm Path High School",
-        address: "Hyderabad",
         email: "school@calmpath.ai",
       },
     });

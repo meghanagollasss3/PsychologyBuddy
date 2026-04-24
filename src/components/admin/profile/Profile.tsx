@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Phone, Building, Shield, Camera, User, Calendar, Edit2, Save, X, Key } from "lucide-react";
 import { Admin } from '@/src/types/admin.types';
+import { RingSpinner } from "../../ui/Spinners";
 
 interface AdminProfile extends Admin {
   adminProfile?: {
@@ -35,6 +36,8 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [imageTimestamp, setImageTimestamp] = useState(Date.now());
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -53,6 +56,19 @@ export default function Profile() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // Reset image load failure when profile or timestamp changes
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [profile?.adminProfile?.profileImageUrl, imageTimestamp]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Profile data:', profile);
+    console.log('Profile image URL:', profile?.adminProfile?.profileImageUrl);
+    console.log('Image URL length:', profile?.adminProfile?.profileImageUrl?.length);
+    console.log('Image timestamp:', imageTimestamp);
+  }, [profile, imageTimestamp]);
 
   const fetchProfile = async () => {
     try {
@@ -213,6 +229,26 @@ export default function Profile() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please select an image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'Error',
+        description: 'Image size must be less than 5MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsUploading(true);
     try {
       const formData = new FormData();
@@ -227,6 +263,7 @@ export default function Profile() {
       
       if (result.success) {
         setProfile(result.data);
+        setImageTimestamp(Date.now()); // Update timestamp to force image refresh
         toast({
           title: 'Success',
           description: 'Profile photo updated successfully',
@@ -246,6 +283,8 @@ export default function Profile() {
       });
     } finally {
       setIsUploading(false);
+      // Reset the file input
+      event.target.value = '';
     }
   };
 
@@ -259,6 +298,7 @@ export default function Profile() {
       
       if (result.success) {
         setProfile(result.data);
+        setImageTimestamp(Date.now()); // Update timestamp to force image refresh
         toast({
           title: 'Success',
           description: 'Profile photo removed successfully',
@@ -281,6 +321,43 @@ export default function Profile() {
 
   const getInitials = (firstName?: string, lastName?: string) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  };
+
+  const isValidImageUrl = (url?: string) => {
+    if (!url) return false;
+    
+    console.log('Checking image URL:', url.length, 'characters');
+    
+    // Check if URL is too large (over 1MB for better performance)
+    if (url.length > 1024 * 1024) {
+      console.warn('Image URL too large:', url.length, 'characters');
+      return false;
+    }
+    
+    // Check if it's a valid data URL
+    if (!url.startsWith('data:image/')) {
+      console.warn('Invalid image URL format');
+      return false;
+    }
+    
+    // Additional validation: check if base64 data is valid
+    try {
+      const base64Data = url.split(',')[1];
+      if (!base64Data) {
+        console.warn('No base64 data found in URL');
+        return false;
+      }
+      
+      // Try to decode the base64 to verify it's valid
+      atob(base64Data);
+      console.log('Base64 data is valid');
+    } catch (error) {
+      console.warn('Invalid base64 data:', error);
+      return false;
+    }
+    
+    console.log('Image URL is valid');
+    return true;
   };
 
   const getRoleBadgeVariant = (role?: string) => {
@@ -309,9 +386,9 @@ export default function Profile() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
+      <div className="flex justify-center py-8">
+                      <RingSpinner className="h-8 w-8" />
+                    </div>
     );
   }
 
@@ -336,18 +413,71 @@ export default function Profile() {
         <div className="max-w-3xl mx-auto space-y-6">
           <Card className="p-6">
             <div className="flex items-center gap-6">
-              <div className="relative">
-                <Avatar className="h-24 w-24 object-contain">
-                  {profile.adminProfile?.profileImageUrl ? (
-                    <AvatarImage src={profile.adminProfile.profileImageUrl} />
-                  ) : null}
-                  <AvatarFallback className="text-2xl">
-                    {getInitials(profile.firstName, profile.lastName)}
-                  </AvatarFallback>
-                </Avatar>
+              <div className="relative h-24 w-24">
+                {(() => {
+                  console.log('Rendering image section, has image URL:', !!profile.adminProfile?.profileImageUrl);
+                  if (profile.adminProfile?.profileImageUrl && !imageLoadFailed) {
+                    const isValid = isValidImageUrl(profile.adminProfile.profileImageUrl);
+                    console.log('Image validation result:', isValid);
+                    if (isValid) {
+                      return (
+                        <img 
+                          src={profile.adminProfile.profileImageUrl}
+                          alt={`${profile.firstName} ${profile.lastName}`}
+                          className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
+                          onError={(e) => {
+                            console.error('Image load error:', e);
+                            console.error('Image URL length:', profile.adminProfile?.profileImageUrl?.length);
+                            console.error('Image URL starts with:', profile.adminProfile?.profileImageUrl?.substring(0, 50));
+                            console.error('Image element:', e.currentTarget);
+                            console.error('Natural width:', e.currentTarget.naturalWidth);
+                            console.error('Natural height:', e.currentTarget.naturalHeight);
+                            setImageLoadFailed(true);
+                          }}
+                          onLoad={() => {
+                            console.log('Image loaded successfully');
+                          }}
+                        />
+                      );
+                    } else {
+                      return (
+                        <div className="relative">
+                          <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-200">
+                            <span className="text-2xl font-semibold text-gray-600">
+                              {getInitials(profile.firstName, profile.lastName)}
+                            </span>
+                          </div>
+                          {/* Warning for oversized image */}
+                          <div className="absolute -bottom-16 left-0 right-0 bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs">
+                            <p className="text-yellow-800 font-medium">⚠️ Image too large</p>
+                            <p className="text-yellow-600">Please upload a smaller image</p>
+                            <button
+                              onClick={handleRemovePhoto}
+                              className="mt-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded hover:bg-yellow-200"
+                            >
+                              Clear Photo
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+                  } else {
+                    return (
+                      <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-200">
+                        <span className="text-2xl font-semibold text-gray-600">
+                          {getInitials(profile.firstName, profile.lastName)}
+                        </span>
+                      </div>
+                    );
+                  }
+                })()}
                 <label htmlFor="photo-upload" className="absolute bottom-0 right-0 cursor-pointer">
                   <div className="bg-[#3B82F6] rounded-full p-1 text-white hover:bg-primary">
-                    <Camera className="h-4 w-4" />
+                    {isUploading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
                   </div>
                   <input
                     id="photo-upload"
@@ -355,7 +485,7 @@ export default function Profile() {
                     accept="image/*"
                     onChange={handlePhotoUpload}
                     className="hidden"
-                    disabled={isUploading} 
+                    disabled={isUploading}
                   />
                 </label>
               </div>
@@ -374,14 +504,17 @@ export default function Profile() {
                 </div>
               </div>
               {profile.adminProfile?.profileImageUrl && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRemovePhoto}
-                  className="text-[#3B82F6] hover:text-red-700"
-                >
-                  Change Photo
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemovePhoto}
+                    className="text-[#3B82F6] hover:text-red-700"
+                  >
+                    Change Photo
+                  </Button>
+                  
+                </>
               )}
             </div>
           </Card>

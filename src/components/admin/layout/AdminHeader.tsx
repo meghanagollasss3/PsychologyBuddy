@@ -85,7 +85,7 @@ export function AdminHeader({
                   <SelectValue placeholder="Select School" />
                 </div>
               </SelectTrigger>
-              <SelectContent className='bg-white'>
+              <SelectContent className='bg-white max-h-50 overflow-y-auto'>
                 <SelectItem value="all">All Schools</SelectItem>
                 {schools && schools.map((school) => (
                   <SelectItem key={school.id} value={school.id}>

@@ -55,9 +55,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/src/contexts/AuthContext";
+import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { useAdminLoading, AdminActions } from '@/src/contexts/AdminLoadingContext';
+import { LoadingButton, AdminLoader } from '@/src/components/admin/ui/AdminLoader';
+import { getAuthHeaders } from '@/src/utils';
 import {
   MeditationResource,
   ApiResponse,
@@ -92,13 +95,10 @@ export default function MeditationTools({
   // Get auth context
   const { user } = useAuth();
   const { toast } = useToast();
+  const { executeWithLoading, setLoading } = useAdminLoading();
 
   // File input ref
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  // Loading states
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Data states
   const [meditationResources, setMeditationResources] = useState<
@@ -118,12 +118,8 @@ export default function MeditationTools({
   const [meditationMoodsMap, setMeditationMoodsMap] = useState<{
     [key: string]: string;
   }>({});
-  const [meditationMoods, setMeditationMoods] = useState<string[]>(
-    defaultMeditationMoods,
-  );
-  const [meditationGoals, setMeditationGoals] = useState<string[]>(
-    defaultMeditationGoals,
-  );
+  const [moods, setMoods] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
 
   // Form states
   const [meditationForm, setMeditationForm] = useState({
@@ -142,6 +138,7 @@ export default function MeditationTools({
     type: "GUIDED" as "GUIDED" | "MUSIC" | "BREATHING" | "BODY_SCAN",
     status: "PUBLISHED" as "DRAFT" | "PUBLISHED" | "ARCHIVED",
     supportedMoods: [] as string[],
+    supportedGoals: [] as string[],
     duration: "",
   });
 
@@ -157,6 +154,8 @@ export default function MeditationTools({
   const [isMeditationMoodPopoverOpen, setIsMeditationMoodPopoverOpen] =
     useState(false);
   const [isMeditationGoalPopoverOpen, setIsMeditationGoalPopoverOpen] =
+    useState(false);
+  const [isMeditationSupportedGoalsPopoverOpen, setIsMeditationSupportedGoalsPopoverOpen] =
     useState(false);
   const [newMood, setNewMood] = useState("");
   const [newGoal, setNewGoal] = useState("");
@@ -184,50 +183,49 @@ export default function MeditationTools({
     proTip: "",
   });
 
+  // Submitting state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
   // API Functions
-  const fetchMeditationMoods = async () => {
+  const fetchLabels = async () => {
     try {
-      const response = await fetch("/api/admin/meditation/moods");
-      const data: ApiResponse<any[]> = await response.json();
-      if (data.success && data.data) {
-        const moodNames = data.data.map((mood: any) => mood.name);
-        const moodMap: { [key: string]: string } = {};
-        data.data.forEach((mood: any) => {
+      const headers = getAuthHeaders();
+      const [moodsRes, goalsRes] = await Promise.all([
+        fetch('/api/labels/moods', { headers }),
+        fetch('/api/labels/goals', { headers }),
+      ]);
+
+      const [moodsData, goalsData] = await Promise.all([
+        moodsRes.json(),
+        goalsRes.json(),
+      ]);
+
+      if (moodsData.success) {
+        setMoods(moodsData.data || []);
+        // Create mood map for ID mapping
+        const moodMap: {[key: string]: string} = {};
+        moodsData.data.forEach((mood: any) => {
           moodMap[mood.name] = mood.id;
         });
-        setMeditationMoods(moodNames);
         setMeditationMoodsMap(moodMap);
+      } else {
+        console.error("Moods API error:", moodsData.message);
       }
-    } catch (error) {
-      console.error("Failed to fetch meditation moods:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch meditation moods",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchMeditationGoals = async () => {
-    try {
-      const response = await fetch("/api/admin/meditation/goals");
-      const data: ApiResponse<any[]> = await response.json();
-      if (data.success && data.data) {
-        const goalNames = data.data.map((goal: any) => goal.name);
-        const goalMap: { [key: string]: string } = {};
-        data.data.forEach((goal: any) => {
+      
+      if (goalsData.success) {
+        setGoals(goalsData.data || []);
+        // Create goal map for ID mapping
+        const goalMap: {[key: string]: string} = {};
+        goalsData.data.forEach((goal: any) => {
           goalMap[goal.name] = goal.id;
         });
-        setMeditationGoals(goalNames);
         setMeditationGoalsMap(goalMap);
+      } else {
+        console.error("Goals API error:", goalsData.message);
       }
     } catch (error) {
-      console.error("Failed to fetch meditation goals:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch meditation goals",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch labels:", error);
     }
   };
 
@@ -256,20 +254,26 @@ export default function MeditationTools({
 
   const fetchMeditationResources = async () => {
     try {
-      console.log("Fetching meditation resources...");
-      const url = selectedSchool && selectedSchool !== 'all' 
-        ? `/api/admin/meditation/resources?page=1&limit=20&schoolId=${selectedSchool}`
-        : "/api/admin/meditation/resources?page=1&limit=20";
-      
-      const response = await fetch(url);
-      const data: ApiResponse<any> = await response.json();
-      console.log("Meditation resources response:", data);
-      if (data.success && data.data) {
-        console.log("Setting meditation resources:", data.data);
-        setMeditationResources(data.data);
-      } else {
-        console.log("No resources found or invalid response structure");
-      }
+      await executeWithLoading(
+        AdminActions.FETCH_MEDITATION_RESOURCES,
+        (async () => {
+          console.log("Fetching meditation resources...");
+          const url = selectedSchool && selectedSchool !== 'all' 
+            ? `/api/admin/meditation/resources?page=1&limit=20&schoolId=${selectedSchool}`
+            : "/api/admin/meditation/resources?page=1&limit=20";
+          
+          const response = await fetch(url);
+          const data: ApiResponse<any> = await response.json();
+          console.log("Meditation resources response:", data);
+          if (data.success && data.data) {
+            console.log("Setting meditation resources:", data.data);
+            setMeditationResources(data.data);
+          } else {
+            console.log("No resources found or invalid response structure");
+          }
+        })(),
+        'Loading meditation Data...'
+      );
     } catch (error) {
       console.error("Failed to fetch meditation resources:", error);
       toast({
@@ -375,23 +379,56 @@ export default function MeditationTools({
 
   const editMeditationResource = (resource: MeditationResource) => {
     setSelectedMeditationResource(resource);
+    
+    // Extract category name from categories array
+    const categoryName = resource.categories && resource.categories.length > 0 
+      ? resource.categories[0].category.name 
+      : "";
+    
+    // Extract goal name from goals array  
+    const goalName = resource.goals && resource.goals.length > 0
+      ? resource.goals[0].goal.name
+      : "";
+    
+    // Extract supported moods from moods array
+    const supportedMoods = resource.moods 
+      ? resource.moods.map(mood => mood.mood.name)
+      : [];
+    
+    // Extract supported goals from goals array
+    const supportedGoals = resource.goals 
+      ? resource.goals.map(goal => goal.goal.name)
+      : [];
+    
+    console.log('Edit Meditation Resource Data:', {
+      resource,
+      categoryName,
+      goalName,
+      supportedMoods,
+      supportedGoals,
+      audioUrl: resource.audioUrl,
+      videoUrl: resource.videoUrl,
+      allFields: Object.keys(resource)
+    });
+    
     setMeditationForm({
       id: resource.id,
       title: resource.title || "",
       description: resource.description || "",
       format: resource.format || "AUDIO",
       durationSec: resource.durationSec ? resource.durationSec.toString() : "",
-      category: "",
-      goal: "",
-      mood: "",
+      category: categoryName,
+      goal: goalName,
+      mood: "", // This field doesn't seem to be used in the interface
       instructor: resource.instructor || "",
       thumbnailUrl: resource.thumbnailUrl || "",
       audioUrl: resource.audioUrl || "",
       videoUrl: resource.videoUrl || "",
       type: resource.type || "GUIDED",
       status: resource.status || "DRAFT",
-      supportedMoods: [],
-      duration: "",
+      supportedMoods: supportedMoods,
+      supportedGoals: supportedGoals,
+      duration: resource.durationSec ? Math.ceil(resource.durationSec / 60).toString() : "",
     });
     setIsEditMeditationOpen(true);
   };
@@ -401,6 +438,46 @@ export default function MeditationTools({
 
     setIsSubmitting(true);
     try {
+      // Validate all required fields
+      const validationErrors: string[] = [];
+      
+      // Check title
+      if (!meditationForm.title.trim()) {
+        validationErrors.push("Title is required");
+      }
+      
+      // Check audio/video file
+      const mediaUrl = meditationForm.audioUrl || meditationForm.videoUrl;
+      if (!mediaUrl) {
+        validationErrors.push("Please upload an audio or video file");
+      }
+      
+      // Check category
+      if (!meditationForm.category) {
+        validationErrors.push("Category is required");
+      }
+      
+      // Check supported moods
+      if (!meditationForm.supportedMoods || meditationForm.supportedMoods.length === 0) {
+        validationErrors.push("At least one supported mood is required");
+      }
+      
+      // Check supported goals
+      if (!meditationForm.supportedGoals || meditationForm.supportedGoals.length === 0) {
+        validationErrors.push("At least one supported goal is required");
+      }
+      
+      // If there are validation errors, show them and return
+      if (validationErrors.length > 0) {
+        toast({ 
+          title: "Validation Error", 
+          description: validationErrors.join(", "), 
+          variant: "destructive" 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Build payload with conditional school ID
       const payload: any = {
         id: selectedMeditationResource.id,
@@ -490,6 +567,7 @@ export default function MeditationTools({
           type: "GUIDED",
           status: "PUBLISHED",
           supportedMoods: [],
+          supportedGoals: [],
           duration: "",
         });
         await fetchMeditationResources();
@@ -513,6 +591,46 @@ export default function MeditationTools({
   const createMeditationResource = async () => {
     setIsSubmitting(true);
     try {
+      // Validate all required fields
+      const validationErrors: string[] = [];
+      
+      // Check title
+      if (!meditationForm.title.trim()) {
+        validationErrors.push("Title is required");
+      }
+      
+      // Check audio/video file
+      const mediaUrl = meditationForm.audioUrl || meditationForm.videoUrl;
+      if (!mediaUrl) {
+        validationErrors.push("Please upload an audio or video file");
+      }
+      
+      // Check category
+      if (!meditationForm.category) {
+        validationErrors.push("Category is required");
+      }
+      
+      // Check supported moods
+      if (!meditationForm.supportedMoods || meditationForm.supportedMoods.length === 0) {
+        validationErrors.push("At least one supported mood is required");
+      }
+      
+      // Check supported goals
+      if (!meditationForm.supportedGoals || meditationForm.supportedGoals.length === 0) {
+        validationErrors.push("At least one supported goal is required");
+      }
+      
+      // If there are validation errors, show them and return
+      if (validationErrors.length > 0) {
+        toast({ 
+          title: "Required", 
+          description: validationErrors.join(", "), 
+          variant: "destructive" 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Build payload with conditional school ID
       const payload: any = {
         title: meditationForm.title,
@@ -605,6 +723,7 @@ export default function MeditationTools({
           type: "GUIDED",
           status: "PUBLISHED",
           supportedMoods: [],
+          supportedGoals: [],
           duration: "",
         });
         setIsAddMeditationOpen?.(false);
@@ -760,14 +879,18 @@ export default function MeditationTools({
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([
-        fetchMeditationResources(),
-        fetchMeditationMoods(),
-        fetchMeditationGoals(),
-        fetchMeditationCategories(),
-        fetchMeditationInstructions(),
-      ]);
-      setIsLoading(false);
+      setLoading(AdminActions.FETCH_MEDITATION_RESOURCES, true, "Loading meditation data...");
+      try {
+        await Promise.all([
+          fetchMeditationResources(),
+          fetchLabels(),
+          fetchMeditationCategories(),
+          fetchMeditationInstructions(),
+        ]);
+      } finally {
+        setIsLoading(false);
+        setLoading(AdminActions.FETCH_MEDITATION_RESOURCES, false);
+      }
     };
     loadData();
   }, [selectedSchool]);
@@ -1009,30 +1132,32 @@ export default function MeditationTools({
   console.log("Current meditation resources:", meditationResources);
   console.log("Filtered meditation resources:", filteredMeditationResources);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading meditation resources...</span>
-        </div>
-      </div>
-    );
-  }
+  
 
   return (
     <div className="space-y-6">
       {/* Search Section */}
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+        <div className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]">
+          <Search className="h-4 w-4" />
+        </div>
         <Input
           placeholder="Search meditation..."
-          className="pl-9"
+          className={`pl-9 ${searchQuery ? 'pr-9' : ''}`}
           value={searchQuery}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
             setSearchQuery(e.target.value)
           }
         />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B] hover:text-[#1E293B] transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1261,7 +1386,7 @@ export default function MeditationTools({
 
       {/* Add Meditation Modal */}
       <Dialog open={isAddMeditationOpen} onOpenChange={setIsAddMeditationOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0" onInteractOutside={(e) => e.preventDefault()}>
           <div className="p-6 border-b border-[#E2E8F0]">
             <DialogTitle className="text-xl">
               Add Meditation Resource
@@ -1273,7 +1398,7 @@ export default function MeditationTools({
           <div className="grid md:grid-cols-2 gap-0">
             <div className="p-6 border-r border-[#E2E8F0] space-y-4">
               <div className="grid gap-2">
-                <Label>Title</Label>
+                <Label>Title <span className="text-red-500">*</span></Label>
                 <Input
                   value={meditationForm.title}
                   onChange={(e) =>
@@ -1286,7 +1411,7 @@ export default function MeditationTools({
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Description</Label>
+                <Label>Description <span className="text-red-500">*</span></Label>
                 <Textarea
                   value={meditationForm.description}
                   onChange={(e) =>
@@ -1300,7 +1425,7 @@ export default function MeditationTools({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Thumbnail</Label>
+                <Label>Thumbnail <span className="text-red-500">*</span></Label>
                 <div
                   className="border-2 border-dashed border-[#E2E8F0] rounded-lg p-4 text-center cursor-pointer hover:border-[#3B82F6]/50"
                   onClick={() => document.getElementById("med-thumb")?.click()}
@@ -1328,7 +1453,7 @@ export default function MeditationTools({
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label>Format</Label>
+                <Label>Format <span className="text-red-500">*</span></Label>
                 <Select
                   value={meditationForm.format}
                   onValueChange={(v: "AUDIO" | "VIDEO" | "TEXT") =>
@@ -1351,7 +1476,7 @@ export default function MeditationTools({
                     ? "Video"
                     : meditationForm.format === "AUDIO"
                       ? "Audio"
-                      : "Text"}
+                      : "Text"} <span className="text-red-500">*</span>
                 </Label>
                 <div
                   className="border-2 border-dashed border-[#E2E8F0] rounded-lg p-4 text-center cursor-pointer hover:border-[#3B82F6]/50"
@@ -1406,7 +1531,7 @@ export default function MeditationTools({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>Category</Label>
+                  <Label>Category <span className="text-red-500">*</span></Label>
                   <Select
                     value={meditationForm.category}
                     onValueChange={(v) =>
@@ -1426,7 +1551,7 @@ export default function MeditationTools({
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label>Status</Label>
+                  <Label>Status <span className="text-red-500">*</span></Label>
                   <Select
                     value={meditationForm.status}
                     onValueChange={(v: "DRAFT" | "PUBLISHED" | "ARCHIVED") =>
@@ -1446,7 +1571,7 @@ export default function MeditationTools({
               </div>
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label>Supported Moods</Label>
+                  <Label>Supported Moods <span className="text-red-500">*</span></Label>
                   <Popover
                     open={isMeditationMoodPopoverOpen}
                     onOpenChange={setIsMeditationMoodPopoverOpen}
@@ -1476,18 +1601,18 @@ export default function MeditationTools({
                       align="start"
                     >
                       <div className="space-y-2">
-                        {meditationMoods.map((mood) => (
+                        {moods.map((mood) => (
                           <div
-                            key={mood}
+                            key={mood.id}
                             className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-[#F1F5F9]"
                             onClick={() => {
                               if (
-                                meditationForm.supportedMoods.includes(mood)
+                                meditationForm.supportedMoods.includes(mood.name)
                               ) {
                                 setMeditationForm((prev) => ({
                                   ...prev,
                                   supportedMoods: prev.supportedMoods.filter(
-                                    (m) => m !== mood,
+                                    (m) => m !== mood.name,
                                   ),
                                 }));
                               } else {
@@ -1495,20 +1620,20 @@ export default function MeditationTools({
                                   ...prev,
                                   supportedMoods: [
                                     ...prev.supportedMoods,
-                                    mood,
+                                    mood.name,
                                   ],
                                 }));
                               }
                             }}
                           >
                             <div
-                              className={`h-4 w-4 border rounded flex items-center justify-center ${meditationForm.supportedMoods.includes(mood) ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
+                              className={`h-4 w-4 border rounded flex items-center justify-center ${meditationForm.supportedMoods.includes(mood.name) ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
                             >
-                              {meditationForm.supportedMoods.includes(mood) && (
+                              {meditationForm.supportedMoods.includes(mood.name) && (
                                 <Check className="h-3 w-3 text-[#FFFFFF]" />
                               )}
                             </div>
-                            <span className="text-sm">{mood}</span>
+                            <span className="text-sm">{mood.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -1527,11 +1652,11 @@ export default function MeditationTools({
                                 e.stopPropagation();
                                 if (
                                   newMood.trim() &&
-                                  !meditationMoods.includes(newMood.trim())
+                                  !moods.some((mood: any) => mood.name === newMood.trim())
                                 ) {
-                                  setMeditationMoods((prev) => [
+                                  setMoods((prev) => [
                                     ...prev,
-                                    newMood.trim(),
+                                    { name: newMood.trim(), id: Date.now().toString() },
                                   ]);
                                   toast({ title: "Mood Added" });
                                   setNewMood("");
@@ -1547,6 +1672,107 @@ export default function MeditationTools({
                   </Popover>
                 </div>
                 <div className="grid gap-2">
+                  <Label>Supported Goals <span className="text-red-500">*</span></Label>
+                  <Popover
+                    open={isMeditationSupportedGoalsPopoverOpen}
+                    onOpenChange={setIsMeditationSupportedGoalsPopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                      >
+                        <span
+                          className={
+                            meditationForm.supportedGoals.length > 0
+                              ? ""
+                              : "text-[#64748B]"
+                          }
+                        >
+                          {meditationForm.supportedGoals.length > 0
+                            ? meditationForm.supportedGoals.join(", ")
+                            : "Select goals..."}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-full p-2 border bg-[#FFFFFF] shadow-xl rounded-[6px]"
+                      align="start"
+                    >
+                      <div className="space-y-2">
+                        {goals.map((goal) => (
+                          <div
+                            key={goal.id}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-[#F1F5F9]"
+                            onClick={() => {
+                              if (
+                                meditationForm.supportedGoals.includes(goal.name)
+                              ) {
+                                setMeditationForm((prev) => ({
+                                  ...prev,
+                                  supportedGoals: prev.supportedGoals.filter(
+                                    (g) => g !== goal.name,
+                                  ),
+                                }));
+                              } else {
+                                setMeditationForm((prev) => ({
+                                  ...prev,
+                                  supportedGoals: [
+                                    ...prev.supportedGoals,
+                                    goal.name,
+                                  ],
+                                }));
+                              }
+                            }}
+                          >
+                            <div
+                              className={`h-4 w-4 border rounded flex items-center justify-center ${meditationForm.supportedGoals.includes(goal.name) ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
+                            >
+                              {meditationForm.supportedGoals.includes(goal.name) && (
+                                <Check className="h-3 w-3 text-[#FFFFFF]" />
+                              )}
+                            </div>
+                            <span className="text-sm">{goal.name}</span>
+                          </div>
+                        ))}
+                        <div className="border-t pt-2 mt-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Add new goal..."
+                              value={newGoal}
+                              onChange={(e) => setNewGoal(e.target.value)}
+                              className="h-8 text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (
+                                  newGoal.trim() &&
+                                  !goals.some((goal: any) => goal.name === newGoal.trim())
+                                ) {
+                                  setGoals((prev) => [
+                                    ...prev,
+                                    { name: newGoal.trim(), id: Date.now().toString() },
+                                  ]);
+                                  toast({ title: "Goal Added" });
+                                  setNewGoal("");
+                                }
+                              }}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                {/* <div className="grid gap-2">
                   <Label>Goal</Label>
                   <Popover
                     open={isMeditationGoalPopoverOpen}
@@ -1573,23 +1799,23 @@ export default function MeditationTools({
                       align="start"
                     >
                       <div className="space-y-2">
-                        {meditationGoals.map((goal) => (
+                        {goals.map((goal) => (
                           <div
-                            key={goal}
+                            key={goal.id}
                             className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-[#F1F5F9]"
                             onClick={() => {
-                              setMeditationForm((prev) => ({ ...prev, goal }));
+                              setMeditationForm((prev) => ({ ...prev, goal: goal.name }));
                               setIsMeditationGoalPopoverOpen(false);
                             }}
                           >
                             <div
-                              className={`h-4 w-4 border rounded-full flex items-center justify-center ${meditationForm.goal === goal ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
+                              className={`h-4 w-4 border rounded-full flex items-center justify-center ${meditationForm.goal === goal.name ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
                             >
-                              {meditationForm.goal === goal && (
+                              {meditationForm.goal === goal.name && (
                                 <div className="h-2 w-2 rounded-full bg-[#3B82F6]-foreground" />
                               )}
                             </div>
-                            <span className="text-sm">{goal}</span>
+                            <span className="text-sm">{goal.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -1608,9 +1834,9 @@ export default function MeditationTools({
                                 e.stopPropagation();
                                 if (
                                   newGoal.trim() &&
-                                  !meditationGoals.includes(newGoal.trim())
+                                  !goals.includes(newGoal.trim())
                                 ) {
-                                  setMeditationGoals((prev) => [
+                                  setGoals((prev) => [
                                     ...prev,
                                     newGoal.trim(),
                                   ]);
@@ -1626,7 +1852,7 @@ export default function MeditationTools({
                       </div>
                     </PopoverContent>
                   </Popover>
-                </div>
+                </div> */}
               </div>
             </div>
             <div className="p-6 bg-muted/30">
@@ -1683,12 +1909,13 @@ export default function MeditationTools({
             >
               Cancel
             </Button>
-            <Button onClick={createMeditationResource} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
+            <LoadingButton 
+              onClick={createMeditationResource}
+              disabled={isSubmitting}
+              loadingText="Creating..."
+            >
               Save
-            </Button>
+            </LoadingButton>
           </div>
         </DialogContent>
       </Dialog>
@@ -1698,7 +1925,7 @@ export default function MeditationTools({
         open={isEditMeditationOpen}
         onOpenChange={setIsEditMeditationOpen}
       >
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0" onInteractOutside={(e) => e.preventDefault()}>
           <div className="p-6 border-b border-[#E2E8F0]">
             <DialogTitle className="text-xl">
               Edit Meditation Resource
@@ -1911,22 +2138,22 @@ export default function MeditationTools({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-full p-2 bg-popover"
+                      className="w-full p-2 bg-white"
                       align="start"
                     >
                       <div className="space-y-2">
-                        {meditationMoods.map((mood) => (
+                        {moods.map((mood) => (
                           <div
-                            key={mood}
+                            key={mood.id}
                             className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted"
                             onClick={() => {
                               if (
-                                meditationForm.supportedMoods.includes(mood)
+                                meditationForm.supportedMoods.includes(mood.name)
                               ) {
                                 setMeditationForm((prev) => ({
                                   ...prev,
                                   supportedMoods: prev.supportedMoods.filter(
-                                    (m) => m !== mood,
+                                    (m) => m !== mood.name,
                                   ),
                                 }));
                               } else {
@@ -1934,20 +2161,20 @@ export default function MeditationTools({
                                   ...prev,
                                   supportedMoods: [
                                     ...prev.supportedMoods,
-                                    mood,
+                                    mood.name,
                                   ],
                                 }));
                               }
                             }}
                           >
                             <div
-                              className={`h-4 w-4 border rounded flex items-center justify-center ${meditationForm.supportedMoods.includes(mood) ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
+                              className={`h-4 w-4 border rounded flex items-center justify-center ${meditationForm.supportedMoods.includes(mood.name) ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
                             >
-                              {meditationForm.supportedMoods.includes(mood) && (
+                              {meditationForm.supportedMoods.includes(mood.name) && (
                                 <Check className="h-3 w-3 text-[#FFFFFF]" />
                               )}
                             </div>
-                            <span className="text-sm">{mood}</span>
+                            <span className="text-sm">{mood.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -1966,11 +2193,11 @@ export default function MeditationTools({
                                 e.stopPropagation();
                                 if (
                                   newMood.trim() &&
-                                  !meditationMoods.includes(newMood.trim())
+                                  !moods.some((mood: any) => mood.name === newMood.trim())
                                 ) {
-                                  setMeditationMoods((prev) => [
+                                  setMoods((prev) => [
                                     ...prev,
-                                    newMood.trim(),
+                                    { name: newMood.trim(), id: Date.now().toString() },
                                   ]);
                                   toast({ title: "Mood Added" });
                                   setNewMood("");
@@ -1986,6 +2213,107 @@ export default function MeditationTools({
                   </Popover>
                 </div>
                 <div className="grid gap-2">
+                  <Label>Supported Goals</Label>
+                  <Popover
+                    open={isMeditationSupportedGoalsPopoverOpen}
+                    onOpenChange={setIsMeditationSupportedGoalsPopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                      >
+                        <span
+                          className={
+                            meditationForm.supportedGoals.length > 0
+                              ? ""
+                              : "text-[#64748B]"
+                          }
+                        >
+                          {meditationForm.supportedGoals.length > 0
+                            ? meditationForm.supportedGoals.join(", ")
+                            : "Select goals..."}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-full p-2 border bg-[#FFFFFF] shadow-xl rounded-[6px]"
+                      align="start"
+                    >
+                      <div className="space-y-2">
+                        {goals.map((goal) => (
+                          <div
+                            key={goal.id}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              if (
+                                meditationForm.supportedGoals.includes(goal.name)
+                              ) {
+                                setMeditationForm((prev) => ({
+                                  ...prev,
+                                  supportedGoals: prev.supportedGoals.filter(
+                                    (g) => g !== goal.name,
+                                  ),
+                                }));
+                              } else {
+                                setMeditationForm((prev) => ({
+                                  ...prev,
+                                  supportedGoals: [
+                                    ...prev.supportedGoals,
+                                    goal.name,
+                                  ],
+                                }));
+                              }
+                            }}
+                          >
+                            <div
+                              className={`h-4 w-4 border rounded flex items-center justify-center ${meditationForm.supportedGoals.includes(goal.name) ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
+                            >
+                              {meditationForm.supportedGoals.includes(goal.name) && (
+                                <Check className="h-3 w-3 text-[#FFFFFF]" />
+                              )}
+                            </div>
+                            <span className="text-sm">{goal.name}</span>
+                          </div>
+                        ))}
+                        <div className="border-t pt-2 mt-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Add new goal..."
+                              value={newGoal}
+                              onChange={(e) => setNewGoal(e.target.value)}
+                              className="h-8 text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (
+                                  newGoal.trim() &&
+                                  !goals.some((goal: any) => goal.name === newGoal.trim())
+                                ) {
+                                  setGoals((prev) => [
+                                    ...prev,
+                                    { name: newGoal.trim(), id: Date.now().toString() },
+                                  ]);
+                                  toast({ title: "Goal Added" });
+                                  setNewGoal("");
+                                }
+                              }}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                {/* <div className="grid gap-2">
                   <Label>Goal</Label>
                   <Popover
                     open={isMeditationGoalPopoverOpen}
@@ -2012,23 +2340,23 @@ export default function MeditationTools({
                       align="start"
                     >
                       <div className="space-y-2">
-                        {meditationGoals.map((goal) => (
+                        {goals.map((goal) => (
                           <div
-                            key={goal}
+                            key={goal.id}
                             className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted"
                             onClick={() => {
-                              setMeditationForm((prev) => ({ ...prev, goal }));
+                              setMeditationForm((prev) => ({ ...prev, goal: goal.name }));
                               setIsMeditationGoalPopoverOpen(false);
                             }}
                           >
                             <div
-                              className={`h-4 w-4 border rounded-full flex items-center justify-center ${meditationForm.goal === goal ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
+                              className={`h-4 w-4 border rounded-full flex items-center justify-center ${meditationForm.goal === goal.name ? "bg-[#3B82F6] border-[#3B82F6]" : "border-[#E2E8F0]"}`}
                             >
-                              {meditationForm.goal === goal && (
+                              {meditationForm.goal === goal.name && (
                                 <div className="h-2 w-2 rounded-full bg-[#3B82F6]-foreground" />
                               )}
                             </div>
-                            <span className="text-sm">{goal}</span>
+                            <span className="text-sm">{goal.name}</span>
                           </div>
                         ))}
                         <div className="border-t pt-2 mt-2">
@@ -2047,9 +2375,9 @@ export default function MeditationTools({
                                 e.stopPropagation();
                                 if (
                                   newGoal.trim() &&
-                                  !meditationGoals.includes(newGoal.trim())
+                                  !goals.includes(newGoal.trim())
                                 ) {
-                                  setMeditationGoals((prev) => [
+                                  setGoals((prev) => [
                                     ...prev,
                                     newGoal.trim(),
                                   ]);
@@ -2065,7 +2393,7 @@ export default function MeditationTools({
                       </div>
                     </PopoverContent>
                   </Popover>
-                </div>
+                </div> */}
               </div>
             </div>
             <div className="p-6 bg-muted/30">
@@ -2122,12 +2450,13 @@ export default function MeditationTools({
             >
               Cancel
             </Button>
-            <Button onClick={updateMeditationResource} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
+            <LoadingButton 
+              onClick={updateMeditationResource}
+              disabled={isSubmitting}
+              loadingText="Updating..."
+            >
               Update
-            </Button>
+            </LoadingButton>
           </div>
         </DialogContent>
       </Dialog>
@@ -2137,7 +2466,7 @@ export default function MeditationTools({
         open={isAddMeditationCategoryModalOpen}
         onOpenChange={setIsAddMeditationCategoryModalOpen}
       >
-        <DialogContent className="sm:max-w-md bg-[#FFFFFF]">
+        <DialogContent className="sm:max-w-md bg-[#FFFFFF]" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add Meditation Category</DialogTitle>
             <DialogDescription className="text-[#65758b]">
@@ -2180,16 +2509,13 @@ export default function MeditationTools({
             >
               Cancel
             </Button>
-            <Button onClick={createMeditationCategory} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Category"
-              )}
-            </Button>
+            <LoadingButton 
+              onClick={createMeditationCategory}
+              disabled={isSubmitting}
+              loadingText="Creating..."
+            >
+              Create Category
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2199,7 +2525,7 @@ export default function MeditationTools({
         open={isEditMeditationInstructionsOpen}
         onOpenChange={setIsEditMeditationInstructionsOpen}
       >
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>
               {meditationInstructions ? "Edit" : "Add"} Meditation Instructions

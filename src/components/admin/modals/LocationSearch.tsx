@@ -16,9 +16,10 @@ interface LocationSearchProps {
   onLocationSelect: (location: Location | null) => void;
   placeholder?: string;
   initialLocationId?: string;
+  className?: string;
 }
 
-export function LocationSearch({ schoolId, onLocationSelect, placeholder = "Search locations...", initialLocationId }: LocationSearchProps) {
+export function LocationSearch({ schoolId, onLocationSelect, placeholder = "Search locations...", initialLocationId, className }: LocationSearchProps) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState(initialLocationId || '');
@@ -92,7 +93,7 @@ export function LocationSearch({ schoolId, onLocationSelect, placeholder = "Sear
       <select
         value={selectedLocationId}
         onChange={(e) => handleLocationChange(e.target.value)}
-        className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+        className={`w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none ${className || ''}`}
         disabled={!schoolId || loading}
       >
         <option value="">

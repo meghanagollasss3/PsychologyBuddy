@@ -98,19 +98,66 @@ export class UserService {
   // Create school
   static async createSchool(data: {
     name: string;
-    phone?: string;
-    email?: string;
+    phone: string;
+    email: string;
     primaryAdminId?: string;
+    location?: {
+      name: string;
+      address: string;
+      city?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+      isMain?: boolean;
+    };
   }) {
     try {
+      // Validate required fields
+      if (!data.phone || data.phone.trim() === '') {
+        throw new AuthError('Phone number is required', 400);
+      }
+      
+      if (!data.email || data.email.trim() === '') {
+        throw new AuthError('Email is required', 400);
+      }
+
+      // Check if school with same name already exists (case-insensitive)
+      const normalizedName = data.name.trim().toLowerCase();
+      const existingSchoolByName = await prisma.school.findFirst({
+        where: { 
+          name: {
+            equals: normalizedName,
+            mode: 'insensitive'
+          }
+        },
+      });
+
+      if (existingSchoolByName) {
+        throw new AuthError('School with this name already exists', 409);
+      }
+
       // Check if school with same email already exists
-      if (data.email) {
-        const existingSchool = await prisma.school.findFirst({
-          where: { email: data.email.toLowerCase().trim() },
+      const existingSchool = await prisma.school.findFirst({
+        where: { email: data.email.toLowerCase().trim() },
+      });
+
+      if (existingSchool) {
+        throw new AuthError('School with this email already exists', 409);
+      }
+
+      // Check if school with same phone number already exists
+      if (data.phone) {
+        const normalizedPhone = data.phone.replace(/\D/g, ''); // Remove all non-numeric characters
+        if (normalizedPhone.length !== 10) {
+          throw new AuthError('Phone number must be exactly 10 digits', 400);
+        }
+
+        const existingSchoolByPhone = await prisma.school.findFirst({
+          where: { phone: normalizedPhone },
         });
 
-        if (existingSchool) {
-          throw new AuthError('School with this email already exists', 409);
+        if (existingSchoolByPhone) {
+          throw new AuthError('School with this phone number already exists', 409);
         }
       }
 
@@ -121,14 +168,39 @@ export class UserService {
       const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
       const userFriendlyId = `SCH-${nameAbbreviation}-${timestamp}-${randomSuffix}`;
 
-      const school = await prisma.school.create({
-        data: {
-          id: userFriendlyId,
-          name: data.name,
-          phone: data.phone,
-          email: data.email?.toLowerCase().trim(), // Store email in lowercase
-          primaryAdminId: data.primaryAdminId,
-        },
+      // Create school and location in a transaction
+      const result = await prisma.$transaction(async (tx) => {
+        const school = await tx.school.create({
+          data: {
+            id: userFriendlyId,
+            name: data.name.trim(), // Store trimmed name (preserve original case for display)
+            phone: data.phone.replace(/\D/g, ''), // Store normalized phone
+            email: data.email.toLowerCase().trim(), // Store email in lowercase
+            primaryAdminId: data.primaryAdminId,
+          },
+        });
+
+        // Create default location if provided
+        if (data.location) {
+          await tx.schoolLocation.create({
+            data: {
+              schoolId: school.id,
+              name: data.location.name.trim(),
+              address: data.location.address.trim(),
+              city: data.location.city?.trim() || null,
+              state: data.location.state?.trim() || null,
+              country: data.location.country?.trim() || null,
+              postalCode: data.location.postalCode?.trim() || null,
+              isMain: data.location.isMain || true,
+            },
+          });
+        }
+
+        return school;
+      });
+
+      const school = await prisma.school.findUnique({
+        where: { id: result.id },
         include: {
           primaryAdmin: {
             select: {
@@ -137,7 +209,12 @@ export class UserService {
               lastName: true,
               email: true,
             }
-          }
+          },
+          _count: {
+            select: {
+              locations: true,
+            },
+          },
         },
       });
 
@@ -154,12 +231,80 @@ export class UserService {
     email?: string;
   }) {
     try {
+      // Check if school with same name already exists (excluding current school)
+      if (data.name) {
+        const normalizedName = data.name.trim().toLowerCase();
+        const existingSchoolByName = await prisma.school.findFirst({
+          where: { 
+            name: {
+              equals: normalizedName,
+              mode: 'insensitive'
+            },
+            id: { not: schoolId }
+          },
+        });
+
+        if (existingSchoolByName) {
+          throw new AuthError('School with this name already exists', 409);
+        }
+      }
+
+      // Check if school with same email already exists (excluding current school)
+      if (data.email) {
+        const existingSchool = await prisma.school.findFirst({
+          where: { 
+            email: data.email.toLowerCase().trim(),
+            id: { not: schoolId }
+          },
+        });
+
+        if (existingSchool) {
+          throw new AuthError('School with this email already exists', 409);
+        }
+      }
+
+      // Check if school with same phone number already exists (excluding current school)
+      if (data.phone) {
+        const normalizedPhone = data.phone.replace(/\D/g, ''); // Remove all non-numeric characters
+        if (normalizedPhone.length !== 10) {
+          throw new AuthError('Phone number must be exactly 10 digits', 400);
+        }
+
+        const existingSchoolByPhone = await prisma.school.findFirst({
+          where: { 
+            phone: normalizedPhone,
+            id: { not: schoolId }
+          },
+        });
+
+        if (existingSchoolByPhone) {
+          throw new AuthError('School with this phone number already exists', 409);
+        }
+      }
+
+      const updateData: any = {
+        ...data,
+        updatedAt: new Date(),
+      };
+
+      // Normalize phone number if provided
+      if (data.phone) {
+        updateData.phone = data.phone.replace(/\D/g, '');
+      }
+
+      // Normalize email if provided
+      if (data.email) {
+        updateData.email = data.email.toLowerCase().trim();
+      }
+
+      // Trim name if provided
+      if (data.name) {
+        updateData.name = data.name.trim();
+      }
+
       const school = await prisma.school.update({
         where: { id: schoolId },
-        data: {
-          ...data,
-          updatedAt: new Date(),
-        },
+        data: updateData,
       });
 
       return ApiResponse.success(school, 'School updated successfully');

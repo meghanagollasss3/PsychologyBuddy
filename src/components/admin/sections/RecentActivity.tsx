@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useTimeFilter, type TimeFilter, type DateRange } from "@/src/contexts/TimeFilterContext";
+import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 // ------------------------------
 // Activity Type Interface
@@ -29,10 +31,13 @@ interface Activity {
 // ------------------------------
 // API Fetching Function
 // ------------------------------
-async function fetchActivities({ pageParam = 0, timeFilter, dateRange }: { 
+async function fetchActivities({ pageParam = 0, timeFilter, dateRange, selectedSchoolId, isSuperAdmin, user }: { 
   pageParam?: number; 
   timeFilter: TimeFilter; 
-  dateRange: DateRange 
+  dateRange: DateRange;
+  selectedSchoolId?: string;
+  isSuperAdmin?: boolean;
+  user?: any;
 }) {
   const limit = 5;
   const params = new URLSearchParams({
@@ -50,6 +55,17 @@ async function fetchActivities({ pageParam = 0, timeFilter, dateRange }: {
     params.append('startDate', dateRange.start.toISOString());
     params.append('endDate', dateRange.end.toISOString());
     console.log('RecentActivities: Adding dateRange', dateRange);
+  }
+
+  // Add school filter if applicable
+  if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
+    params.append('schoolId', selectedSchoolId);
+    console.log('RecentActivities: Adding schoolId', selectedSchoolId);
+  } else if (!isSuperAdmin && (user?.schoolId || user?.school?.id)) {
+    // For Admins, we should pass their schoolId too
+    const adminSchoolId = user?.schoolId || user?.school?.id;
+    params.append('schoolId', adminSchoolId);
+    console.log('RecentActivities: Adding admin schoolId', adminSchoolId);
   }
 
   console.log('RecentActivities: Fetching with params', params.toString());
@@ -169,9 +185,13 @@ ActivityRow.displayName = "ActivityRow";
 export function RecentActivity() {
   const router = useRouter();
   const { timeFilter, dateRange } = useTimeFilter();
+  const { selectedSchoolId, isSuperAdmin } = useSchoolFilter();
+  const { user } = useAuth();
 
   console.log('RecentActivity Component: timeFilter', timeFilter);
   console.log('RecentActivity Component: dateRange', dateRange);
+  console.log('RecentActivity Component: selectedSchoolId', selectedSchoolId);
+  console.log('RecentActivity Component: isSuperAdmin', isSuperAdmin);
 
   const {
     data,
@@ -181,8 +201,8 @@ export function RecentActivity() {
     isFetchingNextPage,
     error,
   } = useInfiniteQuery({
-    queryKey: ["recent-activities", timeFilter, dateRange],
-    queryFn: ({ pageParam }) => fetchActivities({ pageParam, timeFilter, dateRange }),
+    queryKey: ["recent-activities", timeFilter, dateRange, selectedSchoolId],
+    queryFn: ({ pageParam }) => fetchActivities({ pageParam, timeFilter, dateRange, selectedSchoolId, isSuperAdmin, user }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset,
     staleTime: 30_000,

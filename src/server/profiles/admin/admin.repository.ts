@@ -138,7 +138,7 @@ export const AdminRepository = {
   },
 
   // Get all admins (SuperAdmin only)
-  getAllAdmins: async (schoolId?: string, locationId?: string) => {
+  getAllAdmins: async (schoolId?: string, locationId?: string, page: number = 1, limit: number = 10) => {
     // Debug: Check LocationAdminAssignments table count at the start
     try {
       const tableCheck = await prisma.$queryRaw<any[]>`
@@ -172,9 +172,27 @@ export const AdminRepository = {
       };
     }
 
+    // Get total count for pagination
+    const total = await prisma.user.count({
+      where: whereClause,
+    });
+
+    // Get paginated results
     const admins = await prisma.user.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        lastActive: true,
+        emailVerified: true,
+        roleId: true,
+        schoolId: true,
         role: {
           include: {
             rolePermissions: {
@@ -203,7 +221,12 @@ export const AdminRepository = {
       orderBy: {
         createdAt: 'desc',
       },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
 
     // Get location assignments for ADMIN role users
     const adminsWithLocations = await Promise.all(
@@ -303,7 +326,20 @@ export const AdminRepository = {
   getAdminById: async (id: string) => {
     return prisma.user.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        lastActive: true,
+        emailVerified: true,
+        roleId: true,
+        schoolId: true,
+        password: true, // Include password so it can be removed in service layer
         role: {
           include: {
             rolePermissions: {
@@ -344,13 +380,14 @@ export const AdminRepository = {
       throw new Error('Admin not found');
     }
 
-    // Update the admin basic info
+    // Update admin basic info
     const updatedAdmin = await prisma.user.update({
       where: { id },
       data: {
         ...(data.firstName && { firstName: data.firstName }),
         ...(data.lastName && { lastName: data.lastName }),
         ...(data.phone && { phone: data.phone }),
+        ...(data.status && { status: data.status }),
         ...(data.schoolId && { schoolId: data.schoolId }),
         adminProfile: {
           upsert: {

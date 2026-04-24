@@ -6,7 +6,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useSchoolFilter } from '@/src/contexts/SchoolFilterContext';
 
 import {
-  Plus, Search, MoreVertical, Edit, Trash2, Shield, Eye, Users
+  Plus, Search, MoreVertical, Edit, Trash2, Shield, Eye, Users, X
 } from 'lucide-react';
 
 import { AddAdminModal } from '../modals/AddAdminModal';
@@ -15,6 +15,7 @@ import { ViewAdminModal } from '../modals/ViewAdminModal';
 
 import { Admin } from '@/src/types/admin.types';
 import { AdminHeader } from '../layout/AdminHeader';
+import { formatRelativeTime } from '@/src/utils/date.util';
 
 import {
   Avatar, AvatarFallback, AvatarImage
@@ -39,6 +40,8 @@ import {
 
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { useAdminLoading, AdminActions } from '@/src/contexts/AdminLoadingContext';
+import { LoadingButton } from '@/src/components/admin/ui/AdminLoader';
 
 ///////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -117,11 +120,14 @@ export function AdminManagementSection() {
   const { toast } = useToast();
   const { user, refreshUser } = useAuth();
   const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } = useSchoolFilter();
+  const { executeWithLoading } = useAdminLoading();
 
   const [admins, setAdmins] = useState<Admin[]>([]);
-  const [loading, setLoading] = useState(true);
   const [locations, setLocations] = useState<any[]>([]);
   const [locationFilter, setLocationFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [pagination, setPagination] = useState<any>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -152,33 +158,56 @@ export function AdminManagementSection() {
 
   const fetchAdmins = useCallback(async () => {
     try {
-      setLoading(true);
+      await executeWithLoading(
+        AdminActions.FETCH_ADMINS,
+        (async () => {
+          const params = new URLSearchParams();
+          
+          // Add pagination parameters
+          params.append('page', page.toString());
+          params.append('limit', limit.toString());
+          
+          // Add school filter if applicable
+          if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
+            params.append('schoolId', selectedSchoolId);
+          }
+          
+          // Add location filter if applicable
+          if (locationFilter && locationFilter !== 'all') {
+            params.append('locationId', locationFilter);
+          }
+          
+          const url = `/api/admins${params.toString() ? `?${params.toString()}` : ''}`;
+          const response = await fetch(url, { credentials: 'include' });
+          if (!response.ok) return;
 
-      const params = new URLSearchParams();
-      
-      // Add school filter if applicable
-      if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
-        params.append('schoolId', selectedSchoolId);
-      }
-      
-      // Add location filter if applicable
-      if (locationFilter && locationFilter !== 'all') {
-        params.append('locationId', locationFilter);
-      }
-      
-      const url = `/api/admins${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) return;
-
-      const data = await response.json();
-      if (data.success) setAdmins(data.data || []);
+          const data = await response.json();
+          if (data.success) {
+            // Handle paginated response structure
+            const adminData = data.data?.admins || data.data || [];
+            setAdmins(adminData);
+            
+            // Update pagination info
+            if (data.data?.pagination) {
+              setPagination(data.data.pagination);
+              // Don't reset page when fetching with pagination
+              if (page === 1) {
+                setPage(data.data.pagination.page || 1);
+              }
+            }
+          } else {
+            // Reset page if no pagination data
+            setPagination(null);
+            setPage(1);
+          }
+        })(),
+        'Fetching admins...'
+      );
 
     } catch (err) {
       console.error("Error fetching admins:", err);
-    } finally {
-      setLoading(false);
     }
-  }, [selectedSchoolId, isSuperAdmin, locationFilter]);
+  }, [selectedSchoolId, isSuperAdmin, locationFilter, executeWithLoading, page, limit]);
 
   ///////////////////////////////////////////////////////////////////////////
   // FETCH LOCATIONS
@@ -239,27 +268,33 @@ export function AdminManagementSection() {
     if (!selectedAdmin) return;
 
     try {
-      const response = await fetch(`/api/admins/${selectedAdmin.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      await executeWithLoading(
+        AdminActions.DELETE_ADMIN,
+        (async () => {
+          const response = await fetch(`/api/admins/${selectedAdmin.id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          });
 
-      const data = await response.json();
+          const data = await response.json();
 
-      if (data.success) {
-        toast({
-          title: "Admin deleted successfully",
-          description: `${selectedAdmin.firstName} ${selectedAdmin.lastName} has been permanently deleted from the system.`
-        });
+          if (data.success) {
+            toast({
+              title: "Admin deleted successfully",
+              description: `${selectedAdmin.firstName} ${selectedAdmin.lastName} has been permanently deleted from the system.`
+            });
 
-        fetchAdmins();
-      } else {
-        toast({
-          title: "Failed to delete admin",
-          description: data.message || "An error occurred while deleting the admin.",
-          variant: "destructive"
-        });
-      }
+            fetchAdmins();
+          } else {
+            toast({
+              title: "Failed to delete admin",
+              description: data.message || "An error occurred while deleting the admin.",
+              variant: "destructive"
+            });
+          }
+        })(),
+        'Deleting admin...'
+      );
 
     } catch (err) {
       console.error("Delete error:", err);
@@ -269,7 +304,7 @@ export function AdminManagementSection() {
         variant: "destructive"
       });
     }
-  }, [selectedAdmin, fetchAdmins, toast]);
+  }, [selectedAdmin, fetchAdmins, toast, executeWithLoading]);
 
   ///////////////////////////////////////////////////////////////////////////
   // MANAGE PERMISSIONS
@@ -311,45 +346,51 @@ export function AdminManagementSection() {
     if (!selectedAdmin) return;
 
     try {
-      // Always include default permissions for admins (except SUPERADMIN)
-      let finalPermissions = { ...editedPermissions };
-      
-      if (!['SUPERADMIN', 'SCHOOL_SUPERADMIN'].includes(selectedAdmin.role.name)) {
-        DEFAULT_PERMISSIONS.forEach(perm => {
-          finalPermissions[perm] = true;
-        });
-      } else if (selectedAdmin.role.name === 'SCHOOL_SUPERADMIN') {
-        // For SCHOOL_SUPERADMIN, also ensure default permissions are always included
-        DEFAULT_PERMISSIONS.forEach(perm => {
-          finalPermissions[perm] = true;
-        });
-      }
+      await executeWithLoading(
+        AdminActions.UPDATE_SETTINGS,
+        (async () => {
+          // Always include default permissions for admins (except SUPERADMIN)
+          let finalPermissions = { ...editedPermissions };
+          
+          if (!['SUPERADMIN', 'SCHOOL_SUPERADMIN'].includes(selectedAdmin.role.name)) {
+            DEFAULT_PERMISSIONS.forEach(perm => {
+              finalPermissions[perm] = true;
+            });
+          } else if (selectedAdmin.role.name === 'SCHOOL_SUPERADMIN') {
+            // For SCHOOL_SUPERADMIN, also ensure default permissions are always included
+            DEFAULT_PERMISSIONS.forEach(perm => {
+              finalPermissions[perm] = true;
+            });
+          }
 
-      const enabledPermissions = Object.entries(finalPermissions)
-        .filter(([_, enabled]) => enabled)
-        .map(([key]) => PERMISSION_MAP[key]);
+          const enabledPermissions = Object.entries(finalPermissions)
+            .filter(([_, enabled]) => enabled)
+            .map(([key]) => PERMISSION_MAP[key]);
 
-      const response = await fetch(`/api/admins/${selectedAdmin.id}/permissions`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ permissions: enabledPermissions }),
-      });
+          const response = await fetch(`/api/admins/${selectedAdmin.id}/permissions`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ permissions: enabledPermissions }),
+          });
 
-      if (!response.ok) throw new Error("Failed to update permissions");
+          if (!response.ok) throw new Error("Failed to update permissions");
 
-      toast({
-        title: "Permissions Updated",
-        description: `Updated permissions for ${selectedAdmin.firstName}`,
-      });
+          toast({
+            title: "Permissions Updated",
+            description: `Updated permissions for ${selectedAdmin.firstName}`,
+          });
 
-      setShowPermissionsModal(false);
-      fetchAdmins();
-      refreshUser();
+          setShowPermissionsModal(false);
+          fetchAdmins();
+          refreshUser();
 
-      if (user?.id === selectedAdmin.id) {
-        window.location.reload();
-      }
+          if (user?.id === selectedAdmin.id) {
+            window.location.reload();
+          }
+        })(),
+        'Updating permissions...'
+      );
 
     } catch (err) {
       toast({
@@ -366,6 +407,7 @@ export function AdminManagementSection() {
     fetchAdmins,
     refreshUser,
     user,
+    executeWithLoading,
   ]);
 
   ///////////////////////////////////////////////////////////////////////////
@@ -420,10 +462,18 @@ export function AdminManagementSection() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
           <Input
             placeholder="Search admins..."
-            className="pl-9"
+            className="pl-9 pr-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Table */}
@@ -535,9 +585,9 @@ export function AdminManagementSection() {
                     </TableCell>
 
                     {/* LAST ACTIVE */}
-                    <TableCell className="text-gray-500">
-                      {admin.adminProfile?.lastActive
-                        ? new Date(admin.adminProfile.lastActive).toLocaleDateString()
+                    <TableCell>
+                      {admin.lastActive
+                        ? formatRelativeTime(admin.lastActive)
                         : "Never"}
                     </TableCell>
 
@@ -591,6 +641,31 @@ export function AdminManagementSection() {
             </TableBody>
           </Table>
         </div>
+
+        {/* PAGINATION */}
+        {pagination && (
+          <div className="flex items-center justify-between mt-4">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Previous
+            </Button>
+
+            <p className="text-sm text-muted-foreground">
+              Page {pagination.page} of {pagination.totalPages}
+            </p>
+
+            <Button
+              variant="outline"
+              disabled={page === pagination.totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ADD ADMIN */}
@@ -638,16 +713,23 @@ export function AdminManagementSection() {
           </DialogHeader>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
-            <Button
+            <LoadingButton
+              variant="outline"
+              onClick={() => setIsDeleteOpen(false)}
+              loadingText="Cancelling..."
+            >
+              Cancel
+            </LoadingButton>
+            <LoadingButton
               variant="destructive"
               onClick={() => {
                 deleteAdmin();
                 setIsDeleteOpen(false);
               }}
+              loadingText="Deleting..."
             >
               Delete Admin
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -763,16 +845,21 @@ export function AdminManagementSection() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPermissionsModal(false)}>
+            <LoadingButton
+              variant="outline"
+              onClick={() => setShowPermissionsModal(false)}
+              loadingText="Cancelling..."
+            >
               Cancel
-            </Button>
+            </LoadingButton>
 
-            <Button
+            <LoadingButton
               onClick={savePermissions}
               disabled={selectedAdmin?.role.name === 'SUPERADMIN'}
+              loadingText="Saving..."
             >
               Save Permissions
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

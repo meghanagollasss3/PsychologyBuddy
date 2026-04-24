@@ -9,6 +9,7 @@ export const CreateAdminSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
   role: z.enum(['ADMIN', 'SCHOOL_SUPERADMIN', 'SUPERADMIN']),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).default('ACTIVE'),
   schoolId: z.string().optional(),
   locationId: z.string().optional(),
   phone: z.string().optional(),
@@ -38,6 +39,7 @@ export const UpdateAdminSchema = z.object({
   phone: z.string().optional(),
   department: z.string().optional(),
   profileImage: z.string().url().optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
   schoolId: z.string().optional(),
   locationId: z.string().optional(),
 });

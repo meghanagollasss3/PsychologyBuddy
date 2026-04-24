@@ -8,54 +8,55 @@ datasource db {
 }
 
 model User {
-  id                     String                           @id @default(uuid())
-  firstName              String
-  lastName               String
-  email                  String                           @unique
-  phone                  String?
-  password               String?
-  schoolId               String?
-  createdAt              DateTime                         @default(now())
-  updatedAt              DateTime                         @updatedAt
-  emailVerified          Boolean                          @default(false)
-  classId                String?
-  roleId                 String
-  status                 String                           @default("ACTIVE")
-  studentId              String?                          @unique
-  locationId             String?
-  adminNotifications     AdminNotification[]
-  adminProfile           AdminProfile?
-  artJournals            ArtJournal[]
-  completions            ArticleCompletion[]              @relation("UserCompletions")
-  articles               Article[]                        @relation("UserArticles")
-  audioJournals          AudioJournal[]
-  createdBadges          Badge[]                          @relation("BadgeCreator")
-  chatSessions           ChatSession[]
-  dailyLogins            DailyLogin[]
-  escalationAlerts       EscalationAlert[]
-  highRiskAlerts         HighRiskAlert[]
-  meditations            Meditation[]                     @relation("UserMeditations")
-  meditationInstructions MeditationListeningInstruction[] @relation("UserMeditationInstruction")
-  moodCheckins           MoodCheckin[]
-  musicInstructions      MusicInstruction[]               @relation("UserMusicInstruction")
-  musicTherapy           MusicTherapy[]                   @relation("UserMusic")
-  ratings                Rating[]                         @relation("UserRatings")
-  resourceAccess         ResourceAccess[]
-  savedArticles          SavedArticle[]                   @relation("UserSaves")
-  sessions               Session[]
-  streaks                Streak?
-  studentProfile         StudentProfile?
-  summaries              Summary[]
-  triggerSelections      TriggerSelection[]
-  userBadges             UserBadge[]
-  classRef               Class?                           @relation(fields: [classId], references: [id])
-  location               SchoolLocation?                  @relation(fields: [locationId], references: [id])
-  role                   Role                             @relation(fields: [roleId], references: [id])
-  school                 School?                          @relation(fields: [schoolId], references: [id])
-  writingJournals        WritingJournal[]
-  primaryAdminSchools    School[]                         @relation("SchoolPrimaryAdmin")
+  id                       String                           @id @default(uuid())
+  firstName                String
+  lastName                 String
+  email                    String                           @unique
+  phone                    String?
+  password                 String?
+  schoolId                 String?
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
+  emailVerified            Boolean                          @default(false)
+  classId                  String?
+  roleId                   String
+  status                   String                           @default("ACTIVE")
+  studentId                String?                          @unique
+  locationId               String?
+  lastActive               DateTime?
+  adminNotifications       AdminNotification[]
+  adminProfile             AdminProfile?
+  artJournals              ArtJournal[]
+  completions              ArticleCompletion[]              @relation("UserCompletions")
+  articles                 Article[]                        @relation("UserArticles")
+  audioJournals            AudioJournal[]
+  createdBadges            Badge[]                          @relation("BadgeCreator")
+  chatSessions             ChatSession[]
+  dailyLogins              DailyLogin[]
+  escalationAlerts         EscalationAlert[]
+  highRiskAlerts           HighRiskAlert[]
   locationAdminAssignments LocationAdminAssignment[]
-  assignedLocations      LocationAdminAssignment[]        @relation("AssignmentAssigner")
+  assignedLocations        LocationAdminAssignment[]        @relation("AssignmentAssigner")
+  meditations              Meditation[]                     @relation("UserMeditations")
+  meditationInstructions   MeditationListeningInstruction[] @relation("UserMeditationInstruction")
+  moodCheckins             MoodCheckin[]
+  musicInstructions        MusicInstruction[]               @relation("UserMusicInstruction")
+  musicTherapy             MusicTherapy[]                   @relation("UserMusic")
+  ratings                  Rating[]                         @relation("UserRatings")
+  resourceAccess           ResourceAccess[]
+  savedArticles            SavedArticle[]                   @relation("UserSaves")
+  primaryAdminSchools      School[]                         @relation("SchoolPrimaryAdmin")
+  sessions                 Session[]
+  streaks                  Streak?
+  studentProfile           StudentProfile?
+  summaries                Summary[]
+  triggerSelections        TriggerSelection[]
+  userBadges               UserBadge[]
+  classRef                 Class?                           @relation(fields: [classId], references: [id])
+  location                 SchoolLocation?                  @relation(fields: [locationId], references: [id])
+  role                     Role                             @relation(fields: [roleId], references: [id])
+  school                   School?                          @relation(fields: [schoolId], references: [id])
+  writingJournals          WritingJournal[]
 
   @@map("Users")
 }
@@ -88,9 +89,9 @@ model School {
   name                   String
   phone                  String?
   email                  String?
-  primaryAdminId         String?
   createdAt              DateTime                         @default(now())
   updatedAt              DateTime                         @updatedAt
+  primaryAdminId         String?
   articles               Article[]
   classes                Class[]
   journalingConfig       JournalingToolConfig?
@@ -99,29 +100,29 @@ model School {
   musicInstructions      MusicInstruction[]
   musicResources         MusicResource[]
   locations              SchoolLocation[]
-  users                  User[]
   primaryAdmin           User?                            @relation("SchoolPrimaryAdmin", fields: [primaryAdminId], references: [id])
+  users                  User[]
 
   @@map("Schools")
 }
 
 model SchoolLocation {
-  id         String   @id @default(uuid())
-  schoolId   String
-  name       String
-  address    String?
-  city       String?
-  state      String?
-  country    String?
-  postalCode String?
-  notes      String?
-  isMain     Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  classes    Class[]
-  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  users      User[]
+  id                       String                    @id @default(uuid())
+  schoolId                 String
+  name                     String
+  address                  String?
+  city                     String?
+  state                    String?
+  country                  String?
+  postalCode               String?
+  notes                    String?
+  isMain                   Boolean                   @default(false)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  classes                  Class[]
   locationAdminAssignments LocationAdminAssignment[]
+  school                   School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  users                    User[]
 
   @@map("SchoolLocations")
 }
@@ -190,9 +191,9 @@ model LocationAdminAssignment {
   adminId    String
   assignedAt DateTime       @default(now())
   assignedBy String
-  location   SchoolLocation @relation(fields: [locationId], references: [id], onDelete: Cascade, map: "LocationAdminAssignment_locationId_fkey")
   admin      User           @relation(fields: [adminId], references: [id], onDelete: Cascade, map: "LocationAdminAssignment_adminId_fkey")
   assigner   User           @relation("AssignmentAssigner", fields: [assignedBy], references: [id], map: "LocationAdminAssignment_assignedBy_fkey")
+  location   SchoolLocation @relation(fields: [locationId], references: [id], onDelete: Cascade, map: "LocationAdminAssignment_locationId_fkey")
 
   @@unique([locationId, adminId])
   @@map("LocationAdminAssignments")
@@ -495,6 +496,7 @@ model Article {
   savedArticles      SavedArticle[]      @relation("ArticleSaves")
   sectionBlocks      SectionBlock[]
 
+  @@unique([title, schoolId])
   @@map("Articles")
 }
 
@@ -893,26 +895,26 @@ model MusicResourceGoal {
   @@map("MusicResourceGoals")
 }
 
-
 model OTP {
-  id               String    @id @default(uuid())
-  phoneNumber      String    @unique
-  otp              String
-  attempts         Int       @default(0)
-  createdAt        DateTime   @default(now())
-  expiresAt        DateTime
-  isVerified       Boolean   @default(false)
-  userId           String?
+  id          String   @id @default(uuid())
+  phoneNumber String   @unique
+  otp         String
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  isVerified  Boolean  @default(false)
+  userId      String?
+
   @@map("OTPs")
 }
 
 model Badge {
-  id             String   @id @default(uuid())
+  id             String      @id @default(uuid())
   name           String
   icon           String?
   description    String
   requirement    String
-  isActive       Boolean   @default(true)
+  isActive       Boolean     @default(true)
   type           BadgeType
   conditionValue Int?
   createdBy      String
@@ -920,6 +922,7 @@ model Badge {
   schoolId       String?
   admin          User        @relation("BadgeCreator", fields: [createdBy], references: [id], onDelete: Cascade)
   userBadges     UserBadge[]
+
   @@map("Badges")
 }
 

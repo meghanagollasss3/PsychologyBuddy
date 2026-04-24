@@ -46,6 +46,9 @@ export const POST = withPermission({
     const mimeType = file.type;
     const dataUrl = `data:${mimeType};base64,${base64}`;
 
+    // Log data URL length for debugging
+    console.log('Data URL length:', dataUrl.length);
+
     // Update admin profile with new photo
     const updatedProfile = await prisma.adminProfile.upsert({
       where: { userId: user.id },
@@ -57,30 +60,61 @@ export const POST = withPermission({
         profileImageUrl: dataUrl,
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            role: {
-              select: {
-                id: true,
-                name: true,
-              }
-            },
-            status: true,
-            createdAt: true,
+        adminPermissions: {
+          include: {
+            permission: true
           }
         }
       }
     });
 
+    // Get the full user data with the same structure as the profile API
+    const fullUserData = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        lastActive: true,
+        emailVerified: true,
+        roleId: true,
+        schoolId: true,
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        adminProfile: {
+          include: {
+            adminPermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        school: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Profile photo updated successfully',
-      data: updatedProfile
+      data: fullUserData
     });
 
   } catch (error) {
@@ -112,30 +146,61 @@ export const DELETE = withPermission({
       where: { userId: user.id },
       data: { profileImageUrl: null },
       include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            role: {
-              select: {
-                id: true,
-                name: true,
-              }
-            },
-            status: true,
-            createdAt: true,
+        adminPermissions: {
+          include: {
+            permission: true
           }
         }
       }
     });
 
+    // Get the full user data with the same structure as the profile API
+    const fullUserData = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        lastActive: true,
+        emailVerified: true,
+        roleId: true,
+        schoolId: true,
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        adminProfile: {
+          include: {
+            adminPermissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
+        school: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Profile photo removed successfully',
-      data: updatedProfile
+      data: fullUserData
     });
 
   } catch (error) {

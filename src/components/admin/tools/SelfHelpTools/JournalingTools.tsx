@@ -54,6 +54,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { useAdminLoading, AdminActions } from "@/src/contexts/AdminLoadingContext";
+import { LoadingButton } from "@/src/components/admin/ui/AdminLoader";
 import { 
   JournalPrompt, 
   JournalingConfig, 
@@ -89,6 +91,7 @@ export default function JournalingTools({
 }: JournalingToolsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { executeWithLoading, setLoading } = useAdminLoading();
   
   // Helper function to extract error messages
   const getErrorMessage = (error: any): string => {
@@ -149,6 +152,8 @@ export default function JournalingTools({
     moodIds: [] as string[]
   });
   const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [promptToDelete, setPromptToDelete] = useState<string | null>(null);
   
   // Dialog states - use props instead of local state
   // const [isAddJournalingPromptOpen, setIsAddJournalingPromptOpen] = useState(false);
@@ -323,6 +328,30 @@ export default function JournalingTools({
   const createJournalPrompt = async () => {
     setIsSubmitting(true);
     try {
+      // Validate all required fields
+      const validationErrors: string[] = [];
+      
+      // Check prompt text
+      if (!journalForm.text.trim()) {
+        validationErrors.push("Prompt is required");
+      }
+      
+      // Check moods
+      if (!journalForm.moodIds || journalForm.moodIds.length === 0) {
+        validationErrors.push("At least one mood is required");
+      }
+      
+      // If there are validation errors, show them and return
+      if (validationErrors.length > 0) {
+        toast({ 
+          title: "Required", 
+          description: validationErrors.join(", "), 
+          variant: "destructive" 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
       const payload: any = {
         text: journalForm.text,
         moodIds: journalForm.moodIds,
@@ -388,52 +417,64 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
   };
 
   const updateJournalPromptStatus = async (id: string, isEnabled: boolean) => {
-    try {
-      const response = await fetch(`/api/admin/journaling/prompts/${id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          "x-user-id": user?.id || "admin@calmpath.ai",
-          ...(user?.school?.id && { "x-school-id": user.school.id }),
-        },
-        body: JSON.stringify({ isEnabled })
-      });
-      const data: ApiResponse<JournalPrompt> = await response.json();
-      if (data.success) {
-        toast({ 
-          title: isEnabled ? "Prompt Enabled" : "Prompt Disabled",
-          description: `Journal prompt has been ${isEnabled ? "enabled" : "disabled"} for students.`
-        });
-        await fetchJournalPrompts();
-      } else {
-        toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to update prompt status", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error('Failed to update journal prompt status:', error);
-      toast({ title: "Error", description: "Failed to update prompt status", variant: "destructive" });
-    }
+    await executeWithLoading(
+      AdminActions.EDIT_JOURNALING_RESOURCE,
+      (async () => {
+        try {
+          const response = await fetch(`/api/admin/journaling/prompts/${id}/status`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              "x-user-id": user?.id || "admin@calmpath.ai",
+              ...(user?.school?.id && { "x-school-id": user.school.id }),
+            },
+            body: JSON.stringify({ isEnabled })
+          });
+          const data: ApiResponse<JournalPrompt> = await response.json();
+          if (data.success) {
+            toast({ 
+              title: isEnabled ? "Prompt Enabled" : "Prompt Disabled",
+              description: `Journal prompt has been ${isEnabled ? "enabled" : "disabled"} for students.`
+            });
+            await fetchJournalPrompts();
+          } else {
+            toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to update prompt status", variant: "destructive" });
+          }
+        } catch (error) {
+          console.error('Failed to update journal prompt status:', error);
+          toast({ title: "Error", description: "Failed to update prompt status", variant: "destructive" });
+        }
+      })(),
+      `${isEnabled ? 'Enabling' : 'Disabling'} prompt...`
+    );
   };
 
   const deleteJournalPrompt = async (id: string) => {
-    try {
-      const response = await fetch(`/api/admin/journaling/prompts/${id}`, {
-        method: 'DELETE',
-        headers: {
-          "x-user-id": user?.id || "admin@calmpath.ai",
-          ...(user?.school?.id && { "x-school-id": user.school.id }),
-        },
-      });
-      const data: ApiResponse<null> = await response.json();
-      if (data.success) {
-        toast({ title: "Success", description: "Journal prompt deleted successfully" });
-        await fetchJournalPrompts();
-      } else {
-        toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to delete prompt", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error('Failed to delete journal prompt:', error);
-      toast({ title: "Error", description: "Failed to delete prompt", variant: "destructive" });
-    }
+    await executeWithLoading(
+      AdminActions.DELETE_JOURNALING_RESOURCE,
+      (async () => {
+        try {
+          const response = await fetch(`/api/admin/journaling/prompts/${id}`, {
+            method: 'DELETE',
+            headers: {
+              "x-user-id": user?.id || "admin@calmpath.ai",
+              ...(user?.school?.id && { "x-school-id": user.school.id }),
+            }
+          });
+          const data: ApiResponse<null> = await response.json();
+          if (data.success) {
+            toast({ title: "Success", description: "Journal prompt deleted successfully" });
+            await fetchJournalPrompts();
+          } else {
+            toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to delete prompt", variant: "destructive" });
+          }
+        } catch (error) {
+          console.error('Failed to delete journal prompt:', error);
+          toast({ title: "Error", description: "Failed to delete prompt", variant: "destructive" });
+        }
+      })(),
+      'Deleting journal prompt...'
+    );
   };
 
   const saveJournalingConfig = async (updatedConfig?: JournalingConfig, updatedArtConfig?: ArtJournalingConfig, updatedAudioConfig?: AudioJournalingConfig) => {
@@ -534,12 +575,17 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([
-        fetchJournalingConfig(),
-        fetchJournalPrompts(),
-        fetchJournalMoods()
-      ]);
-      setIsLoading(false);
+      setLoading(AdminActions.FETCH_JOURNALING_RESOURCES, true, "Loading journaling data...");
+      try {
+        await Promise.all([
+          fetchJournalingConfig(),
+          fetchJournalPrompts(),
+          fetchJournalMoods()
+        ]);
+      } finally {
+        setIsLoading(false);
+        setLoading(AdminActions.FETCH_JOURNALING_RESOURCES, false);
+      }
     };
     loadData();
   }, [selectedSchool]); // Only refetch when school selection changes
@@ -587,9 +633,16 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
     await createJournalPrompt();
   };
 
-  const handleDeletePrompt = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this journal prompt? This action cannot be undone.")) {
-      await deleteJournalPrompt(id);
+  const handleDeletePrompt = (id: string) => {
+    setPromptToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeletePrompt = async () => {
+    if (promptToDelete) {
+      await deleteJournalPrompt(promptToDelete);
+      setIsDeleteModalOpen(false);
+      setPromptToDelete(null);
     }
   };
 
@@ -619,21 +672,11 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
     (p.moodIds && p.moodIds.some((m: string) => m && m.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading journaling tools...</span>
-        </div>
-      </div>
-    );
-  }
-
+  
   return (
     <div className="space-y-6">
       {/* Role-based Permission Banner */}
-      <div className={cn(
+      {/* <div className={cn(
         "flex items-start gap-3 rounded-lg border p-4",
         isSuperAdmin 
           ? "bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900" 
@@ -657,10 +700,10 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
             }
           </p>
         </div>
-      </div>
+      </div> */}
 
       {/* Show warning when all schools is selected */}
-      {isSuperAdmin && selectedSchool === "all" && (
+      {/* {isSuperAdmin && selectedSchool === "all" && (
         <div className="flex items-start gap-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 p-4">
           <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
           <div>
@@ -672,7 +715,7 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
             </p>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Privacy Notice */}
       <div className="flex items-start gap-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 p-4">
@@ -952,14 +995,14 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
         }
         setIsAddJournalingPromptOpen?.(open);
       }}>
-  <DialogContent className="sm:max-w-lg">
+  <DialogContent className="sm:max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
     <DialogHeader>
       <DialogTitle>{editingPrompt ? "Edit Journal Prompt" : "Add Journal Prompt"}</DialogTitle>
       <DialogDescription>{editingPrompt ? "Edit an existing prompt for student journaling." : "Create a new prompt for student journaling. Prompts can be used across writing and art journaling."}</DialogDescription>
     </DialogHeader>
     <div className="grid gap-4 py-4">
       <div className="grid gap-2">
-        <Label>Prompt</Label>
+        <Label>Prompt <span className="text-red-500">*</span></Label>
         <Textarea 
           placeholder="Enter the journal prompt..."
           value={journalForm.text}
@@ -968,7 +1011,7 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
         />
       </div>
       <div className="grid gap-2">
-        <Label>Mood(s)</Label>
+        <Label>Mood(s) <span className="text-red-500">*</span></Label>
         <div className="flex flex-wrap gap-2">
           {journalMoods.map((mood) => (
             <Button
@@ -991,15 +1034,46 @@ toast({ title: "Error", description: getErrorMessage(data.error) || "Failed to c
     </div>
     <DialogFooter>
       <Button variant="outline" onClick={() => setIsAddJournalingPromptOpen?.(false)}>Cancel</Button>
-      <Button 
+      <LoadingButton 
               onClick={createJournalPrompt} 
-              disabled={isSubmitting || !journalForm.text.trim()}
+              disabled={isSubmitting}
+              isLoading={isSubmitting}
+              loadingText="Saving..."
             >
-              {isSubmitting ? "Saving..." : (editingPrompt ? "Update" : "Create")}
-            </Button>
+              {editingPrompt ? "Update" : "Create"}
+            </LoadingButton>
     </DialogFooter>
   </DialogContent>
 </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsDeleteModalOpen(false);
+          setPromptToDelete(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Journal Prompt</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this journal prompt? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeletePrompt}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 </div>
   );
 }

@@ -4,6 +4,11 @@ export function formatRelativeTime(date: Date | string): string {
   const diffInMs = now.getTime() - inputDate.getTime();
   const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
 
+  // Handle future dates (negative diffInDays)
+  if (diffInDays < 0) {
+    return 'Today';
+  }
+
   if (diffInDays === 0) {
     return 'Today';
   } else if (diffInDays === 1) {

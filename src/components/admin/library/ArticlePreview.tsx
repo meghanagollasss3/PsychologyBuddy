@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAuthHeaders } from "@/src/utils/session.util";
+import { useAdminLoading } from "@/src/contexts/AdminLoadingContext";
+import { AdminLoader } from "@/src/components/admin/ui/AdminLoader";
 
 interface ArticlePreviewProps {
   articleId: string;
@@ -32,6 +34,7 @@ export default function ArticlePreview({ articleId }: ArticlePreviewProps) {
   const [loading, setLoading] = useState(true);
   const [article, setArticle] = useState<any>(null);
   const [blocks, setBlocks] = useState<any[]>([]);
+  const { executeWithLoading } = useAdminLoading();
   
   // Get URL params for fallback
   const articleTitle = searchParams.get("title") || "";
@@ -279,10 +282,7 @@ export default function ArticlePreview({ articleId }: ArticlePreviewProps) {
           }
         />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading preview...</p>
-          </div>
+          <AdminLoader message="Loading preview..." />
         </div>
       </div>
     );

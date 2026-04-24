@@ -51,17 +51,46 @@ export class AdminService {
   }
 
   // Get all admins (SuperAdmin and SchoolSuperAdmin only)
-  static async getAllAdmins(schoolId?: string, userSchoolId?: string, locationId?: string) {
+  static async getAllAdmins(schoolId?: string, userSchoolId?: string, locationId?: string, page: number = 1, limit: number = 10) {
     try {
-      const admins = await AdminRepository.getAllAdmins(schoolId, locationId);
+      const admins = await AdminRepository.getAllAdmins(schoolId, locationId, page, limit);
       
-      // Remove passwords from response
-      const adminsWithoutPasswords = admins.map(admin => {
-        const { password, ...adminWithoutPassword } = admin;
-        return adminWithoutPassword;
+      // Passwords are already excluded by repository select clause
+      const adminsWithoutPasswords = admins;
+
+      // Get total count for pagination
+      const total = await prisma.user.count({
+        where: {
+          role: {
+            name: {
+              in: ['ADMIN', 'SCHOOL_SUPERADMIN', 'SUPERADMIN'],
+            },
+          },
+          ...(schoolId && schoolId !== 'all' && { schoolId }),
+          ...(locationId && locationId !== 'all' && {
+            locationAdminAssignments: {
+              some: {
+                locationId: locationId
+              }
+            }
+          }),
+        },
       });
 
-      return ApiResponse.success(adminsWithoutPasswords, 'Admins retrieved successfully');
+      // Calculate pagination info
+      const totalPages = Math.ceil(total / limit);
+
+      return ApiResponse.success({
+        admins: adminsWithoutPasswords,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        }
+      }, 'Admins retrieved successfully');
     } catch (error) {
       throw error;
     }

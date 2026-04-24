@@ -8,11 +8,18 @@ export const CreateStudentSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain uppercase, lowercase, and number'),
-  email: z.string().email('Valid email required').optional(),
+  email: z.string().email('Valid email required'),
   classId: z.string().min(1, 'Class ID is required'),
   schoolId: z.string().min(1, 'School selection is required'),
   locationId: z.string().min(1, 'Location is required'),
-  phone: z.string().optional(),
+  phone: z.string().regex(/^\d{10}$/, 'Phone must be exactly 10 digits'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).default('ACTIVE'),
+  emergencyContact: z.object({
+    name: z.string().min(3, 'Emergency contact name must be at least 3 characters'),
+    phone: z.string().regex(/^\d{10}$/, 'Emergency contact phone must be exactly 10 digits'),
+    relationship: z.string().min(2, 'Relationship must be at least 2 characters'),
+  }),
 });
 
 // Student update validator (Admin only)

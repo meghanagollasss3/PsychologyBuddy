@@ -6,9 +6,21 @@ export class LibraryService {
   // Create new article
   static async createArticle(data: CreateArticleData, userId: string, userSchoolId?: string) {
     try {
+      // Check if article title already exists
+      const existingArticle = await prisma.article.findFirst({
+        where: {
+          title: data.title.trim(),
+          ...(userSchoolId && { schoolId: userSchoolId }),
+        },
+      });
+
+      if (existingArticle) {
+        throw AuthError.conflict('An article with this title already exists');
+      }
+
       const article = await prisma.article.create({
         data: {
-          title: data.title,
+          title: data.title.trim(),
           author: data.author,
           thumbnailUrl: data.thumbnailUrl || null,
           readTime: data.readTime || null,
@@ -300,9 +312,24 @@ export class LibraryService {
         throw AuthError.notFound('Article not found');
       }
 
+      // Check if title is being updated and if it's already taken
+      if (data.title && data.title.trim() !== existingArticle.title) {
+        const duplicateArticle = await prisma.article.findFirst({
+          where: {
+            title: data.title.trim(),
+            id: { not: id }, // Exclude current article from check
+            ...(existingArticle.schoolId && { schoolId: existingArticle.schoolId }),
+          },
+        });
+
+        if (duplicateArticle) {
+          throw AuthError.conflict('An article with this title already exists');
+        }
+      }
+
       // Update article with relations
       const updateData: any = {
-        ...(data.title && { title: data.title }),
+        ...(data.title && { title: data.title.trim() }),
         ...(data.author && { author: data.author }),
         ...(data.thumbnailUrl !== undefined && { thumbnailUrl: data.thumbnailUrl || null }),
         ...(data.readTime !== undefined && { readTime: data.readTime || null }),

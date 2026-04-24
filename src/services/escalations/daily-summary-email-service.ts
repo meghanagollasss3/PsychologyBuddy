@@ -60,10 +60,7 @@ export class DailySummaryEmailService {
               in: ['SCHOOL_SUPERADMIN', 'ADMIN', 'COUNSELOR']
             }
           },
-          status: 'ACTIVE',
-          email: {
-            not: null as any
-          }
+          status: 'ACTIVE'
         },
         select: {
           id: true,

@@ -29,11 +29,24 @@ export class AuthService {
         throw AuthError.invalidCredentials('Invalid password');
       }
 
+      // Check student status
+      const studentStatus = student.studentProfile?.status || 'ACTIVE';
+      if (studentStatus === 'INACTIVE') {
+        throw AuthError.forbidden('Your account is inactive. Please contact your school administrator.');
+      }
+      
+      if (studentStatus === 'SUSPENDED') {
+        throw AuthError.forbidden('Your account is suspended. Please contact your school administrator.');
+      }
+
       // Create session
       const sessionId = SessionUtil.generateSessionId();
       const expiresAt = SessionUtil.getExpirationTime();
       
       await AuthRepository.createSession(sessionId, student.id, student.roleId, expiresAt);
+
+      // Update last active timestamp
+      await AuthRepository.updateLastActive(student.id);
 
       // Update user's streak for login activity
       try {
@@ -78,11 +91,23 @@ export class AuthService {
         throw AuthError.invalidCredentials('Invalid password');
       }
 
+      // Check user status
+      if (user.status === 'INACTIVE') {
+        throw AuthError.forbidden('Your account is inactive. Please contact your school administrator.');
+      }
+      
+      if (user.status === 'SUSPENDED') {
+        throw AuthError.forbidden('Your account is suspended. Please contact your school administrator.');
+      }
+
       // Create session
       const sessionId = SessionUtil.generateSessionId();
       const expiresAt = SessionUtil.getExpirationTime();
       
       await AuthRepository.createSession(sessionId, user.id, user.roleId, expiresAt);
+
+      // Update last active timestamp
+      await AuthRepository.updateLastActive(user.id);
 
       // Return user data without password
       const { password: _, ...userWithoutPassword } = user;
@@ -119,8 +144,40 @@ export class AuthService {
         throw AuthError.unauthorized('Session expired');
       }
 
+      // Check user status for students
+      if (session.user.role?.name === 'STUDENT') {
+        const studentStatus = session.user.studentProfile?.status || 'ACTIVE';
+        if (studentStatus === 'INACTIVE') {
+          // Clean up session for inactive student
+          await AuthRepository.deleteSession(sessionId);
+          throw AuthError.forbidden('Your account is inactive. Please contact your school administrator.');
+        }
+        
+        if (studentStatus === 'SUSPENDED') {
+          // Clean up session for suspended student
+          await AuthRepository.deleteSession(sessionId);
+          throw AuthError.forbidden('Your account is suspended. Please contact your school administrator.');
+        }
+      }
+
+      // Check user status for admins
+      if (session.user.role?.name && ['ADMIN', 'SCHOOL_SUPERADMIN', 'SUPERADMIN'].includes(session.user.role.name)) {
+        const adminStatus = session.user.status || 'ACTIVE';
+        if (adminStatus === 'INACTIVE') {
+          // Clean up session for inactive admin
+          await AuthRepository.deleteSession(sessionId);
+          throw AuthError.forbidden('Your account is inactive. Please contact your school administrator.');
+        }
+        
+        if (adminStatus === 'SUSPENDED') {
+          // Clean up session for suspended admin
+          await AuthRepository.deleteSession(sessionId);
+          throw AuthError.forbidden('Your account is suspended. Please contact your school administrator.');
+        }
+      }
+
       // Return user data without password
-      const { password: _, ...userWithoutPassword } = session.user;
+      const { password, _, ...userWithoutPassword } = session.user;
       
       return ApiResponse.success({
         user: userWithoutPassword,
@@ -215,11 +272,23 @@ export class AuthService {
         throw AuthError.invalidCredentials('Admin not found');
       }
 
+      // Check user status
+      if (admin.status === 'INACTIVE') {
+        throw AuthError.forbidden('Your account is inactive. Please contact your school administrator.');
+      }
+      
+      if (admin.status === 'SUSPENDED') {
+        throw AuthError.forbidden('Your account is suspended. Please contact your school administrator.');
+      }
+
       // Create session
       const sessionId = SessionUtil.generateSessionId();
       const expiresAt = SessionUtil.getExpirationTime();
       
       await AuthRepository.createSession(sessionId, admin.id, admin.roleId, expiresAt);
+
+      // Update last active timestamp
+      await AuthRepository.updateLastActive(admin.id);
 
       // Consume the OTP after successful login
       otpService.consumeOTP(phoneNumber);

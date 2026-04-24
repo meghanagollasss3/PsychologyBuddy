@@ -52,6 +52,8 @@ import { cn } from '@/lib/utils';
 import { AdminHeader } from '../../admin/layout/AdminHeader';
 import { getAuthHeaders } from '@/src/utils/session.util';
 import { useToast } from '@/components/ui/use-toast';
+import { useAdminLoading, AdminActions } from '@/src/contexts/AdminLoadingContext';
+import { LoadingButton } from '@/src/components/admin/ui/AdminLoader';
 
 interface Article {
   id: string;
@@ -125,17 +127,18 @@ interface Category {
 
 export function ArticleList() {
   const router = useRouter();
-  const mountedRef = useRef(false);
+  const mountedRef = useRef(true);
   const { toast } = useToast();
   const { selectedSchoolId, setSelectedSchoolId, schools, isSuperAdmin } = useSchoolFilter();
   const { timeFilter, dateRange } = useTimeFilter();
+  const { executeWithLoading } = useAdminLoading();
   const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
   // const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [categoryForm, setCategoryForm] = useState({ name: '', status: 'active' });
   const [categoryError, setCategoryError] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -153,7 +156,15 @@ export function ArticleList() {
     goal: '',
     status: 'draft',
   });
-  const [formErrors, setFormErrors] = useState<{title?: string; author?: string}>({});
+  const [formErrors, setFormErrors] = useState<{
+  title?: string; 
+  author?: string; 
+  description?: string; 
+  readTime?: string; 
+  category?: string; 
+  supportedMoods?: string; 
+  goal?: string;
+}>({});
   const [moods, setMoods] = useState<Mood[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -168,41 +179,43 @@ export function ArticleList() {
     if (!mountedRef.current) return; // Only prevent calls on unmounted component
     
     try {
-      const headers = getAuthHeaders();
-      const params = new URLSearchParams();
-      
-      // Add school filter if applicable
-      if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
-        params.append('schoolId', selectedSchoolId);
-      }
-      
-      // Add time filter
-      params.append('timeRange', timeFilter);
-      
-      const url = `/api/articles${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url, { headers });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success && mountedRef.current) {
-        setArticles(data.data);
-      } else if (!data.success) {
-        console.error("API returned error:", data.message);
-      }
+      await executeWithLoading(
+        AdminActions.FETCH_ARTICLES,
+        (async () => {
+          const headers = getAuthHeaders();
+          const params = new URLSearchParams();
+          
+          // Add school filter if applicable
+          if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
+            params.append('schoolId', selectedSchoolId);
+          }
+          
+          // Add time filter
+          params.append('timeRange', timeFilter);
+          
+          const url = `/api/articles${params.toString() ? `?${params.toString()}` : ''}`;
+          const response = await fetch(url, { headers });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (data.success && mountedRef.current) {
+            setArticles(data.data);
+          } else if (!data.success) {
+            console.error("API returned error:", data.message);
+          }
+        })(),
+        'Fetching articles...'
+      );
     } catch (error) {
       if (mountedRef.current) {
         console.error('Failed to fetch articles:', error);
       }
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false);
-      }
     }
-  }, [selectedSchoolId, isSuperAdmin, timeFilter]);
+  }, [selectedSchoolId, isSuperAdmin, timeFilter, executeWithLoading]);
 
   const fetchLabels = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -271,6 +284,15 @@ export function ArticleList() {
     }
   };
 
+  const handleRemoveThumbnail = () => {
+    setArticleForm(prev => ({ ...prev, thumbnail: '' }));
+    // Clear the file input as well
+    const fileInput = document.getElementById('thumbnail-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
   const resetArticleForm = () => {
     setArticleForm({
       title: '',
@@ -290,65 +312,149 @@ export function ArticleList() {
   };
 
   const handleSaveAndContinue = async () => {
-    const errors: {title?: string; author?: string} = {};
+    const errors: {
+      title?: string; 
+      author?: string; 
+      description?: string; 
+      readTime?: string; 
+      category?: string; 
+      supportedMoods?: string; 
+      goal?: string;
+    } = {};
     
+    // Title validation
     if (!articleForm.title.trim()) {
-      errors.title = 'Title is required';
+      errors.title = 'Article title is required';
+    } else if (articleForm.title.trim().length < 3) {
+      errors.title = 'Title must be at least 3 characters long';
+    } else if (articleForm.title.trim().length > 200) {
+      errors.title = 'Title must be less than 200 characters';
+    } else {
+      // Check for duplicate title
+      const trimmedTitle = articleForm.title.trim();
+      const duplicateArticle = articles.find(article => 
+        article.title.toLowerCase() === trimmedTitle.toLowerCase()
+      );
+      
+      if (duplicateArticle) {
+        errors.title = 'An article with this title already exists';
+      }
     }
+    
+    // Author validation
     if (!articleForm.author.trim()) {
-      errors.author = 'Author is required';
+      errors.author = 'Author name is required';
+    } else if (articleForm.author.trim().length < 2) {
+      errors.author = 'Author name must be at least 2 characters long';
+    }
+    
+    // Description validation
+    if (!articleForm.description.trim()) {
+      errors.description = 'Description is required';
+    } else if (articleForm.description.trim().length < 10) {
+      errors.description = 'Description must be at least 10 characters long';
+    } else if (articleForm.description.trim().length > 500) {
+      errors.description = 'Description must be less than 500 characters';
+    }
+    
+    // Read Time validation
+    if (articleForm.readTime.trim()) {
+      const readTimeNum = parseInt(articleForm.readTime);
+      if (isNaN(readTimeNum) || readTimeNum < 1) {
+        errors.readTime = 'Read time must be at least 1 minute';
+      } else if (readTimeNum > 120) {
+        errors.readTime = 'Read time seems too long (max 120 minutes)';
+      }
+    }
+    
+    // Category validation
+    if (!articleForm.category) {
+      errors.category = 'Please select a category';
+    }
+    
+    // Moods validation
+    if (articleForm.supportedMoods.length === 0) {
+      errors.supportedMoods = 'Please select at least one supported mood';
+    }
+    
+    // Goal validation
+    if (!articleForm.goal) {
+      errors.goal = 'Please select a primary goal';
     }
     
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
+      // Show toast for first error
+      const firstError = Object.values(errors)[0];
+      toast({
+        title: "Validation Error",
+        description: firstError,
+        variant: "destructive"
+      });
       return;
     }
     
     setFormErrors({});
     
-    setLoading(true);
     try {
-      const headers = getAuthHeaders();
-      const response = await fetch('/api/articles', {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...articleForm,
-          thumbnailUrl: articleForm.thumbnail, // Map thumbnail to thumbnailUrl for database
-          readTime: parseInt(articleForm.readTime) || null,
-          categoryIds: articleForm.category && categories.find(c => c.id === articleForm.category) ? [articleForm.category] : [],
-          moodIds: articleForm.supportedMoods.map((moodName) => {
-            const mood = moods.find(m => m.name === moodName);
-            return mood ? mood.id : '';
-          }).filter(Boolean),
-          goalIds: articleForm.goal && goals.find(g => g.name === articleForm.goal) ? 
-            [goals.find(g => g.name === articleForm.goal)?.id || '']
-          : [],
-          status: articleForm.status.toUpperCase(), // Convert to uppercase for backend
-        }),
-      });
+      await executeWithLoading(
+        AdminActions.CREATE_ARTICLE,
+        (async () => {
+          const headers = getAuthHeaders();
+          const response = await fetch('/api/articles', {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...articleForm,
+              thumbnailUrl: articleForm.thumbnail, // Map thumbnail to thumbnailUrl for database
+              readTime: parseInt(articleForm.readTime) || null,
+              categoryIds: articleForm.category && categories.find(c => c.id === articleForm.category) ? [articleForm.category] : [],
+              moodIds: articleForm.supportedMoods.map((moodName) => {
+                const mood = moods.find(m => m.name === moodName);
+                return mood ? mood.id : '';
+              }).filter(Boolean),
+              goalIds: articleForm.goal && goals.find(g => g.name === articleForm.goal) ? 
+                [goals.find(g => g.name === articleForm.goal)?.id || '']
+              : [],
+              status: articleForm.status.toUpperCase(), // Convert to uppercase for backend
+            }),
+          });
 
-      console.log('🖼️ Creating article with thumbnailUrl:', articleForm.thumbnail ? articleForm.thumbnail.substring(0, 100) + '...' : 'null');
-      console.log('🖼️ Thumbnail length:', articleForm.thumbnail ? articleForm.thumbnail.length : 0);
+          console.log('🖼️ Creating article with thumbnailUrl:', articleForm.thumbnail ? articleForm.thumbnail.substring(0, 100) + '...' : 'null');
+          console.log('🖼️ Thumbnail length:', articleForm.thumbnail ? articleForm.thumbnail.length : 0);
 
-      const data = await response.json();
+          const data = await response.json();
 
-      if (data.success) {
-        setIsCreateOpen(false);
-        resetArticleForm();
-        // Navigate to editor or next step
-        router.push(`/admin/library/editor/${data.data.id}`);
-      } else {
-        alert('Failed to create article: ' + data.message);
-      }
+          if (data.success) {
+            setArticles([data.data, ...articles]);
+            resetArticleForm();
+            toast({
+              title: "Article Created",
+              description: "Article has been created successfully."
+            });
+            
+            // Navigate to edit mode to add content
+            router.push(`/admin/library/editor/${data.data.id}`);
+          } else {
+            toast({
+              title: "Error",
+              description: data.message || "Failed to create article",
+              variant: "destructive"
+            });
+          }
+        })(),
+        'Creating article...'
+      );
     } catch (error) {
       console.error('Failed to create article:', error);
-      alert('Failed to create article');
-    } finally {
-      setLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to create article. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -407,20 +513,41 @@ export function ArticleList() {
     if (!selectedArticle) return;
 
     try {
-      const headers = getAuthHeaders();
-      const response = await fetch(`/api/articles/${selectedArticle.id}`, {
-        method: 'DELETE',
-        headers,
-      });
+      await executeWithLoading(
+        AdminActions.DELETE_ARTICLE,
+        (async () => {
+          const headers = getAuthHeaders();
+          const response = await fetch(`/api/articles/${selectedArticle.id}`, {
+            method: 'DELETE',
+            headers,
+          });
 
-      const data = await response.json();
-      if (data.success) {
-        setArticles(articles.filter(a => a.id !== selectedArticle.id));
-        setIsDeleteOpen(false);
-        setSelectedArticle(null);
-      }
+          const data = await response.json();
+          if (data.success) {
+            setArticles(articles.filter(a => a.id !== selectedArticle.id));
+            setIsDeleteOpen(false);
+            setSelectedArticle(null);
+            toast({
+              title: "Article Deleted",
+              description: "Article has been deleted successfully."
+            });
+          } else {
+            toast({
+              title: "Error",
+              description: data.message || "Failed to delete article",
+              variant: "destructive"
+            });
+          }
+        })(),
+        'Deleting article...'
+      );
     } catch (error) {
       console.error('Failed to delete article:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete article. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -438,16 +565,9 @@ export function ArticleList() {
       });
       return;
     }
-    toast({
-      title: "Category Added",
-      description: `"${categoryForm.name}" has been added to categories.`,
-    });
-    // if (!categoryForm.name.trim()) {
-    //   setCategoryError('Category name is required');
-    //   return;
-    // }
     
     setCategoryError(''); // Clear error if validation passes
+    setIsAddingCategory(true);
     
     try {
       const headers = getAuthHeaders();
@@ -466,6 +586,10 @@ export function ArticleList() {
       const data = await response.json();
       
       if (data.success) {
+        toast({
+          title: "Category Added",
+          description: `"${categoryForm.name}" has been added to categories.`,
+        });
         resetCategoryForm();
         setIsCategoryOpen(false);
         setCategoryError(''); // Clear error on success
@@ -477,6 +601,8 @@ export function ArticleList() {
     } catch (error) {
       console.error('Failed to create category:', error);
       setCategoryError('Failed to create category');
+    } finally {
+      setIsAddingCategory(false);
     }
   };
 
@@ -513,10 +639,19 @@ export function ArticleList() {
             </div>
             <input 
               placeholder="Search articles..." 
-              className="pl-9 w-full h-10 rounded-lg border border-input bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3c83f6] focus:ring-offset-2 disabled:cursor-not-allowed"
+              className={`pl-9 w-full h-10 rounded-lg border border-input bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3c83f6] focus:ring-offset-2 disabled:cursor-not-allowed ${searchQuery ? 'pr-9' : ''}`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -565,13 +700,7 @@ export function ArticleList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Loading articles...
-                  </TableCell>
-                </TableRow>
-              ) : filteredArticles.length === 0 ? (
+              {filteredArticles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
                     <div className="text-[#94A3B8]">
@@ -691,8 +820,20 @@ export function ArticleList() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>Delete</Button>
+            <LoadingButton
+              variant="outline"
+              onClick={() => setIsDeleteOpen(false)}
+              loadingText="Cancelling..."
+            >
+              Cancel
+            </LoadingButton>
+            <LoadingButton
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              loadingText="Deleting..."
+            >
+              Delete
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -751,16 +892,21 @@ export function ArticleList() {
             <Button variant="outline" onClick={() => setIsCategoryOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddCategory} className='bg-[#3c83f6] text-white'>
+            <LoadingButton 
+              onClick={handleAddCategory} 
+              className='bg-[#3c83f6] text-white'
+              isLoading={isAddingCategory}
+              loadingText="Adding..."
+            >
               Add Category
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Add Article Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetArticleForm(); }}>
-        <DialogContent className="sm:max-w-lg bg-white max-h-[90vh] overflow-y-auto">
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-lg bg-white max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">Add New Article</DialogTitle>
             <DialogDescription className='text-[#65758b]'>
@@ -777,11 +923,23 @@ export function ArticleList() {
                 onClick={() => document.getElementById('thumbnail-upload')?.click()}
               >
                 {articleForm.thumbnail ? (
-                  <img 
-                    src={articleForm.thumbnail} 
-                    alt="Thumbnail preview" 
-                    className="w-full h-32 object-cover rounded-lg"
-                  />
+                  <div className="relative">
+                    <img 
+                      src={articleForm.thumbnail} 
+                      alt="Thumbnail preview" 
+                      className="w-full h-32 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveThumbnail();
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <Upload className="h-8 w-8 mx-auto text-gray-500" />
@@ -843,36 +1001,56 @@ export function ArticleList() {
               </div>
 
               <div className="space-y-2 mt-[20px]">
-                <Label htmlFor="readTime">Read Time (minutes)</Label>
+                <Label htmlFor="readTime">Read Time (minutes) <span className='text-red-500'>*</span></Label>
                 <Input
                   id="readTime"
                   type="number"
                   value={articleForm.readTime}
-                  onChange={(e) => setArticleForm(prev => ({ ...prev, readTime: e.target.value }))}
+                  onChange={(e) => {
+                    setArticleForm(prev => ({ ...prev, readTime: e.target.value }));
+                    if (formErrors.readTime) {
+                      setFormErrors(prev => ({ ...prev, readTime: undefined }));
+                    }
+                  }}
                   placeholder="e.g. 5"
-                  className='mt-[8px] h-10 shadow-none border border-border bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#3c83f6] focus-visible:ring-offset-2 focus-visible:outline-none'
+                  className={formErrors.readTime ? 'border-red-500 mt-[8px] h-10 shadow-none border border-border bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#3c83f6] focus-visible:ring-offset-2 focus-visible:outline-none' : 'mt-[8px] h-10 shadow-none border border-border bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#3c83f6] focus-visible:ring-offset-2 focus-visible:outline-none'}
                 />
+                {formErrors.readTime && (
+                  <p className="text-sm text-red-500">{formErrors.readTime}</p>
+                )}
               </div>
 
               <div className="space-y-2 mt-[20px]">
-                <Label htmlFor="description">Short Description</Label>
+                <Label htmlFor="description">Short Description <span className='text-red-500'>*</span></Label>
                 <Textarea
                   id="description"
                   value={articleForm.description}
-                  onChange={(e) => setArticleForm(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => {
+                    setArticleForm(prev => ({ ...prev, description: e.target.value }));
+                    if (formErrors.description) {
+                      setFormErrors(prev => ({ ...prev, description: undefined }));
+                    }
+                  }}
                   placeholder="Write a brief description..."
                   rows={3}
                   required
-                  className='mt-[8px] shadow-none border border-border bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#3c83f6] focus-visible:ring-offset-2 focus-visible:outline-none'
+                  className={formErrors.description ? 'border-red-500 mt-[8px] shadow-none border border-border bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#3c83f6] focus-visible:ring-offset-2 focus-visible:outline-none' : 'mt-[8px] shadow-none border border-border bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#3c83f6] focus-visible:ring-offset-2 focus-visible:outline-none'}
                 />
+                {formErrors.description && (
+                  <p className="text-sm text-red-500">{formErrors.description}</p>
+                )}
               </div>
 
               <div className="space-y-2 mt-[20px]" >
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">Category <span className='text-red-500'>*</span></Label>
                 <Select
                   value={articleForm.category}
-                  onValueChange={(value) => setArticleForm(prev => ({ ...prev, category: value }))}
-                
+                  onValueChange={(value) => {
+                    setArticleForm(prev => ({ ...prev, category: value }));
+                    if (formErrors.category) {
+                      setFormErrors(prev => ({ ...prev, category: undefined }));
+                    }
+                  }}
                 >
                   <SelectTrigger className='mt-[9px] h-10 shadow-none border border-border bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus:ring-2 focus:ring-[#3c83f6] focus:ring-offset-2 focus:outline-none'>
                     <SelectValue placeholder="Select category" />
@@ -887,10 +1065,13 @@ export function ArticleList() {
                       ))}
                   </SelectContent>
                 </Select>
+                {formErrors.category && (
+                  <p className="text-sm text-red-500">{formErrors.category}</p>
+                )}
               </div>
 
               <div className="space-y-2 mt-[20px]">
-              <Label>Supported Moods</Label>
+              <Label>Supported Moods <span className='text-red-500'>*</span></Label>
               <Popover open={isMoodPopoverOpen} onOpenChange={setIsMoodPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -923,22 +1104,26 @@ export function ArticleList() {
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-2 mt-1 border bg-white shadow-xl rounded-[6px]" align="start">
                   <div className="space-y-2">
-                    {articleMoods.map((mood) => (
+                    {moods.map((mood) => (
                       <div
-                        key={mood}
+                        key={mood.id}
                         className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-200"
                         onClick={() => {
-                          if (articleForm.supportedMoods.includes(mood)) {
-                            setArticleForm(prev => ({ ...prev, supportedMoods: prev.supportedMoods.filter(m => m !== mood) }));
+                          if (articleForm.supportedMoods.includes(mood.name)) {
+                            setArticleForm(prev => ({ ...prev, supportedMoods: prev.supportedMoods.filter(m => m !== mood.name) }));
                           } else {
-                            setArticleForm(prev => ({ ...prev, supportedMoods: [...prev.supportedMoods, mood] }));
+                            setArticleForm(prev => ({ ...prev, supportedMoods: [...prev.supportedMoods, mood.name] }));
+                          }
+                          // Clear mood error when moods are selected
+                          if (formErrors.supportedMoods) {
+                            setFormErrors(prev => ({ ...prev, supportedMoods: undefined }));
                           }
                         }}
                       >
-                        <div className={`h-4 w-4 border rounded flex items-center justify-center ${articleForm.supportedMoods.includes(mood) ? 'bg-primary border-primary' : 'border-input'}`}>
-                          {articleForm.supportedMoods.includes(mood) && <Check className="h-3 w-3 text-primary-foreground" />}
+                        <div className={`h-4 w-4 border rounded flex items-center justify-center ${articleForm.supportedMoods.includes(mood.name) ? 'bg-primary border-primary' : 'border-input'}`}>
+                          {articleForm.supportedMoods.includes(mood.name) && <Check className="h-3 w-3 text-primary-foreground" />}
                         </div>
-                        <span className="text-sm">{mood}</span>
+                        <span className="text-sm">{mood.name}</span>
                       </div>
                     ))}
                     <div className="border-t pt-2 mt-2">
@@ -996,10 +1181,13 @@ export function ArticleList() {
                   </div>
                 </PopoverContent>
               </Popover>
+            {formErrors.supportedMoods && (
+              <p className="text-sm text-red-500">{formErrors.supportedMoods}</p>
+            )}
             </div>
 
               <div className="space-y-2 mt-[20px]">
-              <Label>Goal</Label>
+              <Label>Goal <span className='text-red-500'>*</span></Label>
               <Popover open={isGoalPopoverOpen} onOpenChange={setIsGoalPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -1015,19 +1203,23 @@ export function ArticleList() {
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-2 mt-1 border bg-white shadow-xl rounded-[6px]" align="start">
                   <div className="space-y-2">
-                    {articleGoals.map((goal) => (
+                    {goals.map((goal) => (
                       <div
-                        key={goal}
+                        key={goal.id}
                         className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-200"
                         onClick={() => {
-                          setArticleForm(prev => ({ ...prev, goal }));
+                          setArticleForm(prev => ({ ...prev, goal: goal.name }));
                           setIsGoalPopoverOpen(false);
+                          // Clear goal error when goal is selected
+                          if (formErrors.goal) {
+                            setFormErrors(prev => ({ ...prev, goal: undefined }));
+                          }
                         }}
                       >
-                        <div className={`h-4 w-4 border rounded-full flex items-center justify-center ${articleForm.goal === goal ? 'bg-primary border-primary' : 'border-input'}`}>
-                          {articleForm.goal === goal && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
+                        <div className={`h-4 w-4 border rounded-full flex items-center justify-center ${articleForm.goal === goal.name ? 'bg-primary border-primary' : 'border-input'}`}>
+                          {articleForm.goal === goal.name && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
                         </div>
-                        <span className="text-sm">{goal}</span>
+                        <span className="text-sm">{goal.name}</span>
                       </div>
                     ))}
                     <div className="border-t pt-2 mt-2">
@@ -1085,6 +1277,9 @@ export function ArticleList() {
                   </div>
                 </PopoverContent>
               </Popover>
+            {formErrors.goal && (
+              <p className="text-sm text-red-500">{formErrors.goal}</p>
+            )}
             </div>
 
               {/* <div className="space-y-2">
@@ -1118,12 +1313,20 @@ export function ArticleList() {
           </div>
           
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+            <LoadingButton
+              variant="outline"
+              onClick={() => setIsCreateOpen(false)}
+              loadingText="Cancelling..."
+            >
               Cancel
-            </Button>
-            <Button onClick={handleSaveAndContinue} disabled={loading} className='bg-[#3c83f6] text-white'>
-              {loading ? 'Creating...' : 'Save & Add Content'}
-            </Button>
+            </LoadingButton>
+            <LoadingButton
+              onClick={handleSaveAndContinue}
+              loadingText="Creating..."
+              className='bg-[#3c83f6] text-white'
+            >
+              Save & Add Content
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

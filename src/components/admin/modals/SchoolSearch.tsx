@@ -17,14 +17,15 @@ interface SchoolSearchProps {
   onSchoolSelect: (school: School | null) => void;
   placeholder?: string;
   className?: string;
+  initialSchool?: School | null;
 }
 
-export function SchoolSearch({ onSchoolSelect, placeholder = "Search schools...", className = "" }: SchoolSearchProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+export function SchoolSearch({ onSchoolSelect, placeholder = "Search schools...", className = "", initialSchool }: SchoolSearchProps) {
+  const [searchQuery, setSearchQuery] = useState(initialSchool?.name || '');
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(initialSchool || null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

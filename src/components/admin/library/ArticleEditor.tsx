@@ -23,6 +23,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getAuthHeaders } from "@/src/utils/session.util";
+import { useAdminLoading } from "@/src/contexts/AdminLoadingContext";
+import { AdminLoader } from "@/src/components/admin/ui/AdminLoader";
 
 type BlockType = "section" | "bullet-list" | "image" | "key-takeaways" | "spacer" | "reflection" | "link";
 
@@ -118,6 +120,7 @@ export default function ArticleEditor({ articleId }: ArticleEditorProps) {
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const { executeWithLoading } = useAdminLoading();
 
   // Load article data and blocks
   const loadArticleData = async () => {
@@ -946,10 +949,7 @@ export default function ArticleEditor({ articleId }: ArticleEditorProps) {
       <div className="flex-1 overflow-auto animate-fade-in">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading article content...</p>
-            </div>
+            <AdminLoader message="Loading article content..." />
           </div>
         ) : (
           /* Live Template Editor - Mirrors Student UI */

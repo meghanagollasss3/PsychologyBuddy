@@ -28,10 +28,8 @@ export const PATCH = withPermission({
     return Response.json(school);
   } catch (error) {
     console.error('Update school error:', error);
-    return Response.json(
-      { success: false, message: 'Internal server error' },
-      { status: 500 }
-    );
+    const errorResponse = handleError(error);
+    return Response.json(errorResponse, { status: errorResponse.error?.code || 500 });
   }
 });
 

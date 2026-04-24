@@ -15,12 +15,12 @@ This document contains all the hex color codes used in this project.
 ### Secondary Colors 
 - **Secondary**: `#F1F5F9` (Light gray)
 - **Secondary Foreground**: `#1E293B` (Dark text)
-
+ 
 ### Status Colors
 - **Success**: `#10B981` (Green)
 - **Success Foreground**: `#FFFFFF` (White)
 - **Warning**: `#F59E0B` (Orange)
-- **Warning Foreground**: `#FFFFFF` (White)
+- **Warning Foreground**: `#FFFFFF` (White) 
 - **Info**: `#3B82F6` (Blue)
 - **Info Foreground**: `#FFFFFF` (White)
 - **Destructive**: `#EF4444` (Red)

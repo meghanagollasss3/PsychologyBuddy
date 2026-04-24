@@ -5,6 +5,8 @@ import { AlertTriangle, ArrowRight, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 interface Alert {
   id: string;
@@ -25,15 +27,32 @@ const priorityStyles = {
 export function AlertsOverview() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const { selectedSchoolId, isSuperAdmin } = useSchoolFilter();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchAlerts();
-  }, []);
+  }, [selectedSchoolId]);
 
   const fetchAlerts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/alerts');
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      
+      // Add school filter if applicable
+      if (isSuperAdmin && selectedSchoolId && selectedSchoolId !== 'all') {
+        params.append('schoolId', selectedSchoolId);
+        console.log('AlertsOverview: Adding schoolId', selectedSchoolId);
+      } else if (!isSuperAdmin && user?.school?.id) {
+        // For Admins, we should pass their schoolId too
+        const adminSchoolId = user?.school?.id;
+        params.append('schoolId', adminSchoolId);
+        console.log('AlertsOverview: Adding admin schoolId', adminSchoolId);
+      }
+
+      const response = await fetch(`/api/admin/alerts?${params.toString()}`);
       const result = await response.json();
       
       console.log('Alerts API Response:', result); // Debug logging

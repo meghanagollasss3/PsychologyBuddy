@@ -7,7 +7,7 @@ import { debounce } from "lodash";
 
 import {
   Users, Plus, Search, Filter, Eye, Edit, Trash2, RotateCcw,
-  MoreVertical,
+  MoreVertical, X,
 } from "lucide-react";
 
 import { AdminHeader } from "@/src/components/admin/layout/AdminHeader";
@@ -15,6 +15,7 @@ import { useSchoolFilter } from "@/src/contexts/SchoolFilterContext";
 import { usePermissions } from "@/src/hooks/usePermissions";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
+import { useAdminLoading, AdminActions } from "@/src/contexts/AdminLoadingContext";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/src/utils/date.util";
+import { LoadingButton } from "@/src/components/admin/ui/AdminLoader";
 
 import { AddStudentModal } from "../modals/AddStudentModal";
 import { EditStudentModal } from "../modals/EditStudentModal";
@@ -148,18 +150,18 @@ const StudentRow = React.memo(function StudentRow({
   return (
     <TableRow className="hover:bg-muted/30">
       <TableCell>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-6">
           <Avatar className="h-9 w-9">
             <AvatarImage src={student.studentProfile?.profileImage || ""} />
-            <AvatarFallback>
+            <AvatarFallback className="font-base bg-[#3B82F6]/10 text-[#3B82F6]">
               {student.firstName[0]}
               {student.lastName[0]}
             </AvatarFallback>
           </Avatar>
           <div>
             <p className="font-medium">{student.firstName} {student.lastName}</p>
-            <p className="text-xs text-muted-foreground">{student.email}</p>
-            <p className="text-xs text-muted-foreground">{student.studentId}</p>
+            {/* <p className="text-xs text-muted-foreground">{student.email}</p> */}
+            <p className="text-xs text-[#94A3B8]">{student.studentId}</p>
           </div>
         </div>
       </TableCell>
@@ -234,8 +236,9 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const [locations, setLocations] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch] = useState(() => debounce((v) => setSearch(v), 300));
-  const limit = 5;
+  const limit = 10;
 
   // Check if user should see location filter
   // Only SCHOOL_SUPERADMIN should see location filter (ADMIN users are auto-restricted to their assigned locations)
@@ -317,13 +320,12 @@ export default function StudentsPage() {
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [studentToArchive, setStudentToArchive] = useState<Student | null>(null);
-  const [isArchiving, setIsArchiving] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [studentToRestore, setStudentToRestore] = useState<Student | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { executeWithLoading } = useAdminLoading();
 
   const handleAddStudent = () => {
     setShowAdd(true);
@@ -342,35 +344,40 @@ export default function StudentsPage() {
   const confirmRestore = async () => {
     if (!studentToRestore) return;
     
-    setIsRestoring(true);
     try {
-      const response = await fetch(`/api/students/${studentToRestore.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'ACTIVE' })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        toast({
-          title: "Student restored successfully",
-          description: `${studentToRestore.firstName} ${studentToRestore.lastName} has been restored to active status.`
-        });
-        
-        // Refresh the student list
-        queryClient.invalidateQueries({ queryKey: ['students'] });
-        
-        setShowRestoreDialog(false);
-        setStudentToRestore(null);
-      } else {
-        toast({
-          title: "Failed to restore student",
-          description: data.message || "An error occurred while restoring the student.",
-          variant: "destructive"
-        });
-      }
+      await executeWithLoading(
+        AdminActions.RESTORE_STUDENT,
+        (async () => {
+          const response = await fetch(`/api/students/${studentToRestore.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ status: 'ACTIVE' })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            toast({
+              title: "Student restored successfully",
+              description: `${studentToRestore.firstName} ${studentToRestore.lastName} has been restored to active status.`
+            });
+            
+            // Refresh the student list
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            
+            setShowRestoreDialog(false);
+            setStudentToRestore(null);
+          } else {
+            toast({
+              title: "Failed to restore student",
+              description: data.message || "An error occurred while restoring the student.",
+              variant: "destructive"
+            });
+          }
+        })(),
+        'Restoring student...'
+      );
     } catch (error) {
       console.error('Restore student error:', error);
       toast({
@@ -378,41 +385,44 @@ export default function StudentsPage() {
         description: "Network error occurred. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setIsRestoring(false);
     }
   };
 
   const confirmArchive = async () => {
     if (!studentToArchive) return;
     
-    setIsArchiving(true);
     try {
-      const response = await fetch(`/api/students/${studentToArchive.id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        toast({
-          title: "Student deleted successfully",
-          description: `${studentToArchive.firstName} ${studentToArchive.lastName} has been permanently deleted from the system.`
-        });
-        
-        // Refresh the student list
-        queryClient.invalidateQueries({ queryKey: ['students'] });
-        
-        setShowArchiveDialog(false);
-        setStudentToArchive(null);
-      } else {
-        toast({
-          title: "Failed to delete student",
-          description: data.message || "An error occurred while deleting the student.",
-          variant: "destructive"
-        });
-      }
+      await executeWithLoading(
+        AdminActions.DELETE_STUDENT,
+        (async () => {
+          const response = await fetch(`/api/students/${studentToArchive.id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            toast({
+              title: "Student deleted successfully",
+              description: `${studentToArchive.firstName} ${studentToArchive.lastName} has been permanently deleted from the system.`
+            });
+            
+            // Refresh the student list
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            
+            setShowArchiveDialog(false);
+            setStudentToArchive(null);
+          } else {
+            toast({
+              title: "Failed to delete student",
+              description: data.message || "An error occurred while deleting the student.",
+              variant: "destructive"
+            });
+          }
+        })(),
+        'Deleting student...'
+      );
     } catch (error) {
       console.error('Delete student error:', error);
       toast({
@@ -420,8 +430,6 @@ export default function StudentsPage() {
         description: "Network error occurred. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setIsArchiving(false);
     }
   };
 
@@ -452,13 +460,31 @@ export default function StudentsPage() {
           <div className="relative flex-1 min-w-[240px]">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              className="pl-10"
+              className="pl-10 pr-10"
               placeholder="Search students..."
+              value={searchInput}
               onChange={(e) => {
-                debouncedSearch(e.target.value);
+                const value = e.target.value;
+                setSearchInput(value);
+                debouncedSearch(value);
                 setPage(1); // Reset page when searching
               }}
             />
+            {searchInput && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1 h-8 w-8 p-0 hover:bg-muted"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearch("");
+                  setPage(1); // Reset page when clearing
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
           {/* STATUS FILTER */}
@@ -579,6 +605,11 @@ export default function StudentsPage() {
           onClose={() => setShowAdd(false)}
           onSuccess={() => {
             setShowAdd(false);
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            toast({
+              title: "Student Added Successfully",
+              description: "The new student has been added to the system."
+            });
           } }
           schools={schools} classes={[]}        />
       )}
@@ -587,7 +618,14 @@ export default function StudentsPage() {
         <EditStudentModal
           student={currentStudent}
           onClose={() => setShowEdit(false)}
-          onSuccess={() => setShowEdit(false)} schools={[]} classes={[]}        />
+          onSuccess={() => {
+            setShowEdit(false);
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            toast({
+              title: "Student Updated Successfully",
+              description: "The student's information has been updated."
+            });
+          } } schools={[]} classes={[]}        />
       )}
 
       {/* Delete Confirmation Dialog */}
@@ -602,15 +640,14 @@ export default function StudentsPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isArchiving}>
+              <AlertDialogCancel>
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmArchive}
-                disabled={isArchiving}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-[#EF4444] text-[#FFFFFF] hover:bg-[#EF4444]/90"
               >
-                {isArchiving ? "Deleting..." : "Delete Student"}
+                Delete Student
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -629,15 +666,14 @@ export default function StudentsPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isRestoring}>
+              <AlertDialogCancel>
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmRestore}
-                disabled={isRestoring}
                 className="bg-green-600 text-white hover:bg-green-700"
               >
-                {isRestoring ? "Restoring..." : "Restore Student"}
+                Restore Student
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

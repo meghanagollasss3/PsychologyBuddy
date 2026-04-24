@@ -18,6 +18,26 @@ export class StudentService {
         throw AuthError.notFound('Student not found');
       }
 
+      // Check if email already exists for another student
+      if (validatedData.email && validatedData.email !== existingStudent.email) {
+        const existingEmail = await prisma.user.findUnique({
+          where: { email: validatedData.email }
+        });
+        if (existingEmail && existingEmail.id !== id) {
+          throw AuthError.conflict('Student with this email already exists');
+        }
+      }
+
+      // Check if phone already exists for another student
+      if (validatedData.phone && validatedData.phone !== existingStudent.phone) {
+        const existingPhone = await prisma.user.findFirst({
+          where: { phone: validatedData.phone }
+        });
+        if (existingPhone && existingPhone.id !== id) {
+          throw AuthError.conflict('Student with this phone number already exists');
+        }
+      }
+
       // Update student data in User table and StudentProfile
       const updatedStudent = await StudentRepository.updateStudent(id, validatedData);
 
@@ -29,29 +49,61 @@ export class StudentService {
   // Create student (Admin only)
   static async createStudent(data: CreateStudentData, creatorId: string, schoolId: string) {
     try {
-      // Auto-generate studentId if not provided
-      let studentId = data.studentId;
-      if (!studentId) {
-        const generatedIdResult = await StudentRepository.generateUniqueStudentId(schoolId, data.classId);
-        studentId = generatedIdResult;
-      }
-
       // Use provided schoolId from parameter
       const finalSchoolId = schoolId;
 
-      // Check if student with this ID already exists in the same school
-      const existingStudent = await StudentRepository.findStudentByStudentId(studentId);
-      if (existingStudent && existingStudent.schoolId === finalSchoolId) {
-        throw AuthError.conflict('Student with this ID already exists');
+      // Always auto-generate unique student ID for guaranteed uniqueness
+      const generatedStudentId = await StudentRepository.generateUniqueStudentId(finalSchoolId, data.classId || '');
+
+      // Comprehensive validation: Double-check uniqueness with character-by-character comparison
+      const existingStudent = await StudentRepository.findStudentByStudentId(generatedStudentId);
+      if (existingStudent) {
+        console.error(`Critical error: Generated student ID ${generatedStudentId} already exists!`);
+        throw new Error(`System error: Student ID collision detected. Please try again.`);
+      }
+
+      // Additional validation: Ensure no case-insensitive duplicates
+      const allStudents = await prisma.user.findMany({
+        where: {
+          role: {
+            name: 'STUDENT',
+          },
+          studentId: {
+            not: null,
+          },
+        },
+        select: {
+          studentId: true,
+        },
+      });
+
+      // Character-by-character exact comparison
+      const hasExactMatch = allStudents.some(student => 
+        student.studentId === generatedStudentId
+      );
+
+      if (hasExactMatch) {
+        console.error(`Critical error: Exact character match found for generated student ID: ${generatedStudentId}`);
+        throw new Error(`System error: Student ID collision detected. Please try again.`);
       }
 
       // Check if student email already exists (both provided and generated)
-      const emailToCheck = data.email || `${studentId.toLowerCase()}@school.local`;
+      const emailToCheck = data.email || `${generatedStudentId.toLowerCase()}@school.local`;
       const existingEmail = await prisma.user.findUnique({
         where: { email: emailToCheck }
       });
       if (existingEmail) {
         throw AuthError.conflict('Student with this email already exists');
+      }
+
+      // Check if student phone already exists
+      if (data.phone) {
+        const existingPhone = await prisma.user.findFirst({
+          where: { phone: data.phone }
+        });
+        if (existingPhone) {
+          throw AuthError.conflict('Student with this phone number already exists');
+        }
       }
 
       // Get student role
@@ -72,7 +124,7 @@ export class StudentService {
       // Create student with profile
       const student = await StudentRepository.createStudent({
         ...data,
-        studentId,
+        studentId: generatedStudentId,
         password: hashedPassword,
         roleId: studentRole.id,
         schoolId: finalSchoolId,
@@ -137,6 +189,7 @@ export class StudentService {
 
           return {
             ...student,
+            status: student.studentProfile?.status || 'ACTIVE',
             studentProfile: {
               ...student.studentProfile,
               lastMoodCheckin: lastCheckinDate,

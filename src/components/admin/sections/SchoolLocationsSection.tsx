@@ -17,7 +17,9 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
-  ArrowLeft
+  AlertTriangle,
+  ArrowLeft,
+  X
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { AdminHeader } from '@/src/components/admin/layout/AdminHeader';
+import { useAdminLoading, AdminActions } from '@/src/contexts/AdminLoadingContext';
+import { RingSpinner } from '@/src/components/ui/Spinners';
 
 interface SchoolLocation {
   id: string;
@@ -83,6 +87,7 @@ export default function SchoolLocationsSection() {
   const { user } = useAuth();
   const permissions = usePermissions();
   const schoolId = searchParams.get('school');
+  const { executeWithLoading } = useAdminLoading();
 
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -92,6 +97,8 @@ export default function SchoolLocationsSection() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -127,30 +134,38 @@ export default function SchoolLocationsSection() {
 
   const loadSchools = async () => {
     try {
-      let apiUrl = '/api/admin/schools/with-locations';
-      
-      // For SCHOOL_SUPERADMIN, only load their school
-      if (user?.role?.name === 'SCHOOL_SUPERADMIN' && user?.school?.id) {
-        apiUrl = `/api/admin/schools/with-locations?schoolId=${user.school.id}`;
-      }
-      
-      const res = await fetch(apiUrl, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      setSchools(data);
-      
-      // Auto-select school based on user role
-      if (!selectedSchool && data.length > 0) {
-        if (user?.role?.name === 'SCHOOL_SUPERADMIN' && user?.school?.id) {
-          // Find the user's school
-          const userSchool = data.find((s: any) => s.id === user.school?.id);
-          setSelectedSchool(userSchool || data[0]);
-        } else {
-          // For other roles, select first school
-          setSelectedSchool(data[0]);
-        }
-      }
+      return await executeWithLoading(
+        AdminActions.FETCH_SCHOOLS,
+        (async () => {
+          let apiUrl = '/api/admin/schools/with-locations';
+          
+          // For SCHOOL_SUPERADMIN, only load their school
+          if (user?.role?.name === 'SCHOOL_SUPERADMIN' && user?.school?.id) {
+            apiUrl = `/api/admin/schools/with-locations?schoolId=${user.school.id}`;
+          }
+          
+          const res = await fetch(apiUrl, {
+            credentials: 'include',
+          });
+          const data = await res.json();
+          setSchools(data);
+          
+          // Auto-select school based on user role
+          if (!selectedSchool && data.length > 0) {
+            if (user?.role?.name === 'SCHOOL_SUPERADMIN' && user?.school?.id) {
+              // Find the user's school
+              const userSchool = data.find((s: any) => s.id === user.school?.id);
+              setSelectedSchool(userSchool || data[0]);
+            } else {
+              // For other roles, select first school
+              setSelectedSchool(data[0]);
+            }
+          }
+          
+          return data;
+        })(),
+        'Loading schools...'
+      );
     } catch (error) {
       toast({
         title: "Error",
@@ -199,39 +214,42 @@ export default function SchoolLocationsSection() {
     if (!selectedSchool) return;
 
     try {
-      const res = await fetch('/api/admin/schools/locations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          schoolId: selectedSchool.id,
-          ...formData,
-        }),
-      });
+      await executeWithLoading(
+        AdminActions.ADD_LOCATION,
+        (async () => {
+          const res = await fetch('/api/admin/schools/locations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              schoolId: selectedSchool.id,
+              ...formData,
+            }),
+          });
 
-      if (res.ok) {
-        toast({
-          title: "Success",
-          description: "Location created successfully",
-        });
-        setShowAddModal(false);
-        resetForm();
-        loadLocations(selectedSchool.id);
-        loadSchools(); // Refresh to show new location count
-      } else {
-        const error = await res.json();
-        toast({
-          title: "Error",
-          description: error.error?.message || "Failed to create location",
-          variant: "destructive",
-        });
-      }
+          if (res.ok) {
+            toast({
+              title: "Success",
+              description: "Location created successfully",
+            });
+            setShowAddModal(false);
+            resetForm();
+            loadLocations(selectedSchool.id);
+            loadSchools(); // Refresh to show new location count
+          } else {
+            const error = await res.json();
+            toast({
+              title: "Error",
+              description: error.error?.message || "Failed to create location",
+              variant: "destructive",
+            });
+            throw new Error(error.error?.message || "Failed to create location");
+          }
+        })(),
+        'Creating location...'
+      );
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Network error occurred",
-        variant: "destructive",
-      });
+      // Error already handled in executeWithLoading
     }
   };
 
@@ -239,71 +257,88 @@ export default function SchoolLocationsSection() {
     if (!selectedLocation || !selectedSchool) return;
 
     try {
-      const res = await fetch(`/api/admin/schools/locations/${selectedLocation.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
+      await executeWithLoading(
+        AdminActions.EDIT_LOCATION,
+        (async () => {
+          const res = await fetch(`/api/admin/schools/locations/${selectedLocation.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(formData),
+          });
 
-      if (res.ok) {
-        toast({
-          title: "Success",
-          description: "Location updated successfully",
-        });
-        setShowEditModal(false);
-        resetForm();
-        loadLocations(selectedSchool.id);
-        loadSchools();
-      } else {
-        const error = await res.json();
-        toast({
-          title: "Error",
-          description: error.error?.message || "Failed to update location",
-          variant: "destructive",
-        });
-      }
+          if (res.ok) {
+            toast({
+              title: "Success",
+              description: "Location updated successfully",
+            });
+            setShowEditModal(false);
+            resetForm();
+            loadLocations(selectedSchool.id);
+            loadSchools();
+          } else {
+            const error = await res.json();
+            toast({
+              title: "Error",
+              description: error.error?.message || "Failed to update location",
+              variant: "destructive",
+            });
+            throw new Error(error.error?.message || "Failed to update location");
+          }
+        })(),
+        'Updating location...'
+      );
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Network error occurred",
-        variant: "destructive",
-      });
+      // Error already handled in executeWithLoading
     }
   };
 
   const handleDeleteLocation = async (locationId: string) => {
-    if (!confirm('Are you sure you want to delete this location? This action cannot be undone.') || !selectedSchool) {
+    if (!selectedSchool) {
+      return;
+    }
+    
+    setLocationToDelete(locationId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteLocation = async () => {
+    if (!locationToDelete || !selectedSchool) {
       return;
     }
 
     try {
-      const res = await fetch(`/api/admin/schools/locations/${locationId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      await executeWithLoading(
+        AdminActions.DELETE_LOCATION,
+        (async () => {
+          const res = await fetch(`/api/admin/schools/locations/${locationToDelete}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          });
 
-      if (res.ok) {
-        toast({
-          title: "Success",
-          description: "Location deleted successfully",
-        });
-        loadLocations(selectedSchool.id);
-        loadSchools();
-      } else {
-        const error = await res.json();
-        toast({
-          title: "Error",
-          description: error.error?.message || "Failed to delete location",
-          variant: "destructive",
-        });
-      }
+          if (res.ok) {
+            toast({
+              title: "Success",
+              description: "Location deleted successfully",
+            });
+            loadLocations(selectedSchool.id);
+            loadSchools();
+            setShowDeleteModal(false);
+            setLocationToDelete(null);
+          } else {
+            const error = await res.json();
+            toast({
+              title: "Error",
+              description: error.error?.message || "Failed to delete location",
+              variant: "destructive",
+            });
+            throw new Error(error.error?.message || "Failed to delete location");
+          }
+        })(),
+        'Deleting location...'
+      );
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Network error occurred",
-        variant: "destructive",
-      });
+      // Error already handled in executeWithLoading
     }
   };
 
@@ -339,7 +374,7 @@ export default function SchoolLocationsSection() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <RingSpinner size="md" color="blue" />
           <p className="mt-2 text-gray-600">Loading locations...</p>
         </div>
       </div>
@@ -472,70 +507,115 @@ export default function SchoolLocationsSection() {
       )}
 
       {/* Add Location Modal */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={showAddModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowAddModal(false);
+        }
+      }}>
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <DialogHeader>
             <DialogTitle>Add New Location</DialogTitle>
           </DialogHeader>
+
           <div className="space-y-4">
             <div>
-              <Label htmlFor="name">Location Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Main Campus, Downtown Branch"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Location Name *
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter location name (e.g., Main Campus)"
+                  className="pl-10"
+                />
+              </div>
             </div>
+
             <div>
-              <Label htmlFor="address">Address</Label>
-              <Input
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Address *
+              </label>
+              <Textarea
                 id="address"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Street address"
+                placeholder="Enter complete address"
+                rows={2}
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="city">City</Label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  City
+                </label>
                 <Input
                   id="city"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="City"
+                  placeholder="Enter city"
                 />
               </div>
+
               <div>
-                <Label htmlFor="state">State</Label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  State
+                </label>
                 <Input
                   id="state"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  placeholder="State"
+                  placeholder="Enter state"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="postalCode">Postal Code</Label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country
+                </label>
+                <Input
+                  id="country"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  placeholder="Enter country"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Postal Code
+                </label>
                 <Input
                   id="postalCode"
                   value={formData.postalCode}
-                  onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-                  placeholder="ZIP/Postal"
+                  onChange={(e) => {
+                    // Only allow numeric input
+                    const numericValue = e.target.value.replace(/\D/g, '');
+                    // Limit to reasonable length (10 digits for most postal codes)
+                    setFormData({ ...formData, postalCode: numericValue.slice(0, 10) });
+                  }}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={10}
+                  placeholder="Enter postal code (numbers only)"
                 />
               </div>
             </div>
+
             <div>
-              <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                placeholder="Country"
-              />
-            </div>
-            <div>
-              <Label htmlFor="notes">Notes</Label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notes
+              </label>
               <Textarea
                 id="notes"
                 value={formData.notes}
@@ -544,6 +624,7 @@ export default function SchoolLocationsSection() {
                 rows={3}
               />
             </div>
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="isMain"
@@ -552,11 +633,12 @@ export default function SchoolLocationsSection() {
               />
               <Label htmlFor="isMain">Mark as main location</Label>
             </div>
+
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setShowAddModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddLocation} disabled={!formData.name.trim()}>
+              <Button onClick={handleAddLocation} disabled={!formData.name.trim() || !formData.address.trim()}>
                 Add Location
               </Button>
             </div>
@@ -565,70 +647,120 @@ export default function SchoolLocationsSection() {
       </Dialog>
 
       {/* Edit Location Modal */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={showEditModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowEditModal(false);
+        }
+      }}>
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <DialogHeader>
             <DialogTitle>Edit Location</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-name">Location Name *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Main Campus, Downtown Branch"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Location Name *
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter location name (e.g., Main Campus)"
+                  className={`pl-10 ${!formData.name.trim() ? 'border-red-300 focus:border-red-500' : ''}`}
+                  required
+                />
+              </div>
+              {!formData.name.trim() && (
+                <p className="text-sm text-red-600 mt-1">Location name is required</p>
+              )}
             </div>
             <div>
-              <Label htmlFor="edit-address">Address</Label>
-              <Input
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Address *
+              </label>
+              <Textarea
                 id="edit-address"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Street address"
+                placeholder="Enter complete address"
+                rows={2}
+                className={`${!formData.address.trim() ? 'border-red-300 focus:border-red-500' : ''}`}
+                required
               />
+              {!formData.address.trim() && (
+                <p className="text-sm text-red-600 mt-1">Address is required</p>
+              )}
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="edit-city">City</Label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  City
+                </label>
                 <Input
                   id="edit-city"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="City"
+                  placeholder="Enter city"
                 />
               </div>
+
               <div>
-                <Label htmlFor="edit-state">State</Label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  State
+                </label>
                 <Input
                   id="edit-state"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  placeholder="State"
+                  placeholder="Enter state"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="edit-postalCode">Postal Code</Label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country
+                </label>
+                <Input
+                  id="edit-country"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  placeholder="Enter country"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Postal Code
+                </label>
                 <Input
                   id="edit-postalCode"
                   value={formData.postalCode}
-                  onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-                  placeholder="ZIP/Postal"
+                  onChange={(e) => {
+                    // Only allow numeric input
+                    const numericValue = e.target.value.replace(/\D/g, '');
+                    // Limit to reasonable length (10 digits for most postal codes)
+                    setFormData({ ...formData, postalCode: numericValue.slice(0, 10) });
+                  }}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={10}
+                  placeholder="Enter postal code (numbers only)"
                 />
               </div>
             </div>
             <div>
-              <Label htmlFor="edit-country">Country</Label>
-              <Input
-                id="edit-country"
-                value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                placeholder="Country"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-notes">Notes</Label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notes
+              </label>
               <Textarea
                 id="edit-notes"
                 value={formData.notes}
@@ -649,7 +781,7 @@ export default function SchoolLocationsSection() {
               <Button variant="outline" onClick={() => setShowEditModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleUpdateLocation} disabled={!formData.name.trim()}>
+              <Button onClick={handleUpdateLocation} disabled={!formData.name.trim() || !formData.address.trim()}>
                 Update Location
               </Button>
             </div>
@@ -658,10 +790,28 @@ export default function SchoolLocationsSection() {
       </Dialog>
 
       {/* Location Details Modal */}
-      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={showDetailsModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowDetailsModal(false);
+        }
+      }}>
+        <DialogContent 
+          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <DialogHeader>
-            <DialogTitle>Location Details</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Location Details</DialogTitle>
+              {/* <button
+                onClick={() => setShowDetailsModal(false)}
+                className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button> */}
+            </div>
           </DialogHeader>
           {selectedLocation ? (
             <div className="space-y-6">
@@ -785,6 +935,69 @@ export default function SchoolLocationsSection() {
               <p className="mt-2 text-gray-600">Loading location details...</p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowDeleteModal(false);
+          setLocationToDelete(null);
+        }
+      }}>
+        <DialogContent 
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader>
+            <DialogTitle>Confirm Delete Location</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
+              <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-900">
+                  Are you sure you want to delete this location?
+                </p>
+                <p className="text-sm text-red-700 mt-1">
+                  This action cannot be undone and will permanently remove the location from the system.
+                </p>
+              </div>
+            </div>
+
+            {(() => {
+              const location = locations.find(loc => loc.id === locationToDelete);
+              return location ? (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900">{location.name}</p>
+                  {location.address && (
+                    <p className="text-xs text-gray-600 mt-1">{location.address}</p>
+                  )}
+                </div>
+              ) : null;
+            })()}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setLocationToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmDeleteLocation}
+              >
+                Delete Location
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
